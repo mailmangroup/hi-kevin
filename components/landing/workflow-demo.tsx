@@ -73,15 +73,15 @@ export function WorkflowDemo() {
 
         <div className="grid gap-12 max-w-6xl mx-auto">
           {/* Header Row */}
-          <div className="grid md:grid-cols-[180px_1.2fr_1fr] gap-8 items-center text-sm font-bold tracking-wider text-slate-700 uppercase px-4 hidden md:grid">
-            <div className="text-right">Time</div>
-            <div className="flex items-center gap-2">
+          <div className="grid md:grid-cols-[180px_1.2fr_1fr] gap-8 items-center hidden md:grid">
+            <div className="text-right text-sm font-bold tracking-wider text-slate-700 uppercase">Time</div>
+            <div className="flex items-center gap-2 bg-white/60 backdrop-blur-sm rounded-xl px-6 py-4 border border-red-200/50">
               <AlertCircle className="w-4 h-4 text-red-500" />
-              Manual Workflow
+              <span className="text-sm font-bold tracking-wider text-slate-700 uppercase">Manual Workflow</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-white/60 backdrop-blur-sm rounded-xl px-6 py-4 border border-green-200/50">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
-              With Kevin
+              <span className="text-sm font-bold tracking-wider text-slate-700 uppercase">With Kevin</span>
             </div>
           </div>
 
@@ -134,14 +134,14 @@ export function WorkflowDemo() {
                 <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent pointer-events-none"></div>
 
                 <div className="flex flex-col h-full relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-start justify-between mb-4 gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center shrink-0 border border-green-300 shadow-sm">
                         <MessageSquare className="w-6 h-6 text-green-600" />
                       </div>
-                      <h4 className="font-bold text-slate-900 text-lg">{scenario.kevinWay.agent}</h4>
+                      <h4 className="font-bold text-slate-900 text-lg leading-tight">{scenario.kevinWay.agent}</h4>
                     </div>
-                    <Badge className="bg-green-600 text-white hover:bg-green-700 border-0 shadow-sm">AI Active</Badge>
+                    <Badge className="bg-green-600 text-white hover:bg-green-700 border-0 shadow-sm shrink-0 mt-1">AI Active</Badge>
                   </div>
 
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-5 mb-6 text-slate-700 text-sm border border-green-200/50 leading-relaxed shadow-sm flex-grow">
