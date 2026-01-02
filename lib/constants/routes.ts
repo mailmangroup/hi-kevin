@@ -1,0 +1,16 @@
+export const ROUTES = {
+  dashboard: '/dashboard',
+  content: '/dashboard/content',
+  contentDraft: (id: string) => `/dashboard/content/${id}`,
+  contentLocalize: '/dashboard/content/localize',
+  leads: '/dashboard/leads',
+  leadDetail: (id: string) => `/dashboard/leads/${id}`,
+  analytics: '/dashboard/analytics',
+  analyticsReports: '/dashboard/analytics/reports',
+  research: '/dashboard/research',
+  researchKols: '/dashboard/research/kols',
+  campaigns: '/dashboard/campaigns',
+  campaignDetail: (id: string) => `/dashboard/campaigns/${id}`,
+  brandSafety: '/dashboard/brand-safety',
+  settings: '/dashboard/settings',
+} as const
