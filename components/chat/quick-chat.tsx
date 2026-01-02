@@ -57,7 +57,7 @@ export function QuickChat() {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: getAIResponse(input),
+        content: getAIResponse(input, pathname),
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiMessage])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import Link from "next/link"
 
 type TabType = "competitors" | "kols" | "trends"
 
-export default function ResearchPage() {
+function ResearchPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>("competitors")
@@ -214,6 +214,14 @@ function TrendsTab() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function ResearchPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <ResearchPageContent />
+    </Suspense>
   )
 }
 

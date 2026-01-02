@@ -20,7 +20,7 @@ export function TrustSection() {
               <Shield className="w-8 h-8" />
             </div>
             <h3 className="font-bold text-xl mb-3 text-slate-900">Brand Safe</h3>
-            <p className="text-slate-600 leading-relaxed">Kevin never publishes without your final 'Go' signal on critical tasks.</p>
+            <p className="text-slate-600 leading-relaxed">Kevin never publishes without your final &apos;Go&apos; signal on critical tasks.</p>
           </div>
           <div className="bg-white p-10 rounded-2xl shadow-sm border border-slate-100 text-center hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 group">
             <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-purple-600 group-hover:scale-110 transition-transform duration-300">

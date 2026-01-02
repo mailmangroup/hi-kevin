@@ -137,7 +137,7 @@ export function AgentMatrix() {
             transition={{ delay: 0.2 }}
             className="text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed"
           >
-            The <strong className="text-slate-900">10 Core Functions</strong> you just saw? Kevin's 6 specialized agents work together to handle them all—automating execution so you can focus on strategy.
+            The <strong className="text-slate-900">10 Core Functions</strong> you just saw? Kevin&apos;s 6 specialized agents work together to handle them all—automating execution so you can focus on strategy.
           </motion.p>
         </div>
 

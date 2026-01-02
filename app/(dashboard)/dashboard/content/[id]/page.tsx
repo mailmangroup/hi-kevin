@@ -61,10 +61,6 @@ export default function ContentDetailPage() {
   const [content, setContent] = useState<ContentItem | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadContent()
-  }, [contentId])
-
   const loadContent = async () => {
     setLoading(true)
     try {
@@ -76,6 +72,11 @@ export default function ContentDetailPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadContent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentId])
 
   if (loading) {
     return (

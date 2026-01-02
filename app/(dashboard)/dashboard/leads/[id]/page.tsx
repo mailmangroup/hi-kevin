@@ -31,10 +31,6 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadLead()
-  }, [leadId])
-
   const loadLead = async () => {
     setLoading(true)
     try {
@@ -46,6 +42,11 @@ export default function LeadDetailPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadLead()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId])
 
   if (loading) {
     return (

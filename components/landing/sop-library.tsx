@@ -29,8 +29,8 @@ export function SopLibrary() {
               Pre-Trained on <span className="text-blue-600">Elite Marketing SOPs</span>.
             </h2>
             <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-              Kevin isn't just a generic LLM; he comes installed with the workflows of a Fortune 500 team.
-              We've codified best practices into executable agents.
+              Kevin isn&apos;t just a generic LLM; he comes installed with the workflows of a Fortune 500 team.
+              We&apos;ve codified best practices into executable agents.
             </p>
 
             <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-200/60 shadow-sm relative overflow-hidden">
@@ -59,7 +59,7 @@ export function SopLibrary() {
 
               <h3 className="text-2xl font-bold mb-2 relative z-10">Want to see the logic?</h3>
               <p className="text-slate-300 mb-8 relative z-10">
-                Download the full "Marketing Operations Manual" that powers Kevin's brain.
+                Download the full &quot;Marketing Operations Manual&quot; that powers Kevin&apos;s brain.
               </p>
 
               <div className="relative z-10 bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 mb-8">

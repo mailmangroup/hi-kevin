@@ -240,7 +240,7 @@ export function MarketingFunctions() {
             transition={{ delay: 0.2 }}
             className="text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed"
           >
-            A mature marketing function isn't just "posting on social." It requires managing these <strong className="text-slate-900">10 Core Functions</strong> simultaneously.
+            A mature marketing function isn&apos;t just &quot;posting on social.&quot; It requires managing these <strong className="text-slate-900">10 Core Functions</strong> simultaneously.
           </motion.p>
         </div>
 

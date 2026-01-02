@@ -162,7 +162,7 @@ export function HeroSection() {
                   </div>
                   <div className="space-y-4 max-w-[90%]">
                     <div className="bg-primary/5 backdrop-blur-sm rounded-2xl rounded-tr-none p-4 border border-primary/10 shadow-xl">
-                      <p className="text-slate-200 text-sm mb-3 leading-relaxed">I'm on it. I've analyzed our competitor's recent moves and drafted the following assets for your approval:</p>
+                      <p className="text-slate-200 text-sm mb-3 leading-relaxed">I&apos;m on it. I&apos;ve analyzed our competitor&apos;s recent moves and drafted the following assets for your approval:</p>
 
                       <div className="space-y-2">
                         {/* Task Item 1 */}
