@@ -1,10 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { Send, User, Bot, Paperclip, Brain, Globe, Share2, Plus } from "lucide-react"
+import { Send, User, Bot, Paperclip, Brain, Globe } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
-import { AIThinking } from "@/components/ui/loading"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -15,6 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ChevronDown, ChevronRight, CheckCircle2, Loader2, Terminal } from "lucide-react"
+
+interface ToolCall {
+  id: string
+  name: string
+  input: any
+  output?: any
+  state: 'running' | 'completed' | 'failed'
+}
 
 interface Message {
   id: string
@@ -25,9 +33,59 @@ interface Message {
     type: "chart" | "code" | "table"
     data: any
   }
+  toolCalls?: ToolCall[]
   isStreaming?: boolean
   followUpQuestions?: string[]
 }
+
+function ToolCallItem({ tool }: { tool: ToolCall }) {
+  const [isOpen, setIsOpen] = React.useState(false)
+
+  return (
+    <div className="mb-2 rounded-lg border border-border bg-gray-50/50 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-gray-100/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 flex-1">
+          {tool.state === 'running' ? (
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          ) : (
+            <CheckCircle2 className="h-3 w-3 text-green-600" />
+          )}
+          <span className="font-medium text-gray-700">
+            {tool.state === 'running' ? 'Using' : 'Used'} {tool.name}
+          </span>
+        </div>
+        {isOpen ? (
+          <ChevronDown className="h-3 w-3 text-gray-400" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-gray-400" />
+        )}
+      </button>
+      
+      {isOpen && (
+        <div className="border-t border-border px-3 py-2 space-y-2 bg-white">
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Input</div>
+            <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600">
+              {typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2)}
+            </pre>
+          </div>
+          {tool.output && (
+            <div>
+              <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Output</div>
+              <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600">
+                {typeof tool.output === 'string' ? tool.output : JSON.stringify(tool.output, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 interface ChatInterfaceProps {
   initialMessage?: string
@@ -204,24 +262,50 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
           }
 
           if (chunk.tool_start) {
-              // Maybe show "Using tool: ..."
+              const toolName = chunk.tool_start.tool || "unknown"
+              const toolInput = chunk.tool_start.input || {}
+              const toolId = Date.now().toString() + Math.random().toString().slice(2)
+              
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? {
+                          ...msg,
+                          toolCalls: [
+                              ...(msg.toolCalls || []),
+                              {
+                                  id: toolId,
+                                  name: toolName,
+                                  input: toolInput,
+                                  state: 'running'
+                              }
+                          ]
+                        }
+                      : msg
+              ))
           }
 
           if (chunk.tool_end) {
-              // Handle artifacts if present
-              if (chunk.tool_end.artifact) {
-                   setMessages((prev) => prev.map(msg =>
-                      msg.id === assistantMsgId
-                          ? {
-                              ...msg,
-                              artifact: {
-                                  type: 'chart', // Simplification, backend should send type
-                                  data: chunk.tool_end.artifact
-                              }
-                            }
-                          : msg
-                  ))
-              }
+              const toolName = chunk.tool_end.tool || "unknown"
+              const toolOutput = chunk.tool_end.output
+              
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? {
+                          ...msg,
+                          toolCalls: (msg.toolCalls || []).map(tc => 
+                              // Update the last running tool with this name
+                              tc.name === toolName && tc.state === 'running'
+                                  ? { ...tc, output: toolOutput, state: 'completed' }
+                                  : tc
+                          ),
+                          // Handle artifacts if present
+                          artifact: chunk.tool_end.artifact ? {
+                              type: 'chart', // Simplification
+                              data: chunk.tool_end.artifact
+                          } : msg.artifact
+                        }
+                      : msg
+              ))
           }
 
           if (chunk.error) {
@@ -293,6 +377,15 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                     : "bg-white text-foreground border border-border rounded-tl-none"
                 )}
               >
+                {/* Tool Calls */}
+                {message.toolCalls && message.toolCalls.length > 0 && (
+                  <div className="mb-3 flex flex-col gap-1">
+                    {message.toolCalls.map((tool) => (
+                      <ToolCallItem key={tool.id} tool={tool} />
+                    ))}
+                  </div>
+                )}
+
                 <div className="whitespace-pre-wrap">{message.content}</div>
                 
                 {/* Artifact Rendering */}
@@ -332,16 +425,6 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
             </div>
           ))}
 
-          {isThinking && (
-             <div className="flex gap-4">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
-                    <Bot className="h-5 w-5" />
-                </div>
-                <div className="bg-white border border-border rounded-2xl rounded-tl-none px-5 py-3">
-                    <AIThinking />
-                </div>
-             </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
