@@ -1,11 +1,14 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -13,7 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
