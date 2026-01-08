@@ -6,17 +6,38 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, Wand2, RefreshCw } from "lucide-react"
 import { AIThinking } from "@/components/ui/loading"
+import { aiService } from "@/lib/api/client"
+import { useToast } from "@/components/ui/toast"
 
 export function AIContentGenerator() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [topic, setTopic] = useState("")
+  const [selectedPlatform, setSelectedPlatform] = useState("xiaohongshu")
+  const [generatedContent, setGeneratedContent] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true)
-    // Mock generation delay
-    setTimeout(() => {
+    setGeneratedContent(null)
+    
+    try {
+      const content = await aiService.generateContent(topic, selectedPlatform)
+      setGeneratedContent(content)
+      toast({
+        title: "Content Generated",
+        description: "Your content has been created successfully.",
+        type: "success",
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Generation Failed",
+        description: "Something went wrong. Please try again.",
+        type: "error",
+      })
+    } finally {
       setIsGenerating(false)
-    }, 3000)
+    }
   }
 
   return (
@@ -43,15 +64,16 @@ export function AIContentGenerator() {
         </div>
 
         <div className="flex gap-2">
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary/5">
-            xiaohongshu
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary/5">
-            douyin
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary/5">
-            weibo
-          </Badge>
+          {['xiaohongshu', 'douyin', 'weibo'].map((platform) => (
+            <Badge 
+              key={platform}
+              variant={selectedPlatform === platform ? "default" : "outline"} 
+              className="cursor-pointer hover:bg-primary/5 capitalize"
+              onClick={() => setSelectedPlatform(platform)}
+            >
+              {platform}
+            </Badge>
+          ))}
         </div>
 
         <div className="pt-2">
@@ -63,14 +85,23 @@ export function AIContentGenerator() {
               </div>
             </div>
           ) : (
-            <Button
-              className="w-full gap-2"
-              onClick={handleGenerate}
-              disabled={!topic}
-            >
-              <Wand2 className="h-4 w-4" />
-              Generate Content
-            </Button>
+            <div className="space-y-4">
+              <Button
+                className="w-full gap-2"
+                onClick={handleGenerate}
+                disabled={!topic}
+              >
+                <Wand2 className="h-4 w-4" />
+                Generate Content
+              </Button>
+              
+              {generatedContent && (
+                 <div className="mt-4 p-4 bg-white rounded-md border border-border">
+                   <h4 className="font-medium mb-2 text-sm text-muted-foreground">Generated Draft:</h4>
+                   <pre className="whitespace-pre-wrap font-sans text-sm">{generatedContent}</pre>
+                 </div>
+              )}
+            </div>
           )}
         </div>
 

@@ -13,12 +13,14 @@ import {
   Shield,
   Settings
 } from "lucide-react"
+import { BetaBadge } from "@/components/ui/beta-badge"
 
 interface NavItem {
   title: string
   href: string
   icon: React.ComponentType<{ className?: string }>
   badge?: number
+  isBeta?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -26,39 +28,46 @@ const navItems: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+    isBeta: true,
   },
   {
     title: "Content",
     href: "/dashboard/content",
     icon: FileText,
     badge: 2,
+    isBeta: true, // Pilot feature
   },
   {
     title: "Leads",
     href: "/dashboard/leads",
     icon: Users,
     badge: 5,
+    isBeta: false,
   },
   {
     title: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart3,
+    isBeta: true,
   },
   {
     title: "Research",
     href: "/dashboard/research",
     icon: Search,
+    isBeta: true,
   },
   {
     title: "Campaigns",
     href: "/dashboard/campaigns",
     icon: Megaphone,
+    isBeta: true,
   },
   {
     title: "Brand Safety",
     href: "/dashboard/brand-safety",
     icon: Shield,
     badge: 1,
+    isBeta: true,
   },
 ]
 
@@ -96,7 +105,10 @@ export function Sidebar({ className }: { className?: string }) {
               )}
             >
               <Icon className="h-5 w-5" />
-              <span className="flex-1">{item.title}</span>
+              <span className="flex-1 flex items-center gap-2">
+                {item.title}
+                {item.isBeta && <BetaBadge />}
+              </span>
               {item.badge && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-semibold text-white">
                   {item.badge}

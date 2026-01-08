@@ -30,10 +30,68 @@ export async function apiCall<T>(
   })
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.statusText}`)
+    let errorData: any = {}
+    try {
+      errorData = await response.json()
+    } catch {
+      errorData = { error: response.statusText }
+    }
+
+    // Handle specific error codes
+    if (errorData.code === 'CREDENTIALS_MISSING' && errorData.redirect && typeof window !== 'undefined') {
+      window.location.href = errorData.redirect
+    }
+
+    // Log detailed error information for debugging
+    console.error('API Error:', {
+      status: response.status,
+      endpoint,
+      errorData
+    })
+
+    const error: any = new Error(errorData.error || errorData.message || response.statusText)
+    error.status = response.status
+    error.code = errorData.code
+    error.redirect = errorData.redirect
+    error.details = errorData
+    throw error
   }
 
   return response.json()
+}
+
+/**
+ * Map user-friendly platform names to backend network keys
+ */
+const PLATFORM_TO_NETWORK_MAP: Record<string, string> = {
+  // Chinese platforms
+  'weibo': 'sweibo',
+  'wechat': 'wechat',
+  'douyin': 'douyin',
+  'kuaishou': 'kuaishou',
+  'bilibili': 'bilibili',
+  'xiaohongshu': 'xhs',
+  'xhs': 'xhs',
+  'red': 'xhs',
+  'wechat channels': 'sph',
+  'channels': 'sph',
+  'sph': 'sph',
+  // International platforms
+  'instagram': 'instagram',
+  'facebook': 'facebook',
+  'x': 'x',
+  'twitter': 'x',
+  'linkedin': 'linkedin',
+  'youtube': 'youtube',
+  'tiktok': 'tiktok',
+}
+
+/**
+ * Convert platform name to backend network key
+ */
+function mapPlatformToNetwork(platform: string): string {
+  const key = platform.toLowerCase().trim()
+  return PLATFORM_TO_NETWORK_MAP[key] || key
 }
 
 /**
@@ -44,17 +102,38 @@ export const aiService = {
   /**
    * Generate content based on brief
    */
-  async generateContent(brief: any, platform: string): Promise<string> {
+  async generateContent(brief: string, platform: string): Promise<string> {
     if (USE_MOCK) {
       // Import mock implementation
       const { generateContentDraft } = await import('@/lib/mock/content')
-      return generateContentDraft(brief, platform)
+      // Construct a mock ContentBrief from the string input
+      const mockBrief = {
+        topic: brief,
+        goal: "Generated from string input",
+        keyPoints: [brief],
+        tone: "Neutral",
+        targetAudience: "General"
+      }
+      return generateContentDraft(mockBrief, platform)
     }
 
-    return apiCall<string>('ai/generate', {
+    // Map to backend schema (ContentGenerationRequest)
+    const payload = {
+      query: brief,
+      network: mapPlatformToNetwork(platform),
+      action: "generate",
+      target_field: "content",
+      original_text: "<title></title><content></content>", // Required structure
+      content_type: "post", // Default
+      // brand_id will be injected by the proxy if not present, or we can fetch it here if we had the user context
+    }
+
+    const response = await apiCall<{ text: string; language: string }>('proxy/content/write', {
       method: 'POST',
-      body: JSON.stringify({ brief, platform }),
+      body: JSON.stringify(payload),
     })
+
+    return response.text
   },
 
   /**
