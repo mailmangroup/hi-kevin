@@ -41,7 +41,7 @@ export interface DashboardData {
  * All endpoints route through /api/proxy/frost/... which:
  * 1. Authenticates user via Supabase
  * 2. Fetches KAWO credentials from profiles table
- * 3. Forwards to backend at http://localhost:8000/frost/...
+ * 3. Forwards to backend API (configured via kawo_api_url in profile or KAWO_API_URL env var)
  * 4. Backend uses HUBSPOT_KEY from its environment
  */
 export const frostService = {
