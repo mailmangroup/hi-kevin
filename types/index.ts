@@ -42,12 +42,6 @@ export interface PlatformConnection {
 
 // ============ Dashboard ============
 export interface DashboardData {
-  stats: {
-    pendingApprovals: number
-    leadsToFollow: number
-    alerts: number
-    scheduledPosts: number
-  }
   suggestions: Suggestion[]
   weeklyPerformance: PerformanceData
 }

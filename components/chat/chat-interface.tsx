@@ -5,7 +5,7 @@ import { Send, User, Bot, Paperclip, Brain, Globe } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   Select,
@@ -14,78 +14,100 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ChevronDown, ChevronRight, CheckCircle2, Loader2, Terminal } from "lucide-react"
-
-interface ToolCall {
-  id: string
-  name: string
-  input: any
-  output?: any
-  state: 'running' | 'completed' | 'failed'
-}
+import { MessageContent } from "./message-content"
+import { ToolCallList, ToolCall } from "./tool-call-display"
 
 interface Message {
   id: string
   role: "user" | "assistant" | "tool"
   content: string
   timestamp: Date
-  artifact?: {
-    type: "chart" | "code" | "table"
-    data: any
-  }
   toolCalls?: ToolCall[]
   isStreaming?: boolean
   followUpQuestions?: string[]
 }
 
-function ToolCallItem({ tool }: { tool: ToolCall }) {
-  const [isOpen, setIsOpen] = React.useState(false)
-
-  return (
-    <div className="mb-2 rounded-lg border border-border bg-gray-50/50 overflow-hidden">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-gray-100/50 transition-colors"
-      >
-        <div className="flex items-center gap-2 flex-1">
-          {tool.state === 'running' ? (
-            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-          ) : (
-            <CheckCircle2 className="h-3 w-3 text-green-600" />
-          )}
-          <span className="font-medium text-gray-700">
-            {tool.state === 'running' ? 'Using' : 'Used'} {tool.name}
-          </span>
-        </div>
-        {isOpen ? (
-          <ChevronDown className="h-3 w-3 text-gray-400" />
-        ) : (
-          <ChevronRight className="h-3 w-3 text-gray-400" />
-        )}
-      </button>
-      
-      {isOpen && (
-        <div className="border-t border-border px-3 py-2 space-y-2 bg-white">
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Input</div>
-            <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600">
-              {typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2)}
-            </pre>
-          </div>
-          {tool.output && (
-            <div>
-              <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Output</div>
-              <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600">
-                {typeof tool.output === 'string' ? tool.output : JSON.stringify(tool.output, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
+interface SubContentItem {
+  type: "tool_input" | "tool_output" | "assistant_message" | "user_message"
+  tool?: string
+  tool_input?: any
+  tool_output?: any
+  artifact?: any
+  content?: string
 }
 
+/**
+ * Parse sub_content_list from database message format to our internal Message format
+ * Maintains sequence order and associates artifacts with their tool calls
+ */
+function parseSubContentList(subContentList: SubContentItem[] | undefined): {
+  toolCalls: ToolCall[]
+  content: string
+} {
+  if (!subContentList || subContentList.length === 0) {
+    return { toolCalls: [], content: "" }
+  }
+
+  const toolCalls: ToolCall[] = []
+  let content = ""
+
+  // Track tool inputs by name to match with outputs (using array to handle multiple calls to same tool)
+  const pendingToolsByName: Map<string, ToolCall[]> = new Map()
+
+  // Process items in order to maintain sequence
+  for (const item of subContentList) {
+    if (item.type === "tool_input" && item.tool) {
+      const toolCall: ToolCall = {
+        id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
+        name: item.tool,
+        input: item.tool_input || {},
+        state: "completed" // Mark as completed since we're loading from history
+      }
+
+      // Track pending tools
+      const pending = pendingToolsByName.get(item.tool) || []
+      pending.push(toolCall)
+      pendingToolsByName.set(item.tool, pending)
+
+      toolCalls.push(toolCall)
+    }
+
+    if (item.type === "tool_output" && item.tool) {
+      // Find the first pending tool with this name that doesn't have output yet
+      const pending = pendingToolsByName.get(item.tool)
+      const pendingTool = pending?.find(t => !t.output)
+
+      if (pendingTool) {
+        pendingTool.output = item.tool_output
+        pendingTool.state = "completed"
+        // Associate artifact with this specific tool call
+        if (item.artifact) {
+          pendingTool.artifact = item.artifact
+        }
+      } else {
+        // Tool output without matching input, create complete tool call
+        toolCalls.push({
+          id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
+          name: item.tool,
+          input: {},
+          output: item.tool_output,
+          artifact: item.artifact,
+          state: "completed"
+        })
+      }
+    }
+
+    if (item.type === "assistant_message" && item.content) {
+      content = item.content
+    }
+
+    if (item.type === "user_message" && item.content) {
+      content = item.content
+    }
+  }
+
+  return { toolCalls, content }
+}
 
 interface ChatInterfaceProps {
   initialMessage?: string
@@ -97,14 +119,14 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
   const [conversationId, setConversationId] = React.useState<string | undefined>(chatId)
+  const [conversationTitle, setConversationTitle] = React.useState<string>("New Conversation")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const initialized = React.useRef(false)
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [credentials, setCredentials] = React.useState<{orgId?: string, brandId?: string}>({})
   const [credentialsLoading, setCredentialsLoading] = React.useState(true)
   const [credentialsError, setCredentialsError] = React.useState<string | null>(null)
-  
+
   // Chat options
   const [thinkingEnabled, setThinkingEnabled] = React.useState(() => {
     const param = searchParams?.get('thinking')
@@ -118,6 +140,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
     return searchParams?.get('model') || "qwen-max"
   })
 
+  // Load credentials and chat history in parallel
   React.useEffect(() => {
     async function loadCredentials() {
       try {
@@ -145,8 +168,16 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
         setCredentialsLoading(false)
       }
     }
+
+    // Load credentials and history in parallel
     loadCredentials()
-  }, [])
+    if (chatId) {
+      setConversationId(chatId)
+      // Load history and title in parallel
+      loadHistory(chatId)
+      loadConversationTitle(chatId)
+    }
+  }, [chatId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -156,24 +187,37 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
     scrollToBottom()
   }, [messages, isThinking])
 
-  // Load history if chatId is present
-  React.useEffect(() => {
-    if (chatId) {
-        setConversationId(chatId)
-        loadHistory(chatId)
-    }
-  }, [chatId])
+  const loadConversationTitle = async (id: string) => {
+      try {
+          const conversation = await aiService.getConversation(id)
+          if (conversation?.title) {
+              setConversationTitle(conversation.title)
+              // Update document title
+              document.title = `${conversation.title} - Kevin`
+              // Notify sidebar to refresh chat history (title may have been generated)
+              window.dispatchEvent(new Event('chat-title-updated'))
+          }
+      } catch (error) {
+          console.error("Failed to load conversation title:", error)
+      }
+  }
 
   const loadHistory = async (id: string) => {
       try {
           const { messages: history } = await aiService.getMessages(id)
-          const formattedMessages: Message[] = history.map((msg: ApiMessage) => ({
-              id: msg.id,
-              role: msg.role,
-              content: msg.content || (msg.role === 'assistant' ? '' : ''), // Ensure content is string
-              timestamp: new Date(msg.created_at),
-              artifact: msg.report ? { type: 'chart', data: msg.report } : undefined
-          }))
+          const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
+              // Parse sub_content_list if available
+              const { toolCalls, content: parsedContent } = parseSubContentList(msg.sub_content_list)
+
+              return {
+                  id: msg.id,
+                  role: msg.role,
+                  // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
+                  content: parsedContent || msg.content || "",
+                  timestamp: new Date(msg.created_at),
+                  toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+              }
+          })
           // Sort by timestamp ascending (oldest first)
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
           setMessages(formattedMessages)
@@ -225,9 +269,10 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
 
     let fullContent = ""
     let followUpQuestions: string[] | undefined
+    let newConversationId: string | undefined
 
     try {
-      const stream = await aiService.chatStream(text, { 
+      const stream = aiService.chatStream(text, {
         conversationId,
         orgId: credentials.orgId,
         brandId: credentials.brandId,
@@ -239,10 +284,10 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
       for await (const chunk of stream) {
           // Handle different event types
           if (chunk.new_conversation) {
-              const newId = chunk.conversation_id
-              setConversationId(newId)
+              newConversationId = chunk.conversation_id
+              setConversationId(newConversationId)
               // Update URL without reloading
-              window.history.replaceState(null, '', `/chat/${newId}`)
+              window.history.replaceState(null, '', `/chat/${newConversationId}`)
 
               // Notify sidebar to refresh chat history
               window.dispatchEvent(new Event('chat-created'))
@@ -263,9 +308,9 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
 
           if (chunk.tool_start) {
               const toolName = chunk.tool_start.tool || "unknown"
-              const toolInput = chunk.tool_start.input || {}
+              const toolInput = chunk.tool_start.tool_input || chunk.tool_start.input || {}
               const toolId = Date.now().toString() + Math.random().toString().slice(2)
-              
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? {
@@ -276,7 +321,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                                   id: toolId,
                                   name: toolName,
                                   input: toolInput,
-                                  state: 'running'
+                                  state: 'running' as const
                               }
                           ]
                         }
@@ -287,22 +332,23 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
           if (chunk.tool_end) {
               const toolName = chunk.tool_end.tool || "unknown"
               const toolOutput = chunk.tool_end.output
-              
+              const toolArtifact = chunk.tool_end.artifact
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? {
                           ...msg,
-                          toolCalls: (msg.toolCalls || []).map(tc => 
+                          toolCalls: (msg.toolCalls || []).map(tc =>
                               // Update the last running tool with this name
                               tc.name === toolName && tc.state === 'running'
-                                  ? { ...tc, output: toolOutput, state: 'completed' }
+                                  ? {
+                                      ...tc,
+                                      output: toolOutput,
+                                      artifact: toolArtifact,
+                                      state: 'completed' as const
+                                    }
                                   : tc
-                          ),
-                          // Handle artifacts if present
-                          artifact: chunk.tool_end.artifact ? {
-                              type: 'chart', // Simplification
-                              data: chunk.tool_end.artifact
-                          } : msg.artifact
+                          )
                         }
                       : msg
               ))
@@ -317,12 +363,12 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
               ))
           }
       }
-      
+
     } catch (error) {
       console.error("Chat error:", error)
-      setMessages((prev) => prev.map(msg => 
-          msg.id === assistantMsgId 
-              ? { ...msg, content: "Sorry, I encountered an error connecting to the server." } 
+      setMessages((prev) => prev.map(msg =>
+          msg.id === assistantMsgId
+              ? { ...msg, content: "Sorry, I encountered an error connecting to the server." }
               : msg
       ))
     } finally {
@@ -333,9 +379,12 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
               : msg
       ))
 
-      // Refresh sidebar list if new conversation
-      if (!chatId && conversationId) {
-          router.refresh()
+      // Fetch conversation title after first message (title is generated by backend)
+      if (newConversationId) {
+          // Small delay to allow backend to generate title
+          setTimeout(() => {
+              loadConversationTitle(newConversationId!)
+          }, 1000)
       }
     }
   }
@@ -379,27 +428,28 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
               >
                 {/* Tool Calls */}
                 {message.toolCalls && message.toolCalls.length > 0 && (
-                  <div className="mb-3 flex flex-col gap-1">
-                    {message.toolCalls.map((tool) => (
-                      <ToolCallItem key={tool.id} tool={tool} />
-                    ))}
+                  <ToolCallList toolCalls={message.toolCalls} />
+                )}
+
+                {/* Message Content with Markdown */}
+                {message.content && (
+                  <MessageContent
+                    content={message.content}
+                    isUser={message.role === "user"}
+                  />
+                )}
+
+                {/* Streaming indicator */}
+                {message.isStreaming && !message.content && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="inline-flex gap-0.5">
+                      <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+                    </span>
                   </div>
                 )}
 
-                <div className="whitespace-pre-wrap">{message.content}</div>
-                
-                {/* Artifact Rendering */}
-                {message.artifact && (
-                    <div className="mt-3 rounded-lg bg-gray-50 p-3 border border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase">
-                            {message.artifact.type}
-                        </p>
-                        <pre className="text-xs overflow-x-auto">
-                            {JSON.stringify(message.artifact.data, null, 2)}
-                        </pre>
-                    </div>
-                )}
-                
                 {/* Follow-up Questions */}
                 {message.followUpQuestions && message.followUpQuestions.length > 0 && (
                     <div className="mt-4 space-y-2">
@@ -437,7 +487,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
               {credentialsError}
             </div>
           )}
-          
+
           <div className="relative rounded-2xl border border-border bg-white shadow-sm focus-within:ring-1 focus-within:ring-primary">
             <textarea
               value={input}
@@ -448,7 +498,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
               className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm focus:outline-none disabled:opacity-50 min-h-[100px]"
               rows={1}
             />
-            
+
             <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Button
@@ -456,7 +506,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                   size="sm"
                   onClick={() => setThinkingEnabled(!thinkingEnabled)}
                   className={cn(
-                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground", 
+                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground",
                     thinkingEnabled && "bg-primary/10 text-primary"
                   )}
                 >
@@ -468,7 +518,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                   size="sm"
                   onClick={() => setIncludeWebSearch(!includeWebSearch)}
                   className={cn(
-                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground", 
+                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground",
                     includeWebSearch && "bg-primary/10 text-primary"
                   )}
                 >

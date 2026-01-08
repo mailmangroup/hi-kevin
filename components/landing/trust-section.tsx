@@ -35,7 +35,7 @@ export function TrustSection() {
           <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">
             Seamless Integration With
           </h4>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60">
             {/* We would normally map through platform logos here. Using text for now as placeholders or simple icons */}
             <div className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <span className="w-8 h-8 bg-green-500 rounded-lg"></span> WeChat

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Save, Bell, Shield, Globe, User, Key, CheckCircle, Loader2 } from "lucide-react"
+import { Save, Bell, Globe, User, Key, CheckCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
 
@@ -14,7 +14,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null)
-  const [credentials, setCredentials] = useState({
+  const [profile, setProfile] = useState({
+    full_name: '',
+    email: '',
     kawo_token: '',
     kawo_org_id: '',
     kawo_brand_id: '',
@@ -32,7 +34,7 @@ export default function SettingsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+          .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
           .eq('id', user.id)
           .maybeSingle()
 
@@ -43,11 +45,23 @@ export default function SettingsPage() {
         }
 
         if (data) {
-          setCredentials({
+          setProfile({
+            full_name: data.full_name || '',
+            email: data.email || user.email || '',
             kawo_token: data.kawo_token || '',
             kawo_org_id: data.kawo_org_id || '',
             kawo_brand_id: data.kawo_brand_id || '',
             kawo_api_url: data.kawo_api_url || ''
+          })
+        } else if (user) {
+          // If no profile exists yet, initialize with user email
+          setProfile({
+            full_name: '',
+            email: user.email || '',
+            kawo_token: '',
+            kawo_org_id: '',
+            kawo_brand_id: '',
+            kawo_api_url: ''
           })
         }
       } catch (e) {
@@ -59,7 +73,7 @@ export default function SettingsPage() {
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCredentials(prev => ({
+    setProfile(prev => ({
       ...prev,
       [e.target.id]: e.target.value
     }))
@@ -86,8 +100,12 @@ export default function SettingsPage() {
         .from('profiles')
         .upsert({
           id: user.id,
-          email: user.email,
-          ...credentials,
+          email: profile.email || user.email,
+          full_name: profile.full_name,
+          kawo_token: profile.kawo_token,
+          kawo_org_id: profile.kawo_org_id,
+          kawo_brand_id: profile.kawo_brand_id,
+          kawo_api_url: profile.kawo_api_url,
           updated_at: new Date().toISOString()
         })
 
@@ -97,7 +115,7 @@ export default function SettingsPage() {
 
       toast({
         title: "Settings saved",
-        description: "Your KAWO credentials have been updated successfully.",
+        description: "Your profile and KAWO credentials have been updated successfully.",
         type: "success"
       })
 
@@ -177,83 +195,125 @@ export default function SettingsPage() {
         {/* Main Settings */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* KAWO Integration */}
+          {/* Profile & KAWO Integration */}
           <Card className="p-6 border-primary/20 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-primary/10 rounded-full">
-                <Key className="h-5 w-5 text-primary" />
+                <User className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold">KAWO Integration</h2>
-                <p className="text-sm text-muted-foreground">Configure your connection to KAWO platform</p>
+                <h2 className="text-xl font-semibold">Profile & KAWO Integration</h2>
+                <p className="text-sm text-muted-foreground">Manage your profile and configure your connection to KAWO platform</p>
               </div>
             </div>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="kawo_token" className="text-sm font-medium text-foreground">
-                  KAWO User Token
-                </label>
-                <Input
-                  id="kawo_token"
-                  type="password"
-                  placeholder="Enter your KAWO user token"
-                  value={credentials.kawo_token}
-                  onChange={handleChange}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Found in your KAWO user settings under API Access
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-6">
+              {/* Profile Section */}
+              <div className="space-y-4 pb-6 border-b border-border">
+                <div className="flex items-center gap-2 mb-4">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium">Profile Information</h3>
+                </div>
+                
                 <div className="space-y-2">
-                  <label htmlFor="kawo_org_id" className="text-sm font-medium text-foreground">
-                    Organization ID
+                  <label htmlFor="full_name" className="text-sm font-medium text-foreground">
+                    Full Name
                   </label>
                   <Input
-                    id="kawo_org_id"
+                    id="full_name"
                     type="text"
-                    placeholder="e.g. 5bbeb8..."
-                    value={credentials.kawo_org_id}
+                    placeholder="Enter your full name"
+                    value={profile.full_name}
                     onChange={handleChange}
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <label htmlFor="kawo_brand_id" className="text-sm font-medium text-foreground">
-                    Brand ID
+                  <label htmlFor="email" className="text-sm font-medium text-foreground">
+                    Email
                   </label>
                   <Input
-                    id="kawo_brand_id"
-                    type="text"
-                    placeholder="e.g. 5a9655..."
-                    value={credentials.kawo_brand_id}
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={profile.email}
                     onChange={handleChange}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="kawo_api_url" className="text-sm font-medium text-foreground">
-                  KAWO API URL
-                </label>
-                <Input
-                  id="kawo_api_url"
-                  type="text"
-                  placeholder="https://api.kawo.com"
-                  value={credentials.kawo_api_url}
-                  onChange={handleChange}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Optional. Leave blank to use default.
-                </p>
+              {/* KAWO Integration Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Key className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium">KAWO Credentials</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="kawo_token" className="text-sm font-medium text-foreground">
+                    KAWO User Token
+                  </label>
+                  <Input
+                    id="kawo_token"
+                    type="password"
+                    placeholder="Enter your KAWO user token"
+                    value={profile.kawo_token}
+                    onChange={handleChange}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Found in your KAWO user settings under API Access
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="kawo_org_id" className="text-sm font-medium text-foreground">
+                      Organization ID
+                    </label>
+                    <Input
+                      id="kawo_org_id"
+                      type="text"
+                      placeholder="e.g. 5bbeb8..."
+                      value={profile.kawo_org_id}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="kawo_brand_id" className="text-sm font-medium text-foreground">
+                      Brand ID
+                    </label>
+                    <Input
+                      id="kawo_brand_id"
+                      type="text"
+                      placeholder="e.g. 5a9655..."
+                      value={profile.kawo_brand_id}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="kawo_api_url" className="text-sm font-medium text-foreground">
+                    KAWO API URL
+                  </label>
+                  <Input
+                    id="kawo_api_url"
+                    type="text"
+                    placeholder="https://api.kawo.com"
+                    value={profile.kawo_api_url}
+                    onChange={handleChange}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional. Leave blank to use default.
+                  </p>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 pt-2">
                 <Button onClick={handleSave} disabled={loading} className="gap-2">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save Credentials
+                  Save Changes
                 </Button>
                 
                 <Button 
@@ -278,53 +338,6 @@ export default function SettingsPage() {
                   Connection failed. Please check your credentials and try again. Ensure you save changes before testing.
                 </p>
               )}
-            </div>
-          </Card>
-
-          {/* Profile Settings */}
-          <Card className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <User className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Profile</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="name" className="text-sm font-medium text-foreground">
-                  Full Name
-                </label>
-                <Input
-                  id="name"
-                  type="text"
-                  defaultValue="Jeremy Dai"
-                  disabled
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  defaultValue="jeremy@example.com"
-                  disabled
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="company" className="text-sm font-medium text-foreground">
-                  Company
-                </label>
-                <Input
-                  id="company"
-                  type="text"
-                  defaultValue="Kevin AI"
-                  disabled
-                />
-              </div>
-              {/* <Button className="gap-2">
-                <Save className="h-4 w-4" />
-                Save Changes
-              </Button> */}
             </div>
           </Card>
 
@@ -370,26 +383,6 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          {/* Security */}
-          <Card className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Shield className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Security</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="current-password" className="text-sm font-medium text-foreground">
-                  Current Password
-                </label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  disabled
-                />
-              </div>
-              <Button variant="outline" disabled>Update Password</Button>
-            </div>
-          </Card>
         </div>
 
         {/* Sidebar */}
@@ -428,18 +421,6 @@ export default function SettingsPage() {
                   <option value="cst">CST (UTC+8)</option>
                 </select>
               </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Account</h2>
-            <div className="space-y-3">
-              <Button variant="outline" className="w-full justify-start">
-                Export Data
-              </Button>
-              <Button variant="outline" className="w-full justify-start text-destructive">
-                Delete Account
-              </Button>
             </div>
           </Card>
         </div>

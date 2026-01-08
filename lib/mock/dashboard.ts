@@ -50,12 +50,6 @@ const suggestions: Suggestion[] = [
 ]
 
 export const mockDashboardData: DashboardData = {
-  stats: {
-    pendingApprovals: 3,
-    leadsToFollow: 5,
-    alerts: 1,
-    scheduledPosts: 2,
-  },
   suggestions,
   weeklyPerformance: {
     platforms: [

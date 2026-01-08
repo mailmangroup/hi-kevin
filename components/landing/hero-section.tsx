@@ -236,7 +236,7 @@ export function HeroSection() {
                         <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs">
                           Approve All
                         </Button>
-                        <Button size="sm" variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 h-8 text-xs">
+                        <Button size="sm" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-800 hover:text-white h-8 text-xs">
                           Review Individually
                         </Button>
                       </div>

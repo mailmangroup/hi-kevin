@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils/cn"
 import {
   LayoutDashboard,
@@ -18,6 +18,14 @@ import {
 import { BetaBadge } from "@/components/ui/beta-badge"
 import { frostService } from "@/lib/api/frost"
 import { aiService, Conversation } from "@/lib/api/client"
+
+// Simple cache to avoid refetching on every navigation
+const sidebarCache = {
+  leadsCount: null as number | null,
+  chatHistory: null as Conversation[] | null,
+  lastFetch: 0,
+  CACHE_DURATION: 30000, // 30 seconds
+}
 
 interface NavItem {
   title: string
@@ -81,10 +89,14 @@ export function Sidebar({ className }: { className?: string }) {
   const [chatHistory, setChatHistory] = useState<Conversation[]>([])
 
   useEffect(() => {
+    const now = Date.now()
+    const isCacheValid = now - sidebarCache.lastFetch < sidebarCache.CACHE_DURATION
+
     const fetchLeadsCount = async () => {
       try {
         const response = await frostService.getNewLeadsCount()
         const count = response.count
+        sidebarCache.leadsCount = count
 
         setNavItems(prev => prev.map(item => {
           if (item.title === "Leads") {
@@ -97,21 +109,44 @@ export function Sidebar({ className }: { className?: string }) {
       }
     }
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (forceRefresh = false) => {
         try {
             const { conversations } = await aiService.getConversations(10)
+            sidebarCache.chatHistory = conversations
             setChatHistory(conversations)
         } catch (error) {
             console.error("Failed to fetch chat history:", error)
         }
     }
 
-    fetchLeadsCount()
-    fetchHistory()
+    // Use cached data if available and valid
+    if (isCacheValid && sidebarCache.leadsCount !== null) {
+      setNavItems(prev => prev.map(item => {
+        if (item.title === "Leads") {
+          return { ...item, badge: sidebarCache.leadsCount! > 0 ? sidebarCache.leadsCount! : undefined }
+        }
+        return item
+      }))
+    } else {
+      fetchLeadsCount()
+    }
 
-    // Listen for new chat creation
-    window.addEventListener('chat-created', fetchHistory)
-    return () => window.removeEventListener('chat-created', fetchHistory)
+    if (isCacheValid && sidebarCache.chatHistory !== null) {
+      setChatHistory(sidebarCache.chatHistory)
+    } else {
+      fetchHistory()
+    }
+
+    sidebarCache.lastFetch = now
+
+    // Listen for new chat creation and title updates - always refresh on these events
+    const handleChatEvent = () => fetchHistory(true)
+    window.addEventListener('chat-created', handleChatEvent)
+    window.addEventListener('chat-title-updated', handleChatEvent)
+    return () => {
+      window.removeEventListener('chat-created', handleChatEvent)
+      window.removeEventListener('chat-title-updated', handleChatEvent)
+    }
   }, [])
 
   return (

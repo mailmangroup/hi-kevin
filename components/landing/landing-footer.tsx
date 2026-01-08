@@ -26,14 +26,6 @@ export function LandingFooter() {
               </Button>
             </Link>
           </div>
-          <div className="mt-6">
-            <p className="text-slate-500 text-sm">
-              Want to see the logic?{" "}
-              <Link href="/manual" className="text-primary hover:underline">
-                Download the Full Marketing Ops Manual
-              </Link>
-            </p>
-          </div>
         </div>
 
         <div className="grid md:grid-cols-4 gap-8 pt-12 border-t border-slate-800 text-sm text-slate-400">

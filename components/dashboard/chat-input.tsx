@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Mic, ArrowUp, Plus, Share2, Brain, Globe } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { Search, Mic, ArrowUp, Plus, Brain, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils/cn"
 import {
@@ -18,7 +19,32 @@ export function ChatInput() {
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
   const [model, setModel] = useState("qwen-max")
+  const [fullName, setFullName] = useState<string | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) return
+
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (data?.full_name) {
+          setFullName(data.full_name)
+        }
+      } catch (e) {
+        console.error('Error loading profile:', e)
+      }
+    }
+    loadProfile()
+  }, [])
 
   const handleSend = () => {
     if (!input.trim()) return
@@ -39,9 +65,11 @@ export function ChatInput() {
     }
   }
 
+  const greeting = fullName ? `Hi ${fullName}, how can I help you today?` : "How can I help you today?"
+
   return (
     <div className="flex flex-col items-center justify-center space-y-8 py-10">
-      <h1 className="text-4xl font-semibold text-foreground">How can I help you today?</h1>
+      <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
       
       <div className="w-full max-w-2xl relative">
         <div className="relative rounded-2xl border border-border bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -94,9 +122,6 @@ export function ChatInput() {
              </div>
              
              <div className="flex gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
-                  <Share2 className="h-5 w-5" />
-                </Button>
                 <Button 
                     size="icon" 
                     className="h-8 w-8 rounded-full" 
@@ -111,7 +136,7 @@ export function ChatInput() {
       </div>
 
       <div className="flex flex-wrap justify-center gap-3">
-        {["Build slides", "Write doc", "Create storybook", "Batch research", "Analyze data"].map((action) => (
+        {["Analyze video", "Create campaign", "Research competitors", "Generate content", "Track performance"].map((action) => (
            <Button key={action} variant="outline" className="rounded-full bg-white/50 hover:bg-white">
              {action}
            </Button>

@@ -31,9 +31,13 @@ export async function DELETE(
 }
 
 async function handleProxy(request: NextRequest, pathSegments: string[]) {
+  console.log('[Proxy] Starting handleProxy for path:', pathSegments.join('/'))
+
   // 1. Check Authentication
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  console.log('[Proxy] Auth check:', { userId: user?.id, authError })
 
   let token: string | null = null
   let orgId: string | null = null
@@ -48,14 +52,17 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
   }
 
   // 2. Fetch Profile & Credentials
+  console.log('[Proxy] Fetching profile for user:', user.id)
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
     .eq('id', user.id)
     .maybeSingle()
 
+  console.log('[Proxy] Profile result:', { profile: profile ? 'exists' : 'null', profileError })
+
   if (profileError) {
-    console.error('Profile fetch error:', profileError)
+    console.error('[Proxy] Profile fetch error:', profileError)
     return NextResponse.json(
       { error: 'Failed to load profile', code: 'PROFILE_FETCH_FAILED' },
       { status: 500 }
