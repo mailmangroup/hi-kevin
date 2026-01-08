@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { KawoCredentialsModal } from '@/components/onboarding/kawo-credentials-modal'
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
-import { QuickChat } from "@/components/chat/quick-chat"
 
 export default async function DashboardLayout({
   children,
@@ -36,7 +35,6 @@ export default async function DashboardLayout({
           {children}
         </main>
       </div>
-      <QuickChat />
       {showOnboarding && <KawoCredentialsModal />}
     </div>
   )

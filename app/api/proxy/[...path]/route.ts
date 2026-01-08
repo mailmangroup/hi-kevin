@@ -35,43 +35,61 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  let token: string | null = null
+  let orgId: string | null = null
+  let brandId: string | null = null
+  let apiUrl: string | null = null
+
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    )
-  }
+     if (process.env.NODE_ENV === 'development') {
+        // Dev bypass
+        token = process.env.VITE_TEST_USER_TOKEN || '1d655514-6cf4-4657-a08d-a3e35dd7dc50'
+        orgId = process.env.VITE_TEST_ORG_ID || '5bbeb89b746706598113c33a'
+        brandId = process.env.VITE_TEST_BRAND_ID || '5a96553fe4b03ac3f944278a'
+        apiUrl = process.env.KAWO_API_URL || 'http://localhost:8000'
+     } else {
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        )
+     }
+  } else {
+      // 2. Fetch Profile & Credentials
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+        .eq('id', user.id)
+        .maybeSingle()
 
-  // 2. Fetch Profile & Credentials
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-    .eq('id', user.id)
-    .maybeSingle()
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        return NextResponse.json(
+          { error: 'Failed to load profile', code: 'PROFILE_FETCH_FAILED' },
+          { status: 500 }
+        )
+      }
 
-  if (profileError) {
-    console.error('Profile fetch error:', profileError)
-    return NextResponse.json(
-      { error: 'Failed to load profile', code: 'PROFILE_FETCH_FAILED' },
-      { status: 500 }
-    )
-  }
-
-  // Check if credentials configured
-  if (!profile || !profile.kawo_token || !profile.kawo_org_id || !profile.kawo_brand_id) {
-    return NextResponse.json(
-      { 
-        error: 'KAWO credentials not configured. Please complete setup.', 
-        code: 'CREDENTIALS_MISSING', 
-        redirect: '/dashboard/settings' 
-      },
-      { status: 403 }
-    )
+      // Check if credentials configured
+      if (!profile || !profile.kawo_token || !profile.kawo_org_id || !profile.kawo_brand_id) {
+        return NextResponse.json(
+          { 
+            error: 'KAWO credentials not configured. Please complete setup.', 
+            code: 'CREDENTIALS_MISSING', 
+            redirect: '/dashboard/settings' 
+          },
+          { status: 403 }
+        )
+      } else {
+          token = profile.kawo_token
+          orgId = profile.kawo_org_id
+          brandId = profile.kawo_brand_id
+          apiUrl = profile.kawo_api_url || 'http://localhost:8005'
+      }
   }
 
   // 3. Construct Target URL
   const path = pathSegments.join('/')
-  const baseUrl = profile.kawo_api_url || process.env.KAWO_API_URL || 'http://localhost:8000'
+  const baseUrl = apiUrl || 'http://localhost:8005'
   const targetUrl = `${baseUrl.replace(/\/$/, '')}/${path}${request.nextUrl.search}`
 
   // 4. Prepare Headers
@@ -82,13 +100,9 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
   headers.delete('connection')
 
   // Use user-specific credentials
-  const token = profile.kawo_token
-  const orgId = profile.kawo_org_id
-  const brandId = profile.kawo_brand_id
-
   headers.set('Authorization', `Bearer ${token}`)
-  headers.set('X-KAWO-Org-Id', orgId)
-  headers.set('X-KAWO-Brand-Id', brandId)
+  if (orgId) headers.set('X-KAWO-Org-Id', orgId)
+  if (brandId) headers.set('X-KAWO-Brand-Id', brandId)
 
   // 4. Forward Request
   try {

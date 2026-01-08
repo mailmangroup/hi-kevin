@@ -1,9 +1,10 @@
 "use client"
 
-import { Bell, Search } from "lucide-react"
+import { Bell, Search, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BetaBadge } from "@/components/ui/beta-badge"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
+import Link from "next/link"
 
 export function Header() {
   return (
@@ -29,11 +30,14 @@ export function Header() {
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-error" />
         </Button>
 
-        <div className="ml-2 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+        <Link href="/dashboard/settings" className="ml-2 flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white relative group">
             J
+             <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-border">
+                <Settings className="h-3 w-3 text-muted-foreground" />
+             </div>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   )

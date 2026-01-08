@@ -12,10 +12,12 @@ import {
   Search,
   Megaphone,
   Shield,
-  Settings
+  Settings,
+  MessageSquare
 } from "lucide-react"
 import { BetaBadge } from "@/components/ui/beta-badge"
 import { frostService } from "@/lib/api/frost"
+import { aiService, Conversation } from "@/lib/api/client"
 
 interface NavItem {
   title: string
@@ -76,6 +78,7 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const [navItems, setNavItems] = useState<NavItem[]>(INITIAL_NAV_ITEMS)
+  const [chatHistory, setChatHistory] = useState<Conversation[]>([])
 
   useEffect(() => {
     const fetchLeadsCount = async () => {
@@ -94,7 +97,21 @@ export function Sidebar({ className }: { className?: string }) {
       }
     }
 
+    const fetchHistory = async () => {
+        try {
+            const { conversations } = await aiService.getConversations(10)
+            setChatHistory(conversations)
+        } catch (error) {
+            console.error("Failed to fetch chat history:", error)
+        }
+    }
+
     fetchLeadsCount()
+    fetchHistory()
+
+    // Listen for new chat creation
+    window.addEventListener('chat-created', fetchHistory)
+    return () => window.removeEventListener('chat-created', fetchHistory)
   }, [])
 
   return (
@@ -108,7 +125,7 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon
           // Dashboard should only be active on exact match, not sub-routes
@@ -121,55 +138,58 @@ export function Sidebar({ className }: { className?: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                "group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
+                isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="flex-1 flex items-center gap-2">
-                {item.title}
-                {item.isBeta && <BetaBadge />}
-              </span>
+              <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
+              <span className="flex-1 truncate">{item.title}</span>
               {item.badge && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-bold text-white">
                   {item.badge}
+                </span>
+              )}
+              {item.isBeta && !item.badge && (
+                <span className="ml-auto">
+                   <BetaBadge />
                 </span>
               )}
             </Link>
           )
         })}
 
-        {/* Settings at bottom */}
-        <div className="pt-4">
-          <Link
-            href="/dashboard/settings"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              pathname === "/dashboard/settings"
-                ? "bg-primary/10 text-primary font-semibold"
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <Settings className="h-5 w-5" />
-            <span className="flex-1">Settings</span>
-          </Link>
+        {/* Chat History Section */}
+        <div className="mt-8">
+            <div className="flex items-center justify-between px-3 mb-2">
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground/70">
+                    Chat History
+                </h3>
+                <Link href="/chat/new">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
+                </Link>
+            </div>
+          
+          <div className="space-y-1">
+            {chatHistory.map((chat) => {
+                const isActive = pathname === `/chat/${chat.id}`
+                return (
+                    <Link
+                        key={chat.id}
+                        href={`/chat/${chat.id}`}
+                        className={cn(
+                            "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
+                            isActive ? "bg-primary/5 text-primary" : "text-muted-foreground"
+                        )}
+                    >
+                        <span className="truncate" title={chat.title}>{chat.title || "New Chat"}</span>
+                    </Link>
+                )
+            })}
+          </div>
         </div>
       </nav>
 
-      {/* User profile */}
-      <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white font-semibold">
-            J
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-sidebar-foreground">Jeremy</p>
-            <p className="text-xs text-sidebar-foreground/60">jeremy@example.com</p>
-          </div>
-        </div>
-      </div>
+      {/* Bottom Section - Settings moved to profile */}
     </div>
   )
 }

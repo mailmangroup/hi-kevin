@@ -17,7 +17,12 @@ export async function apiCall<T>(
 
     // In demo mode, we'll call mock functions directly from components
     // This is a placeholder for future real API calls
-    throw new Error(`Mock mode: Call mock functions directly for ${endpoint}`)
+    // For now, if we are in mock mode but want to test backend, we can comment this out or set USE_MOCK to false
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_FORCE_MOCK !== 'true') {
+        // fall through to real API call if in dev and not forced mock
+    } else {
+        throw new Error(`Mock mode: Call mock functions directly for ${endpoint}`)
+    }
   }
 
   // Real API call
@@ -94,11 +99,151 @@ function mapPlatformToNetwork(platform: string): string {
   return PLATFORM_TO_NETWORK_MAP[key] || key
 }
 
+export interface Conversation {
+  id: string
+  title: string
+  updated_at: string
+  message_count: number
+  last_message?: string
+  is_favorite: boolean
+  has_report?: boolean
+}
+
+export interface Message {
+  id: string
+  role: "user" | "assistant" | "tool"
+  content: string
+  created_at: string
+  sub_content_list?: any[]
+  report_id?: string
+  report?: any
+  type?: string
+}
+
 /**
  * AI Service
- * Handles all AI-related operations with mock implementations
+ * Handles all AI-related operations
  */
 export const aiService = {
+  /**
+   * Get list of conversations
+   */
+  async getConversations(limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number }> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return {
+            conversations: [
+                { id: '1', title: 'Content Strategy Q1', updated_at: new Date().toISOString(), message_count: 5, is_favorite: false },
+                { id: '2', title: 'Lead Scoring Analysis', updated_at: new Date(Date.now() - 86400000).toISOString(), message_count: 3, is_favorite: true },
+            ],
+            total: 2
+        }
+    }
+    return apiCall(`proxy/agent/conversations?limit=${limit}&skip=${skip}`)
+  },
+
+  /**
+   * Get a single conversation
+   */
+  async getConversation(conversationId: string): Promise<Conversation> {
+      if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+          return { id: conversationId, title: 'Mock Conversation', updated_at: new Date().toISOString(), message_count: 5, is_favorite: false }
+      }
+      return apiCall(`proxy/agent/conversations/${conversationId}`)
+  },
+
+  /**
+   * Get messages for a conversation
+   */
+  async getMessages(conversationId: string, limit = 50, skip = 0): Promise<{ messages: Message[], total: number }> {
+      if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+          return {
+              messages: [
+                  { id: '1', role: 'assistant', content: 'Hello! I am Kevin.', created_at: new Date().toISOString() }
+              ],
+              total: 1
+          }
+      }
+      return apiCall(`proxy/agent/conversations/${conversationId}/messages?limit=${limit}&skip=${skip}`)
+  },
+
+  /**
+   * Stream chat response
+   */
+  async *chatStream(
+    message: string, 
+    options: { 
+        conversationId?: string, 
+        orgId?: string, 
+        brandId?: string,
+        model?: string,
+        includeWebSearch?: boolean,
+        thinkingEnabled?: boolean,
+        toolSelectionEnabled?: boolean
+    }
+  ): AsyncGenerator<any, void, unknown> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        yield { type: 'chunk', content: 'This is a ' }
+        await new Promise(r => setTimeout(r, 100))
+        yield { type: 'chunk', content: 'mock streamed ' }
+        await new Promise(r => setTimeout(r, 100))
+        yield { type: 'chunk', content: 'response.' }
+        return
+    }
+
+    const payload = {
+        query: message,
+        conversation_id: options.conversationId,
+        org_id: options.orgId,
+        brand_id: options.brandId,
+        stream: true,
+        model: options.model || "qwen-max",
+        include_web_search: options.includeWebSearch ?? true,
+        thinking_enabled: options.thinkingEnabled ?? false,
+        tool_selection_enabled: options.toolSelectionEnabled ?? true
+    }
+
+    console.log('[API] Sending chat query payload:', payload)
+
+    const response = await fetch('/api/proxy/agent/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+        throw new Error(`Chat request failed: ${response.statusText}`)
+    }
+
+    if (!response.body) throw new Error("No response body")
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    
+    let buffer = ''
+
+    while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const data = line.slice(6)
+                if (data === '[DONE]') return
+                try {
+                    const parsed = JSON.parse(data)
+                    yield parsed
+                } catch (e) {
+                    console.error('Error parsing SSE data:', e)
+                }
+            }
+        }
+    }
+  },
+
   /**
    * Generate content based on brief
    */
@@ -203,13 +348,15 @@ export const aiService = {
   /**
    * Chat with Kevin
    */
-  async chat(message: string, context?: any): Promise<string> {
+  async chat(message: string, context?: any): Promise<any> {
     if (USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      return `I'd be happy to help with "${message}". In the full version, I'll provide detailed assistance based on your data and context.`
+      return { 
+          message: `I'd be happy to help with "${message}". In the full version, I'll provide detailed assistance based on your data and context.`
+      }
     }
 
-    return apiCall<string>('ai/chat', {
+    return apiCall<any>('proxy/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, context }),
     })
