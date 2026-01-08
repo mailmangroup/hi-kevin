@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils/cn"
 import {
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Settings
 } from "lucide-react"
 import { BetaBadge } from "@/components/ui/beta-badge"
+import { frostService } from "@/lib/api/frost"
 
 interface NavItem {
   title: string
@@ -23,7 +25,7 @@ interface NavItem {
   isBeta?: boolean
 }
 
-const navItems: NavItem[] = [
+const INITIAL_NAV_ITEMS: NavItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -41,7 +43,7 @@ const navItems: NavItem[] = [
     title: "Leads",
     href: "/dashboard/leads",
     icon: Users,
-    badge: 5,
+    badge: undefined, // Will be populated dynamically
     isBeta: false,
   },
   {
@@ -73,6 +75,27 @@ const navItems: NavItem[] = [
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
+  const [navItems, setNavItems] = useState<NavItem[]>(INITIAL_NAV_ITEMS)
+
+  useEffect(() => {
+    const fetchLeadsCount = async () => {
+      try {
+        const response = await frostService.getNewLeadsCount()
+        const count = response.count
+
+        setNavItems(prev => prev.map(item => {
+          if (item.title === "Leads") {
+            return { ...item, badge: count > 0 ? count : undefined }
+          }
+          return item
+        }))
+      } catch (error) {
+        console.error("Failed to fetch new leads count:", error)
+      }
+    }
+
+    fetchLeadsCount()
+  }, [])
 
   return (
     <div className={cn("flex h-full w-60 flex-col border-r border-sidebar-border bg-sidebar", className)}>
@@ -110,7 +133,7 @@ export function Sidebar({ className }: { className?: string }) {
                 {item.isBeta && <BetaBadge />}
               </span>
               {item.badge && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-semibold text-white">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
                   {item.badge}
                 </span>
               )}
