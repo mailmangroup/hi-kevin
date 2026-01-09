@@ -21,8 +21,11 @@ Kevin transforms how single marketers handle multiple roles:
 - **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + shadcn/ui
-- **State**: Zustand
-- **Charts**: Recharts
+- **State Management**: 
+  - Server: TanStack Query (React Query)
+  - Client: Zustand
+- **Authentication & User Data**: Supabase
+- **Visualizations**: Recharts
 - **Forms**: React Hook Form + Zod
 - **Internationalization**: next-intl
 
@@ -31,27 +34,31 @@ Kevin transforms how single marketers handle multiple roles:
 ```
 kevin-demo/
 ├── app/                    # Next.js App Router
-│   ├── (auth)/            # Authentication pages
-│   ├── (dashboard)/       # Main application
-│   └── api/               # API routes (mock data)
+│   ├── (dashboard)/       # Main application layout & pages
+│   │   ├── dashboard/     # Dashboard views (Analytics, Content, Leads, etc.)
+│   │   └── chat/          # Chat interface pages
+│   ├── api/               # API Routes
+│   │   └── proxy/         # Backend API Proxy
+│   └── login/             # Authentication page
 ├── components/
-│   ├── ui/                # shadcn/ui base components
-│   ├── layout/            # Layout components
-│   ├── dashboard/         # Dashboard components
-│   ├── content/           # Content Agent
-│   ├── leads/             # Leads Agent
-│   ├── analytics/         # Analytics Agent
-│   ├── research/          # Research Agent
-│   ├── campaigns/         # Campaign Agent
-│   └── brand-safety/      # Brand Safety Agent
+│   ├── analytics/         # Analytics specific components
+│   ├── brand-safety/      # Brand Safety components
+│   ├── campaigns/         # Campaign management components
+│   ├── chat/              # Chat interface components
+│   ├── content/           # Content generation & workspace
+│   ├── dashboard/         # Main dashboard widgets
+│   ├── landing/           # Landing page components
+│   ├── layout/            # Sidebar, Header, etc.
+│   ├── leads/             # Leads & CRM components
+│   └── ui/                # Shared UI components (shadcn/ui)
 ├── lib/
-│   ├── api/               # API client
-│   ├── mock/              # Mock data services
-│   └── utils/             # Utility functions
-├── hooks/                 # Custom React hooks
-├── stores/                # Zustand stores
-├── types/                 # TypeScript definitions
-└── messages/              # i18n translations
+│   ├── api/               # API clients (Analytics, Frost, Chat)
+│   ├── hooks/             # Custom React hooks
+│   ├── mock/              # Mock data for demo mode
+│   ├── supabase/          # Supabase client configuration
+│   └── utils/             # Helper functions
+├── types/                 # TypeScript type definitions
+└── public/                # Static assets
 ```
 
 ## Getting Started
@@ -96,136 +103,21 @@ npm install
 
 # Run development server
 npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
 ```
 
-The app will be available at [http://localhost:3000](http://localhost:3000)
+## Environment Configuration
 
-### Environment Variables
+Create a `.env.local` file with the following variables:
 
 ```env
-NEXT_PUBLIC_USE_MOCK=true  # Use mock data (default for demo)
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Mock Mode (Set to false to use real backend)
+NEXT_PUBLIC_USE_MOCK=true
+NEXT_PUBLIC_FORCE_MOCK=false
+
+# Backend Configuration (Optional if set in user profile)
+KAWO_API_URL=your_backend_api_url
 ```
-
-## Features
-
-### 🏠 Dashboard
-- Today's focus with action items
-- Kevin's intelligent suggestions
-- Weekly performance overview
-- Quick chat interface
-
-### ✍️ Content Agent
-- Content calendar management
-- AI-powered draft generation
-- Multi-platform localization
-- Compliance checking
-- Asset library
-
-### 🎯 Leads Agent
-- Visual pipeline management
-- AI-powered lead scoring
-- Automated follow-up suggestions
-- Activity tracking
-
-### 📊 Analytics Agent
-- Cross-platform performance dashboard
-- Competitor tracking
-- Auto-generated reports
-- Trend analysis
-
-### 🔍 Research Agent
-- Real-time trend radar
-- KOL database and matching
-- Market insights
-- Competitor intelligence
-
-### 📅 Campaign Agent
-- Campaign builder
-- Launch checklists
-- Progress tracking
-- Performance analysis
-
-### 🛡️ Brand Safety Agent
-- Content compliance review
-- Sensitive date calendar
-- Brand guidelines enforcement
-- Prohibited word detection
-
-## Project Status
-
-**Current Progress**: Phase 2 (~20% complete)
-**Last Updated**: 2026-01-01
-
-See [PROGRESS.md](./PROGRESS.md) for detailed progress tracking and sprint goals.
-
-## Mock Data Strategy
-
-This demo uses mock data that mirrors real API structures. All data services are abstracted through a client layer that can be easily switched to real APIs:
-
-```typescript
-// Currently returns mock data
-const data = await apiCall('/dashboard')
-
-// Future: Switch to real API by changing environment variable
-NEXT_PUBLIC_USE_MOCK=false
-```
-
-## Future Roadmap
-
-### AI Integration
-- Connect to real AI services (Qwen, GPT, Claude)
-- Implement streaming responses
-- Add prompt management
-
-### Data Integration
-- Connect to KAWO or other social media APIs
-- Real-time data synchronization
-- Live analytics
-
-### Collaboration Features
-- Multi-user permissions
-- Approval workflows
-- Team collaboration
-- Activity logs
-
-### Mobile App
-- React Native implementation
-- Push notifications
-- Mobile-optimized workflows
-
-## Design Language
-
-The UI follows modern SaaS design principles with:
-- Clean, minimal interface
-- Indigo primary color (#6366F1)
-- Platform-specific colors (小红书红, 抖音黑, etc.)
-- Card-based layouts with subtle shadows
-- Responsive design for all screen sizes
-
-See [DESIGN.md](./DESIGN.md) for detailed design specifications.
-
-## Documentation
-
-- **[README.md](./README.md)** - Project overview, tech stack, and setup (this file)
-- **[DESIGN.md](./DESIGN.md)** - Complete design system specifications
-- **[PROGRESS.md](./PROGRESS.md)** - Development progress and sprint tracking
-
-## Contributing
-
-This is a demo project. For questions or feedback, please contact the Kevin Product Team.
-
-## License
-
-Proprietary - Kevin Product Team
-
----
-
-**Version**: 1.0
-**Last Updated**: 2026-01-01
-**Status**: Demo Development
