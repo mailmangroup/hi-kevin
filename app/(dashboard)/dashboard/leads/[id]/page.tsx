@@ -19,7 +19,7 @@ import {
   Calendar,
   MoreVertical,
 } from "lucide-react"
-import { getLead } from "@/lib/mock/leads"
+import { frostService } from "@/lib/api/frost"
 import { formatDate } from "@/lib/utils/date"
 import type { Lead } from "@/types"
 
@@ -34,8 +34,37 @@ export default function LeadDetailPage() {
   const loadLead = async () => {
     setLoading(true)
     try {
-      const data = await getLead(leadId)
-      setLead(data)
+      const data: any = await frostService.getContact(leadId)
+      if (data) {
+        // Transform HubSpot contact to Lead type
+        // TODO: Centralize this transformation
+        const transformedLead: Lead = {
+          id: data.id,
+          name: `${data.properties.firstname || ''} ${data.properties.lastname || ''}`.trim(),
+          email: data.properties.email || '',
+          company: data.properties.company,
+          title: data.properties.jobtitle,
+          phone: data.properties.phone,
+          
+          stage: 'new', // Default to new, logic to map HubSpot stages needed
+          source: data.properties.lead_source || 'Unknown',
+          tags: [],
+          
+          score: parseInt(data.properties.hubspotscore || '0'),
+          fitScore: 0, // Placeholder
+          behaviorScore: 0, // Placeholder
+          scoreBreakdown: [],
+          
+          activities: [], // Placeholder
+          lastContactedAt: data.properties.lastmodifieddate ? new Date(data.properties.lastmodifieddate) : undefined,
+          
+          createdAt: data.properties.createdate ? new Date(data.properties.createdate) : new Date(),
+          updatedAt: data.properties.lastmodifieddate ? new Date(data.properties.lastmodifieddate) : new Date(),
+        }
+        setLead(transformedLead)
+      } else {
+        setLead(null)
+      }
     } catch (error) {
       console.error("Failed to load lead:", error)
     } finally {

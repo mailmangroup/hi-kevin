@@ -104,7 +104,9 @@ export function Sidebar({ className }: { className?: string }) {
           }
           return item
         }))
-      } catch (error) {
+      } catch (error: any) {
+        // Ignore missing credentials error as it's expected during onboarding
+        if (error?.code === 'CREDENTIALS_MISSING') return
         console.error("Failed to fetch new leads count:", error)
       }
     }
@@ -114,7 +116,9 @@ export function Sidebar({ className }: { className?: string }) {
             const { conversations } = await aiService.getConversations(10)
             sidebarCache.chatHistory = conversations
             setChatHistory(conversations)
-        } catch (error) {
+        } catch (error: any) {
+            // Ignore missing credentials error as it's expected during onboarding
+            if (error?.code === 'CREDENTIALS_MISSING') return
             console.error("Failed to fetch chat history:", error)
         }
     }

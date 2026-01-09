@@ -49,12 +49,11 @@ export const frostService = {
    * Get dashboard data grouped by source and stage
    *
    * @param period 'current_week' or 'last_week'
-   * @param limit Maximum number of leads to fetch (default: 100)
    *
    * Backend endpoint: GET /frost/dashboard
    */
-  async getDashboard(period: string = 'current_week', limit: number = 100): Promise<DashboardData> {
-    return apiCall<DashboardData>(`proxy/frost/dashboard?period=${period}&limit=${limit}`)
+  async getDashboard(period: string = 'current_week'): Promise<DashboardData> {
+    return apiCall<DashboardData>(`proxy/frost/dashboard?period=${period}`)
   },
 
   /**
@@ -80,6 +79,25 @@ export const frostService = {
         limit: 100,
       }),
     })
+  },
+
+  /**
+   * Get a single contact by ID
+   */
+  async getContact(contactId: string) {
+    const filters = [
+      {
+        filters: [
+          {
+            propertyName: 'hs_object_id',
+            operator: 'EQ',
+            value: contactId
+          }
+        ]
+      }
+    ]
+    const result: any = await this.searchContacts(filters)
+    return result.results?.[0] || null
   },
 
   /**

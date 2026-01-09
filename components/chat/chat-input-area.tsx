@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Paperclip, Brain, Globe, X, ArrowUp } from "lucide-react"
+import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { compressImage } from "@/lib/utils/image-compression"
 
 export interface ChatInputAreaProps {
   input: string
@@ -50,26 +51,49 @@ export function ChatInputArea({
   showBorder = true
 }: ChatInputAreaProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  
+  const [isCompressing, setIsCompressing] = React.useState(false)
+
   // Model constants
   const AVAILABLE_MODELS = ["qwen-max", "qwen-plus"]
-  
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        setSelectedImages((prev: string[]) => [...prev, result])
-      }
-      reader.readAsDataURL(file)
-    })
-    
-    // Reset input
-    if (fileInputRef.current) {
+    setIsCompressing(true)
+
+    try {
+      // Compress images in parallel
+      const compressionPromises = Array.from(files).map(async (file) => {
+        try {
+          // Check file size
+          const fileSizeMB = file.size / (1024 * 1024)
+          console.log(`[Upload] Processing ${file.name} (${fileSizeMB.toFixed(2)}MB)`)
+
+          // Compress to max 0.5MB, 1920px, 0.8 quality
+          const compressed = await compressImage(file, 0.5, 1920, 0.8)
+          return compressed
+        } catch (error) {
+          console.error(`Failed to compress ${file.name}:`, error)
+          // Fall back to original file if compression fails
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target?.result as string)
+            reader.readAsDataURL(file)
+          })
+        }
+      })
+
+      const compressedImages = await Promise.all(compressionPromises)
+      setSelectedImages((prev: string[]) => [...prev, ...compressedImages])
+    } catch (error) {
+      console.error('Error processing images:', error)
+    } finally {
+      setIsCompressing(false)
+      // Reset input
+      if (fileInputRef.current) {
         fileInputRef.current.value = ''
+      }
     }
   }
 
@@ -165,14 +189,18 @@ export function ChatInputArea({
               multiple
               onChange={handleFileSelect}
           />
-          <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-muted-foreground hover:bg-muted" 
-              disabled={disabled}
+          <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:bg-muted"
+              disabled={disabled || isCompressing}
               onClick={() => fileInputRef.current?.click()}
           >
-              <Paperclip className="h-5 w-5" />
+              {isCompressing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Paperclip className="h-5 w-5" />
+              )}
           </Button>
           <Button
             onClick={onSend}

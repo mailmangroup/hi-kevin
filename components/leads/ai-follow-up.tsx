@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AIThinking } from "@/components/ui/loading"
 import { Sparkles, Copy, ThumbsUp, ThumbsDown, RefreshCw, Send } from "lucide-react"
-import { generateFollowUp } from "@/lib/mock/leads"
 
 interface AIFollowUpProps {
   leadId: string
@@ -21,7 +20,9 @@ export function AIFollowUp({ leadId, initialSuggestion, insights }: AIFollowUpPr
   const handleGenerate = async () => {
     setIsGenerating(true)
     try {
-      const newSuggestion = await generateFollowUp(leadId)
+      // Placeholder for AI generation until backend service is ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const newSuggestion = "Hi, following up on our previous conversation. I noticed you checked out our pricing page. Do you have any questions I can answer?";
       setSuggestion(newSuggestion)
     } catch (error) {
       console.error("Failed to generate follow-up:", error)

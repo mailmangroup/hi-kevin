@@ -17,15 +17,6 @@ export {
   mockContentItems,
 } from './content'
 
-// Leads
-export {
-  getLeads,
-  getLead,
-  updateLeadStage,
-  generateFollowUp,
-  mockLeads,
-} from './leads'
-
 // Brand Safety
 export {
   getComplianceAlerts,

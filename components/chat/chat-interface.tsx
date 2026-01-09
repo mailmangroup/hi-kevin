@@ -18,6 +18,7 @@ interface Message {
   timestamp: Date
   toolCalls?: ToolCall[]
   isStreaming?: boolean
+  thinking?: string
   followUpQuestions?: string[]
   images?: string[]
 }
@@ -281,6 +282,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
     ])
 
     let fullContent = ""
+    let thinkingContent = ""
     let followUpQuestions: string[] | undefined
     let newConversationId: string | undefined
 
@@ -305,6 +307,16 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
 
               // Notify sidebar to refresh chat history
               window.dispatchEvent(new Event('chat-created'))
+          }
+
+          // Handle thinking chunks - accumulate them
+          if (chunk.thinking !== undefined && chunk.thinking !== null) {
+              thinkingContent += chunk.thinking || ""
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, thinking: thinkingContent }
+                      : msg
+              ))
           }
 
           if (chunk.content) {
@@ -444,6 +456,16 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                     {message.images.map((img, i) => (
                       <img key={i} src={img} alt="Uploaded" className="max-w-full h-auto rounded-lg max-h-64 object-contain bg-black/5" />
                     ))}
+                  </div>
+                )}
+
+                {/* Thinking Content */}
+                {message.thinking && (
+                  <div className="mb-3 pb-3 border-b border-gray-200">
+                    <div className="text-xs font-medium text-gray-500 mb-1">Thinking:</div>
+                    <div className="text-xs text-gray-600 italic whitespace-pre-wrap">
+                      {message.thinking}
+                    </div>
                   </div>
                 )}
 

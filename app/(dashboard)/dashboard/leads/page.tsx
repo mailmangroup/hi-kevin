@@ -272,7 +272,7 @@ export default function LeadsPage() {
       {/* Aggregated View (Nested Table) */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="p-6 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Lead Sources Breakdown</h2>
+          <h2 className="text-lg font-semibold">Source Breakdown</h2>
           <Button variant="outline" size="sm" onClick={() => downloadCSV('summary')} title="Export Summary">
             <Download className="h-4 w-4" />
           </Button>

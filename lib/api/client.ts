@@ -44,7 +44,10 @@ export async function apiCall<T>(
 
     // Handle specific error codes
     if (errorData.code === 'CREDENTIALS_MISSING' && errorData.redirect && typeof window !== 'undefined') {
-      window.location.href = errorData.redirect
+      // Only redirect if we're not already on the target page
+      if (window.location.pathname !== errorData.redirect) {
+        window.location.href = errorData.redirect
+      }
     }
 
     // Log detailed error information for debugging
@@ -322,8 +325,9 @@ export const aiService = {
    */
   async generateFollowUp(leadId: string): Promise<string> {
     if (USE_MOCK) {
-      const { generateFollowUp } = await import('@/lib/mock/leads')
-      return generateFollowUp(leadId)
+      // Mock implementation without external dependencies
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return "Hi there, following up on our previous conversation. I noticed you checked out our pricing page. Do you have any questions I can answer?";
     }
 
     return apiCall<string>('ai/follow-up', {

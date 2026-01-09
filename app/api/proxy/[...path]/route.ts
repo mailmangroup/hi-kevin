@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Configure route segment config for larger payloads
+export const runtime = 'nodejs'
+export const maxDuration = 60 // 60 seconds timeout
+// Note: Body size limits are controlled at the platform level (Vercel has 4.5MB limit on Hobby, 100MB on Pro)
+
 // Handle GET, POST, PUT, DELETE, etc.
 export async function GET(
   request: NextRequest,
@@ -74,8 +79,7 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
     return NextResponse.json(
       { 
         error: 'KAWO credentials not configured. Please complete setup.', 
-        code: 'CREDENTIALS_MISSING', 
-        redirect: '/dashboard/settings' 
+        code: 'CREDENTIALS_MISSING'
       },
       { status: 403 }
     )
