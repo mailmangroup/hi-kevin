@@ -40,7 +40,7 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    isBeta: true,
+    isBeta: false,
   },
   {
     title: "Content",
@@ -60,7 +60,7 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
     title: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart3,
-    isBeta: true,
+    isBeta: false,
   },
   {
     title: "Research",
@@ -179,16 +179,14 @@ export function Sidebar({ className }: { className?: string }) {
             >
               <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               <span className="flex-1 truncate">{item.title}</span>
-              {item.badge && (
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-bold text-white">
-                  {item.badge}
-                </span>
-              )}
-              {item.isBeta && !item.badge && (
-                <span className="ml-auto">
-                   <BetaBadge />
-                </span>
-              )}
+              <div className="ml-auto flex items-center gap-2">
+                {item.isBeta && <BetaBadge />}
+                {item.badge && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-bold text-white">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
             </Link>
           )
         })}

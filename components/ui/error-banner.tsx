@@ -6,9 +6,13 @@ interface ErrorBannerProps {
   message: string
   className?: string
   onClose?: () => void
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }
 
-export function ErrorBanner({ title = "Error", message, className, onClose }: ErrorBannerProps) {
+export function ErrorBanner({ title = "Error", message, className, onClose, action }: ErrorBannerProps) {
   if (!message) return null
 
   return (
@@ -17,6 +21,14 @@ export function ErrorBanner({ title = "Error", message, className, onClose }: Er
       <div className="flex-1">
         <h3 className="font-medium text-sm">{title}</h3>
         <p className="text-sm opacity-90 mt-1">{message}</p>
+        {action && (
+          <button
+            onClick={action.onClick}
+            className="mt-2 text-sm font-medium underline hover:no-underline"
+          >
+            {action.label}
+          </button>
+        )}
       </div>
       {onClose && (
         <button onClick={onClose} className="text-destructive/70 hover:text-destructive">

@@ -1,11 +1,23 @@
 "use client"
 
-import { useState, useEffect, Fragment } from "react"
+import { useState, useEffect, Fragment, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { LoadingState } from "@/components/ui/loading"
 import { Download, Calendar, ChevronDown, ChevronRight, UserPlus } from "lucide-react"
+import { 
+  DndContext, 
+  useSensor, 
+  useSensors, 
+  PointerSensor, 
+  KeyboardSensor,
+  closestCorners
+} from "@dnd-kit/core"
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { type DashboardData } from "@/lib/api/frost"
 import { useDashboardData, useNewLeadsCount } from "@/lib/hooks/use-dashboard-data"
+import { PipelineColumn } from "@/components/leads/pipeline-column"
+import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog"
+import type { Lead } from "@/types"
 import {
   Select,
   SelectContent,
@@ -29,8 +41,21 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 export default function LeadsPage() {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
   const [selectedPeriod, setSelectedPeriod] = useState("current_week")
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({})
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const { 
     data: dashboardData, 
@@ -64,6 +89,36 @@ export default function LeadsPage() {
 
   const loadDashboard = () => {
     refetchDashboard()
+  }
+
+  const leads: Lead[] = useMemo(() => {
+    return dashboardData?.leads?.map((lead: any) => {
+      const props = lead.properties || {}
+      return {
+        id: lead.id,
+        name: `${props.firstname || ''} ${props.lastname || ''}`.trim() || 'Unknown Name',
+        title: props.jobtitle,
+        company: props.company,
+        email: props.email,
+        phone: props.phone,
+        stage: (props.hs_lead_status?.toLowerCase() || 'new') as Lead['stage'],
+        source: props.hs_analytics_source || props.lead_source || 'Unknown',
+        tags: [], // Mock or extract if available
+        score: parseInt(props.hubspot_score || '0'), 
+        createdAt: new Date(props.createdate || Date.now()),
+        updatedAt: new Date(props.lastmodifieddate || Date.now()),
+        // Defaults
+        fitScore: 0,
+        behaviorScore: 0,
+        scoreBreakdown: [],
+        activities: [],
+      }
+    }) || []
+  }, [dashboardData])
+
+  const handleLeadClick = (lead: Lead) => {
+    setSelectedLead(lead)
+    setDialogOpen(true)
   }
 
   const downloadCSV = (type: 'summary' | 'details') => {
@@ -286,61 +341,42 @@ export default function LeadsPage() {
       </div>
 
       {/* Details Board */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-border flex items-center justify-between">
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">Details Board</h2>
-          <Button variant="outline" size="sm" onClick={() => downloadCSV('details')} title="Export Details">
-            <Download className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadCSV('details')} title="Export Details">
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border">
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Name</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Email</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Company</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Title</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Status</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Source</th>
-                <th className="px-6 py-3 text-left font-semibold text-muted-foreground">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {dashboardData.leads?.length === 0 ? (
-                 <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
-                       No leads found for this period.
-                    </td>
-                 </tr>
-              ) : (
-                 dashboardData.leads?.map((lead: any) => {
-                    const props = lead.properties || {};
+
+        <div className="overflow-x-auto pb-4">
+           <DndContext sensors={sensors} collisionDetection={closestCorners}>
+              <div className="flex gap-4 min-w-max">
+                 {Object.keys(dashboardData?.sources || {}).map(source => {
+                    const sourceLeads = leads.filter(l => l.source === source)
                     return (
-                     <tr key={lead.id} className="hover:bg-muted/10 transition-colors">
-                       <td className="px-6 py-3 font-medium">
-                         {props.firstname} {props.lastname}
-                       </td>
-                       <td className="px-6 py-3 text-muted-foreground">{props.email}</td>
-                       <td className="px-6 py-3 text-muted-foreground">{props.company}</td>
-                       <td className="px-6 py-3 text-muted-foreground">{props.jobtitle}</td>
-                       <td className="px-6 py-3">
-                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                           {props.hs_lead_status}
-                         </span>
-                       </td>
-                       <td className="px-6 py-3 text-muted-foreground">{props.hs_analytics_source || props.lead_source}</td>
-                       <td className="px-6 py-3 text-muted-foreground">
-                         {props.createdate ? new Date(props.createdate).toLocaleDateString() : '-'}
-                       </td>
-                     </tr>
-                   )
-                 })
-              )}
-            </tbody>
-          </table>
+                      <PipelineColumn 
+                        key={source}
+                        id={source}
+                        title={source}
+                        count={sourceLeads.length}
+                        leads={sourceLeads}
+                        onLeadClick={handleLeadClick}
+                      />
+                    )
+                 })}
+              </div>
+           </DndContext>
         </div>
       </div>
+      
+      <LeadDetailDialog 
+        lead={selectedLead} 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+      />
     </div>
   )
 }

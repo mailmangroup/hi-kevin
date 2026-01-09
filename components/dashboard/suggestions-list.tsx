@@ -7,6 +7,7 @@ import { ArrowRight, Circle } from "lucide-react"
 import Link from "next/link"
 import type { Suggestion } from "@/types"
 import { formatRelativeTime } from "@/lib/utils/date"
+import { BetaBadge } from "@/components/ui/beta-badge"
 
 interface SuggestionsListProps {
   suggestions: Suggestion[]
@@ -32,6 +33,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
           <CardTitle className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
             Kevin&apos;s Suggestions
+            <BetaBadge />
           </CardTitle>
           <CardDescription>AI-powered action items for today</CardDescription>
         </CardHeader>
@@ -53,6 +55,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
             <CardTitle className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
               Kevin&apos;s Suggestions
+              <BetaBadge />
             </CardTitle>
             <CardDescription>AI-powered action items for today</CardDescription>
           </div>

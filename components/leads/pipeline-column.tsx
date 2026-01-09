@@ -10,9 +10,10 @@ interface PipelineColumnProps {
   title: string
   count: number
   leads: Lead[]
+  onLeadClick?: (lead: Lead) => void
 }
 
-export function PipelineColumn({ id, title, count, leads }: PipelineColumnProps) {
+export function PipelineColumn({ id, title, count, leads, onLeadClick }: PipelineColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
   return (
@@ -36,7 +37,7 @@ export function PipelineColumn({ id, title, count, leads }: PipelineColumnProps)
       >
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
+            <LeadCard key={lead.id} lead={lead} onClick={onLeadClick} />
           ))}
         </SortableContext>
 

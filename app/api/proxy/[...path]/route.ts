@@ -115,9 +115,27 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
 
   // 4. Forward Request
   try {
-    const body = request.method !== 'GET' && request.method !== 'HEAD' 
-      ? await request.blob() 
-      : null
+    let body = null
+    const isChatQuery = pathSegments.join('/') === 'agent/query' && request.method === 'POST'
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      if (isChatQuery) {
+        const json = await request.json()
+        
+        // Dynamic model selection based on images
+        if (json.images && json.images.length > 0) {
+          if (json.model === 'qwen-max') {
+            json.model = 'qwen-vl-max'
+          } else if (json.model === 'qwen-plus') {
+            json.model = 'qwen3-vl-plus'
+          }
+        }
+        
+        body = JSON.stringify(json)
+      } else {
+        body = await request.blob()
+      }
+    }
 
     const response = await fetch(targetUrl, {
       method: request.method,

@@ -3,7 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { TrendingUp, TrendingDown, Minus, ArrowRight, Info } from "lucide-react"
 import Link from "next/link"
 import type { DashboardData } from "@/types"
 
@@ -12,13 +13,35 @@ interface PerformanceChartProps {
 }
 
 export function PerformanceChart({ data }: PerformanceChartProps) {
+  const maxEngagement = Math.max(...data.platforms.map((p) => p.engagement || 0)) || 100
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>This Week&apos;s Performance</CardTitle>
-            <CardDescription>Engagement across platforms</CardDescription>
+            <div className="flex items-center gap-2">
+              <CardDescription>Engagement across platforms</CardDescription>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[300px] text-xs">
+                    <p className="font-semibold mb-2">Engagement Calculation:</p>
+                    <ul className="space-y-1 list-disc pl-3">
+                      <li><span className="font-medium">XHS:</span> like + share + comment + fav + danmaku</li>
+                      <li><span className="font-medium">SPH:</span> fav + like + forward + comment</li>
+                      <li><span className="font-medium">Weibo:</span> likes + reposts + comments</li>
+                      <li><span className="font-medium">WeChat:</span> share + add_to_fav</li>
+                      <li><span className="font-medium">Douyin:</span> digg + share + comment + completion + subscribe + forward + download</li>
+                      <li><span className="font-medium">Bilibili:</span> like + reply + share + fav + coin + danmaku</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/analytics" className="flex items-center gap-1">
@@ -31,8 +54,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
       <CardContent>
         <div className="space-y-4">
           {data.platforms.map((platform) => {
-            const isPositive = platform.change > 0
-            const isNegative = platform.change < 0
+            const isPositive = (platform.change || 0) > 0
+            const isNegative = (platform.change || 0) < 0
             const Icon = isPositive
               ? TrendingUp
               : isNegative
@@ -59,13 +82,13 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
                       className="absolute inset-y-0 left-0 rounded-full transition-all"
                       style={{
                         backgroundColor: platform.color,
-                        width: `${(platform.engagement / 4000) * 100}%`,
+                        width: `${((platform.engagement || 0) / maxEngagement) * 100}%`,
                         opacity: 0.8,
                       }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <span className="text-xs font-semibold text-foreground">
-                        {platform.engagement.toLocaleString()}
+                        {(platform.engagement || 0).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -83,7 +106,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    {Math.abs(platform.change)}%
+                    {Math.abs(platform.change || 0)}%
                   </div>
                 </div>
               </div>
@@ -98,7 +121,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
               <p className="text-muted-foreground">Total Engagement</p>
               <p className="text-lg font-bold mt-1">
                 {data.platforms
-                  .reduce((sum, p) => sum + p.engagement, 0)
+                  .reduce((sum, p) => sum + (p.engagement || 0), 0)
                   .toLocaleString()}
               </p>
             </div>
@@ -106,8 +129,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
               <p className="text-muted-foreground">Average Change</p>
               <p className="text-lg font-bold mt-1">
                 {(
-                  data.platforms.reduce((sum, p) => sum + p.change, 0) /
-                  data.platforms.length
+                  data.platforms.reduce((sum, p) => sum + (p.change || 0), 0) /
+                  (data.platforms.length || 1)
                 ).toFixed(1)}
                 %
               </p>

@@ -12,9 +12,10 @@ import { formatDistanceToNow } from "@/lib/utils/date"
 interface LeadCardProps {
   lead: Lead
   isDragging?: boolean
+  onClick?: (lead: Lead) => void
 }
 
-export function LeadCard({ lead, isDragging = false }: LeadCardProps) {
+export function LeadCard({ lead, isDragging = false, onClick }: LeadCardProps) {
   const {
     attributes,
     listeners,
@@ -31,75 +32,68 @@ export function LeadCard({ lead, isDragging = false }: LeadCardProps) {
 
   const isActuallyDragging = isDragging || isSortableDragging
 
+  const CardContent = (
+    <Card
+      className={`cursor-grab p-2 transition-all hover:shadow-md active:cursor-grabbing ${
+        isActuallyDragging ? "opacity-50" : ""
+      }`}
+    >
+      {/* Header */}
+      <div className="mb-2 flex items-start justify-between">
+        <div className="flex-1">
+          <h4 className="mb-0.5 text-xs font-semibold text-foreground truncate">{lead.name}</h4>
+          {lead.title && (
+            <p className="text-[10px] text-muted-foreground truncate">{lead.title}</p>
+          )}
+        </div>
+        {/* Score Badge */}
+        <div className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <span className="text-[10px] font-bold text-primary">{lead.score}</span>
+        </div>
+      </div>
+
+      {/* Company & Contact */}
+      <div className="mb-2 space-y-1">
+        {lead.company && (
+          <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <Building2 className="h-3 w-3" />
+            <span className="truncate">{lead.company}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 text-[10px] text-muted">
+          <Mail className="h-3 w-3" />
+          <span className="truncate">{lead.email}</span>
+        </div>
+      </div>
+
+      {/* Footer - Next Follow Up */}
+      <div className="flex items-center justify-between border-t border-border pt-2">
+        {lead.nextFollowUpAt ? (
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>{formatDistanceToNow(lead.nextFollowUpAt)}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <TrendingUp className="h-3 w-3" />
+            <span>No schedule</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Link href={`/dashboard/leads/${lead.id}`}>
-        <Card
-          className={`cursor-grab p-4 transition-all hover:shadow-md active:cursor-grabbing ${
-            isActuallyDragging ? "opacity-50" : ""
-          }`}
-        >
-          {/* Header */}
-          <div className="mb-3 flex items-start justify-between">
-            <div className="flex-1">
-              <h4 className="mb-1 text-sm font-semibold text-foreground">{lead.name}</h4>
-              {lead.title && (
-                <p className="text-xs text-muted-foreground">{lead.title}</p>
-              )}
-            </div>
-            {/* Score Badge */}
-            <div className="ml-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <span className="text-sm font-bold text-primary">{lead.score}</span>
-            </div>
-          </div>
-
-          {/* Company & Contact */}
-          <div className="mb-3 space-y-1.5">
-            {lead.company && (
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <Building2 className="h-3.5 w-3.5" />
-                <span>{lead.company}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <Mail className="h-3.5 w-3.5" />
-              <span className="truncate">{lead.email}</span>
-            </div>
-            {lead.phone && (
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <Phone className="h-3.5 w-3.5" />
-                <span>{lead.phone}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          {lead.tags.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {lead.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {/* Footer - Next Follow Up */}
-          <div className="flex items-center justify-between border-t border-border pt-3">
-            {lead.nextFollowUpAt ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Follow up {formatDistanceToNow(lead.nextFollowUpAt)}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span>No follow-up scheduled</span>
-              </div>
-            )}
-          </div>
-        </Card>
-      </Link>
+      {onClick ? (
+        <div onClick={() => onClick(lead)} role="button" tabIndex={0} className="outline-none">
+          {CardContent}
+        </div>
+      ) : (
+        <Link href={`/dashboard/leads/${lead.id}`}>
+          {CardContent}
+        </Link>
+      )}
     </div>
   )
 }

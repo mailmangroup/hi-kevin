@@ -1,19 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { Send, User, Bot, Paperclip, Brain, Globe } from "lucide-react"
+import { User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { ChatInputArea } from "./chat-input-area"
 import { MessageContent } from "./message-content"
 import { ToolCallList, ToolCall } from "./tool-call-display"
 
@@ -25,6 +19,7 @@ interface Message {
   toolCalls?: ToolCall[]
   isStreaming?: boolean
   followUpQuestions?: string[]
+  images?: string[]
 }
 
 interface SubContentItem {
@@ -140,6 +135,9 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
     return searchParams?.get('model') || "qwen-max"
   })
 
+  // Image upload
+  const [selectedImages, setSelectedImages] = React.useState<string[]>([])
+
   // Load credentials and chat history in parallel
   React.useEffect(() => {
     async function loadCredentials() {
@@ -230,11 +228,24 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
   React.useEffect(() => {
     if (initialMessage && !initialized.current && !chatId && !credentialsLoading && credentials.orgId) {
       initialized.current = true
-      handleSend(initialMessage)
+      
+      let images: string[] = []
+      // Check for pending images from dashboard
+      const pendingImages = sessionStorage.getItem('pending_chat_images')
+      if (pendingImages) {
+          try {
+              images = JSON.parse(pendingImages)
+              sessionStorage.removeItem('pending_chat_images')
+          } catch (e) {
+              console.error("Failed to parse pending images", e)
+          }
+      }
+
+      handleSend(initialMessage, images)
     }
   }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
 
-  const handleSend = async (text: string = input) => {
+  const handleSend = async (text: string = input, images: string[] = selectedImages) => {
     if (!text.trim() || isThinking) return
 
     // Don't send if credentials are still loading or missing
@@ -248,10 +259,12 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
       role: "user",
       content: text,
       timestamp: new Date(),
+      images: images.length > 0 ? images : undefined
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
+    setSelectedImages([])
     setIsThinking(true)
 
     // Create a placeholder for assistant message
@@ -278,7 +291,8 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
         brandId: credentials.brandId,
         thinkingEnabled,
         includeWebSearch,
-        model
+        model,
+        images
       })
 
       for await (const chunk of stream) {
@@ -389,13 +403,6 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Messages Area */}
@@ -429,6 +436,15 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                 {/* Tool Calls */}
                 {message.toolCalls && message.toolCalls.length > 0 && (
                   <ToolCallList toolCalls={message.toolCalls} />
+                )}
+
+                {/* Uploaded Images */}
+                {message.images && message.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {message.images.map((img, i) => (
+                      <img key={i} src={img} alt="Uploaded" className="max-w-full h-auto rounded-lg max-h-64 object-contain bg-black/5" />
+                    ))}
+                  </div>
                 )}
 
                 {/* Message Content with Markdown */}
@@ -489,70 +505,24 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
           )}
 
           <div className="relative rounded-2xl border border-border bg-white shadow-sm focus-within:ring-1 focus-within:ring-primary">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
+            <ChatInputArea 
+              input={input}
+              setInput={setInput}
+              onSend={() => handleSend()}
+              thinkingEnabled={thinkingEnabled}
+              setThinkingEnabled={setThinkingEnabled}
+              includeWebSearch={includeWebSearch}
+              setIncludeWebSearch={setIncludeWebSearch}
+              model={model}
+              setModel={setModel}
+              selectedImages={selectedImages}
+              setSelectedImages={setSelectedImages}
               placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
-              disabled={credentialsLoading || !!credentialsError}
-              className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm focus:outline-none disabled:opacity-50 min-h-[100px]"
-              rows={1}
+              disabled={credentialsLoading || !!credentialsError || isThinking}
+              isThinking={isThinking}
+              showBorder={false}
+              className="border-none shadow-none focus-within:ring-0"
             />
-
-            <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={thinkingEnabled ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setThinkingEnabled(!thinkingEnabled)}
-                  className={cn(
-                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground",
-                    thinkingEnabled && "bg-primary/10 text-primary"
-                  )}
-                >
-                  <Brain className="h-4 w-4" />
-                  <span className="text-xs font-medium">Think</span>
-                </Button>
-                <Button
-                  variant={includeWebSearch ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setIncludeWebSearch(!includeWebSearch)}
-                  className={cn(
-                    "gap-2 h-8 rounded-lg text-muted-foreground hover:text-foreground",
-                    includeWebSearch && "bg-primary/10 text-primary"
-                  )}
-                >
-                  <Globe className="h-4 w-4" />
-                  <span className="text-xs font-medium">Search</span>
-                </Button>
-
-                <div className="h-4 w-px bg-border mx-1" />
-
-                <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger className="h-8 border-none bg-transparent shadow-none w-auto gap-2 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 focus:ring-0">
-                    <SelectValue placeholder="Model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="qwen-max">qwen-max</SelectItem>
-                    <SelectItem value="qwen-plus">qwen-plus</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted" disabled={credentialsLoading || !!credentialsError}>
-                    <Paperclip className="h-5 w-5" />
-                </Button>
-                <Button
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || isThinking || credentialsLoading || !!credentialsError}
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.

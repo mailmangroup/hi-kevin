@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { BetaBadge } from "@/components/ui/beta-badge"
 import { FileText, Download, CheckCircle2, Loader2, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 
@@ -33,7 +34,10 @@ export function ReportGenerator() {
     <Card className="p-6 bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-indigo-900">Auto-Report Generator</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-indigo-900">Auto-Report Generator</h3>
+            <BetaBadge label="AI Report Generation" />
+          </div>
           <p className="text-sm text-indigo-600/80 mt-1">
             Generate professional PDF reports in seconds.
           </p>

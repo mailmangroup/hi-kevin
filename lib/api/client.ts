@@ -178,7 +178,8 @@ export const aiService = {
         model?: string,
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
-        toolSelectionEnabled?: boolean
+        toolSelectionEnabled?: boolean,
+        images?: string[]
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -199,7 +200,8 @@ export const aiService = {
         model: options.model || "qwen-max",
         include_web_search: options.includeWebSearch ?? true,
         thinking_enabled: options.thinkingEnabled ?? false,
-        tool_selection_enabled: options.toolSelectionEnabled ?? true
+        tool_selection_enabled: options.toolSelectionEnabled ?? true,
+        images: options.images
     }
 
     console.log('[API] Sending chat query payload:', payload)
