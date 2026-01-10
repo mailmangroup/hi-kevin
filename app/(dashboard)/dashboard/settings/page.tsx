@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Save, Bell, Globe, User, Key, CheckCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
+import { useUserStore } from "@/lib/store/user-store"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -23,15 +24,33 @@ export default function SettingsPage() {
     kawo_api_url: ''
   })
   const [error, setError] = useState<string | null>(null)
+  
+  const { profile: storeProfile, fetchProfile, setProfile: setStoreProfile } = useUserStore()
+
+  useEffect(() => {
+    // If we have profile in store, use it immediately
+    if (storeProfile) {
+      setProfile(prev => ({
+        ...prev,
+        full_name: storeProfile.full_name || '',
+        email: storeProfile.email || prev.email, // Preserve email if we have it locally, otherwise use store
+      }))
+    }
+  }, [storeProfile])
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        // Use getSession instead of getUser to avoid unnecessary network calls
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
         
         if (!user) return
 
+        // If we have store profile, we might still want to fetch full details (tokens etc) that are not in store
+        // But for full_name we can rely on store.
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
@@ -52,6 +71,12 @@ export default function SettingsPage() {
             kawo_org_id: data.kawo_org_id || '',
             kawo_brand_id: data.kawo_brand_id || '',
             kawo_api_url: data.kawo_api_url || ''
+          })
+          
+          // Update store with latest data
+          setStoreProfile({
+            full_name: data.full_name,
+            email: data.email || user.email || null
           })
         } else if (user) {
           // If no profile exists yet, initialize with user email
@@ -117,6 +142,12 @@ export default function SettingsPage() {
         title: "Settings saved",
         description: "Your profile and KAWO credentials have been updated successfully.",
         type: "success"
+      })
+
+      // Update global store
+      setStoreProfile({
+        full_name: profile.full_name,
+        email: profile.email || null
       })
 
     } catch (e: any) {

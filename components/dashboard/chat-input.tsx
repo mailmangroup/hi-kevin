@@ -2,50 +2,50 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { ChatInputArea } from "@/components/chat/chat-input-area"
+import { ChatInputArea, UploadedImage } from "@/components/chat/chat-input-area"
 import { BetaBadge } from "@/components/ui/beta-badge"
+import { useUserStore } from "@/lib/store/user-store"
 
 export function ChatInput() {
   const [input, setInput] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
   const [model, setModel] = useState("qwen-max")
-  const [fullName, setFullName] = useState<string | null>(null)
-  const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const router = useRouter()
+  
+  const { profile, fetchProfile } = useUserStore()
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (!user) return
+    fetchProfile()
+  }, [fetchProfile])
 
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .maybeSingle()
-
-        if (data?.full_name) {
-          setFullName(data.full_name)
-        }
-      } catch (e) {
-        console.error('Error loading profile:', e)
-      }
-    }
-    loadProfile()
-  }, [])
+  const fullName = profile?.full_name
 
   const handleSend = () => {
     if (!input.trim() && selectedImages.length === 0) return
-    
-    // Save images to session storage if any
-    if (selectedImages.length > 0) {
-        sessionStorage.setItem('pending_chat_images', JSON.stringify(selectedImages))
+
+    // Check if any images are still uploading
+    const uploadingImages = selectedImages.filter(img => img.uploading)
+    if (uploadingImages.length > 0) {
+      console.warn("Cannot send message: images are still uploading")
+      return
+    }
+
+    // Check if any images failed to upload (no OSS key)
+    const failedImages = selectedImages.filter(img => !img.uploading && !img.key)
+    if (failedImages.length > 0) {
+      console.error("Cannot send message: some images failed to upload. Please remove them and try again.")
+      return
+    }
+
+    // Filter images to only those with successful OSS keys
+    const validImages = selectedImages.filter(img => img.key)
+
+    // Save valid images to session storage if any
+    if (validImages.length > 0) {
+        sessionStorage.setItem('pending_chat_images', JSON.stringify(validImages))
     }
 
     // Navigate to chat page with initial message and options

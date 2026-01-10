@@ -12,10 +12,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - api/proxy (allow proxy calls if needed, though they should be protected by session check inside)
+     * - api/proxy (proxy handles its own auth and needs to process large bodies)
      * But usually we want to protect everything except public assets.
      * Let's exclude images, etc.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/proxy|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

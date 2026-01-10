@@ -40,7 +40,9 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
 
   // 1. Check Authentication
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // Use getSession to avoid extra calls to auth/v1/user
+  const { data: { session }, error: authError } = await supabase.auth.getSession()
+  const user = session?.user
 
   console.log('[Proxy] Auth check:', { userId: user?.id, authError })
 
@@ -107,10 +109,11 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
 
   // 4. Prepare Headers
   const headers = new Headers(request.headers)
-  
-  // Remove host to avoid confusion
+
+  // Remove headers that should not be forwarded
   headers.delete('host')
   headers.delete('connection')
+  headers.delete('content-length') // Will be recalculated by fetch()
 
   // Use user-specific credentials
   headers.set('Authorization', `Bearer ${token}`)
@@ -124,22 +127,52 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       if (isChatQuery) {
-        const json = await request.json()
-        
+        let json
+        try {
+          json = await request.json()
+          console.log('[API] Successfully parsed JSON payload')
+        } catch (jsonError) {
+          console.error('[API] Failed to parse JSON:', jsonError)
+          return NextResponse.json(
+            { error: 'Failed to parse request body. Payload may be too large or malformed.', details: String(jsonError) },
+            { status: 400 }
+          )
+        }
+
+        console.log('[API] Sending chat query payload:', {
+          query: json.query?.substring(0, 100),
+          hasImages: !!json.images,
+          imageCount: json.images?.length || 0,
+          model: json.model,
+          org_id: json.org_id,
+          brand_id: json.brand_id
+        })
+
         // Dynamic model selection based on images
         if (json.images && json.images.length > 0) {
+          console.log('[API] Images detected, switching model:', {
+            from: json.model,
+            to: json.model === 'qwen-max' ? 'qwen-vl-max' : (json.model === 'qwen-plus' ? 'qwen3-vl-plus' : json.model)
+          })
           if (json.model === 'qwen-max') {
             json.model = 'qwen-vl-max'
           } else if (json.model === 'qwen-plus') {
             json.model = 'qwen3-vl-plus'
           }
         }
-        
+
         body = JSON.stringify(json)
       } else {
         body = await request.blob()
       }
     }
+
+    console.log('[API] Forwarding request to:', {
+      url: targetUrl,
+      method: request.method,
+      hasBody: !!body,
+      bodySize: body ? (typeof body === 'string' ? body.length : body.size) : 0
+    })
 
     const response = await fetch(targetUrl, {
       method: request.method,
@@ -147,6 +180,12 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
       body: body,
       // @ts-ignore
       duplex: 'half', // Required for streaming bodies in some Next.js versions/Node
+    })
+
+    console.log('[API] Backend response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
     })
 
     // Log errors for debugging

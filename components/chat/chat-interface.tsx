@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { ChatInputArea } from "./chat-input-area"
+import { ChatInputArea, UploadedImage } from "./chat-input-area"
 import { MessageContent } from "./message-content"
 import { ToolCallList, ToolCall } from "./tool-call-display"
 import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
@@ -26,12 +26,13 @@ interface Message {
 }
 
 interface SubContentItem {
-  type: "tool_input" | "tool_output" | "assistant_message" | "user_message"
+  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image"
   tool?: string
   tool_input?: any
   tool_output?: any
   artifact?: any
   content?: string
+  image_url?: string
 }
 
 /**
@@ -41,19 +42,29 @@ interface SubContentItem {
 function parseSubContentList(subContentList: SubContentItem[] | undefined): {
   toolCalls: ToolCall[]
   content: string
+  images: string[]
 } {
   if (!subContentList || subContentList.length === 0) {
-    return { toolCalls: [], content: "" }
+    return { toolCalls: [], content: "", images: [] }
   }
 
   const toolCalls: ToolCall[] = []
   let content = ""
-
+  const images: string[] = []
+  
   // Track tool inputs by name to match with outputs (using array to handle multiple calls to same tool)
   const pendingToolsByName: Map<string, ToolCall[]> = new Map()
 
   // Process items in order to maintain sequence
   for (const item of subContentList) {
+    if (item.type === "user_message" && item.content) {
+      content = item.content
+    }
+    
+    if (item.type === "user_image" && item.image_url) {
+        images.push(item.image_url)
+    }
+
     if (item.type === "tool_input" && item.tool) {
       const toolCall: ToolCall = {
         id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
@@ -99,12 +110,12 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
       content = item.content
     }
 
-    if (item.type === "user_message" && item.content) {
+    if (item.type === "assistant_message" && item.content) {
       content = item.content
     }
   }
 
-  return { toolCalls, content }
+  return { toolCalls, content, images }
 }
 
 interface ChatInterfaceProps {
@@ -148,14 +159,17 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
   })
 
   // Image upload
-  const [selectedImages, setSelectedImages] = React.useState<string[]>([])
+  const [selectedImages, setSelectedImages] = React.useState<UploadedImage[]>([])
 
   // Load credentials and chat history in parallel
   React.useEffect(() => {
     async function loadCredentials() {
       try {
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        // Use getSession instead of getUser to avoid unnecessary network calls
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
+        
         if (user) {
           const { data, error } = await supabase.from('profiles').select('kawo_org_id, kawo_brand_id').eq('id', user.id).single()
           if (error) throw error
@@ -217,16 +231,17 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           const { messages: history } = await aiService.getMessages(id)
           const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images } = parseSubContentList(msg.sub_content_list)
 
-              return {
-                  id: msg.id,
-                  role: msg.role,
-                  // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
-                  content: parsedContent || msg.content || "",
-                  timestamp: new Date(msg.created_at),
-                  toolCalls: toolCalls.length > 0 ? toolCalls : undefined
-              }
+  return {
+      id: msg.id,
+      role: msg.role,
+      // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
+      content: parsedContent || msg.content || "",
+      timestamp: new Date(msg.created_at),
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      images: images.length > 0 ? images : undefined
+  }
           })
           // Sort by timestamp ascending (oldest first)
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
@@ -241,9 +256,9 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     if (initialMessage && !initialized.current && !chatId && !credentialsLoading && credentials.orgId) {
       initialized.current = true
       
-      let images: string[] = []
       // Check for pending images from dashboard
       const pendingImages = sessionStorage.getItem('pending_chat_images')
+      let images: UploadedImage[] = []
       if (pendingImages) {
           try {
               images = JSON.parse(pendingImages)
@@ -257,7 +272,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     }
   }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
 
-  const handleSend = async (text: string = input, images: string[] = selectedImages) => {
+  const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages) => {
     if (!text.trim() || isThinking) return
 
     // Don't send if credentials are still loading or missing
@@ -266,12 +281,31 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
       return
     }
 
+    // Check if any images are still uploading
+    const uploadingImages = images.filter(img => img.uploading)
+    if (uploadingImages.length > 0) {
+      console.warn("Cannot send message: images are still uploading")
+      // You can add a toast notification here if you have a toast system
+      return
+    }
+
+    // Check if any images failed to upload (no OSS key)
+    const failedImages = images.filter(img => !img.uploading && !img.key)
+    if (failedImages.length > 0) {
+      console.error("Cannot send message: some images failed to upload. Please remove them and try again.")
+      // You can add a toast notification here
+      return
+    }
+
+    // Filter images to only those with successful OSS keys
+    const validImages = images.filter(img => img.key)
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: text,
       timestamp: new Date(),
-      images: images.length > 0 ? images : undefined
+      images: validImages.length > 0 ? validImages.map(img => img.url) : undefined
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -305,7 +339,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
         thinkingEnabled,
         includeWebSearch,
         model,
-        images
+        images: validImages.map(img => img.key!) // Only send OSS keys
       })
 
       for await (const chunk of stream) {

@@ -41,7 +41,9 @@ export function KawoCredentialsModal() {
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      // Use getSession instead of getUser to avoid unnecessary network calls
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
 
       if (!user) {
         toast({

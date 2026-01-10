@@ -13,6 +13,15 @@ import {
 } from "@/components/ui/select"
 import { compressImage } from "@/lib/utils/image-compression"
 
+export interface UploadedImage {
+  id: string
+  url: string // Preview URL (blob:...) or remote URL
+  key?: string // OSS Key
+  file?: File
+  uploading: boolean
+  error?: boolean
+}
+
 export interface ChatInputAreaProps {
   input: string
   setInput: (value: string) => void
@@ -23,8 +32,8 @@ export interface ChatInputAreaProps {
   setIncludeWebSearch: (enabled: boolean) => void
   model: string
   setModel: (model: string) => void
-  selectedImages: string[]
-  setSelectedImages: (images: string[] | ((prev: string[]) => string[])) => void
+  selectedImages: UploadedImage[]
+  setSelectedImages: (images: UploadedImage[] | ((prev: UploadedImage[]) => UploadedImage[])) => void
   className?: string
   placeholder?: string
   disabled?: boolean
@@ -51,60 +60,96 @@ export function ChatInputArea({
   showBorder = true
 }: ChatInputAreaProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const [isCompressing, setIsCompressing] = React.useState(false)
+  // Track global uploading state to disable send button if any image is uploading
+  const isUploading = selectedImages.some(img => img.uploading)
+  // Track if any images have failed to upload
+  const hasFailedUploads = selectedImages.some(img => img.error)
 
   // Model constants
   const AVAILABLE_MODELS = ["qwen-max", "qwen-plus"]
+
+  const uploadImage = async (img: UploadedImage) => {
+      try {
+          if (!img.file) return
+
+          // 1. Get signed URL
+          const res = await fetch('/api/proxy/upload/sign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: img.file.name, filetype: img.file.type })
+          })
+          
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(err.error || 'Failed to get sign url')
+          }
+          
+          const { uploadUrl, objectKey } = await res.json()
+
+          // 2. Upload to OSS
+          const uploadRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: img.file
+          })
+          
+          if (!uploadRes.ok) {
+             throw new Error('Failed to upload to OSS')
+          }
+
+          // 3. Update state
+          setSelectedImages(prev => prev.map(p => 
+              p.id === img.id ? { ...p, uploading: false, key: objectKey } : p
+          ))
+      } catch (e) {
+          console.error('Upload failed:', e)
+          setSelectedImages(prev => prev.map(p => 
+              p.id === img.id ? { ...p, uploading: false, error: true } : p
+          ))
+      }
+  }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    setIsCompressing(true)
+    const newImages: UploadedImage[] = []
 
-    try {
-      // Compress images in parallel
-      const compressionPromises = Array.from(files).map(async (file) => {
-        try {
-          // Check file size
-          const fileSizeMB = file.size / (1024 * 1024)
-          console.log(`[Upload] Processing ${file.name} (${fileSizeMB.toFixed(2)}MB)`)
-
-          // Compress to max 0.5MB, 1920px, 0.8 quality
-          const compressed = await compressImage(file, 0.5, 1920, 0.8)
-          return compressed
-        } catch (error) {
-          console.error(`Failed to compress ${file.name}:`, error)
-          // Fall back to original file if compression fails
-          return new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = (e) => resolve(e.target?.result as string)
-            reader.readAsDataURL(file)
-          })
+    for (const file of Array.from(files)) {
+        const id = Math.random().toString(36).substring(7)
+        const previewUrl = URL.createObjectURL(file)
+        const imageObj: UploadedImage = {
+            id,
+            url: previewUrl,
+            file,
+            uploading: true
         }
-      })
+        newImages.push(imageObj)
+    }
 
-      const compressedImages = await Promise.all(compressionPromises)
-      setSelectedImages((prev: string[]) => [...prev, ...compressedImages])
-    } catch (error) {
-      console.error('Error processing images:', error)
-    } finally {
-      setIsCompressing(false)
-      // Reset input
-      if (fileInputRef.current) {
+    // Add to state
+    setSelectedImages((prev) => [...prev, ...newImages])
+
+    // Reset input
+    if (fileInputRef.current) {
         fileInputRef.current.value = ''
-      }
+    }
+
+    // Start uploads
+    for (const img of newImages) {
+        uploadImage(img)
     }
   }
 
   const removeImage = (index: number) => {
-    setSelectedImages((prev: string[]) => prev.filter((_, i) => i !== index))
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      onSend()
+      if (!isUploading) {
+        onSend()
+      }
     }
   }
 
@@ -115,10 +160,30 @@ export function ChatInputArea({
           <div className="flex gap-2 p-4 pb-0 overflow-x-auto">
               {selectedImages.map((img, idx) => (
                   <div key={idx} className="relative group flex-shrink-0">
-                      <img src={img} alt="Selected" className="h-16 w-16 object-cover rounded-lg border border-border" />
+                      <div className="relative">
+                        <img 
+                          src={img.url} 
+                          alt="Selected" 
+                          className={cn(
+                            "h-16 w-16 object-cover rounded-lg border border-border transition-opacity",
+                            img.uploading ? "opacity-50" : "opacity-100",
+                            img.error ? "border-red-500" : ""
+                          )} 
+                        />
+                        {img.uploading && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          </div>
+                        )}
+                        {img.error && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-red-500/10 rounded-lg">
+                             <X className="h-4 w-4 text-red-500" />
+                          </div>
+                        )}
+                      </div>
                       <button
                           onClick={() => removeImage(idx)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
                       >
                           <X className="h-3 w-3" />
                       </button>
@@ -193,28 +258,18 @@ export function ChatInputArea({
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:bg-muted"
-              disabled={disabled || isCompressing}
+              disabled={disabled || isUploading}
               onClick={() => fileInputRef.current?.click()}
           >
-              {isCompressing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Paperclip className="h-5 w-5" />
-              )}
+            <Paperclip className="h-5 w-5" />
           </Button>
           <Button
             onClick={onSend}
-            disabled={(!input.trim() && selectedImages.length === 0) || isThinking || disabled}
+            disabled={(!input.trim() && selectedImages.length === 0) || isThinking || disabled || isUploading || hasFailedUploads}
             size="icon"
             className="h-8 w-8 rounded-full"
+            title={hasFailedUploads ? "Please remove failed images before sending" : undefined}
           >
-            {/* We can make the icon conditional or passed as prop, but usually ArrowUp or Send is fine. 
-                ChatInterface used Send, Dashboard used ArrowUp. Let's standardize on Send for now as it's more chat-like, 
-                or ArrowUp which is modern AI style. ChatInterface used Send, let's use ArrowUp to be modern? 
-                The user asked for consistency. Let's use Send for now to match the existing ChatInterface icon, or check what ChatInterface used.
-                ChatInterface used Send. Dashboard used ArrowUp.
-                I will use ArrowUp as it's becoming the standard for AI inputs (ChatGPT, Claude).
-            */}
             <ArrowUp className="h-4 w-4" />
           </Button>
         </div>

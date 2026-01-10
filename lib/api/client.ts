@@ -207,16 +207,30 @@ export const aiService = {
         images: options.images
     }
 
-    console.log('[API] Sending chat query payload:', payload)
+    const payloadString = JSON.stringify(payload)
+    const payloadSizeKB = (payloadString.length / 1024).toFixed(2)
 
-    const response = await fetch('/api/proxy/agent/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
+    console.log('[API] Sending chat query payload:', payload)
+    console.log(`[API] Payload size: ${payloadSizeKB} KB`)
+    console.log('[API] Initiating fetch to /api/proxy/agent/query...')
+
+    let response
+    try {
+        response = await fetch('/api/proxy/agent/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payloadString
+        })
+        console.log('[API] Fetch completed, status:', response.status)
+    } catch (fetchError) {
+        console.error('[API] Fetch failed:', fetchError)
+        throw new Error(`Network error: ${fetchError}`)
+    }
 
     if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('[API] Response not OK:', response.status, errorText)
+        throw new Error(`Chat request failed: ${response.statusText} - ${errorText}`)
     }
 
     if (!response.body) throw new Error("No response body")
