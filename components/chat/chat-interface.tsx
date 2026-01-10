@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client"
 import { ChatInputArea } from "./chat-input-area"
 import { MessageContent } from "./message-content"
 import { ToolCallList, ToolCall } from "./tool-call-display"
+import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
+import { ArtifactPanel } from "./artifact-panel"
 
 interface Message {
   id: string
@@ -111,6 +113,15 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
+  return (
+    <ArtifactProvider>
+      <ChatInterfaceInner initialMessage={initialMessage} chatId={chatId} />
+    </ArtifactProvider>
+  )
+}
+
+function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
+  const { openArtifact, isPanelOpen } = useArtifact()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
@@ -378,6 +389,19 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
                         }
                       : msg
               ))
+
+              // Auto-open artifact panel when artifact is received
+              if (toolArtifact) {
+                const artifactData: ArtifactData = {
+                  id: `${toolName}-${Date.now()}`,
+                  type: determineArtifactType(toolArtifact, toolName),
+                  title: toolArtifact.title || getToolDisplayName(toolName),
+                  data: toolArtifact.data || toolArtifact,
+                  toolName,
+                  session: toolArtifact.session,
+                }
+                openArtifact(artifactData)
+              }
           }
 
           if (chunk.error) {
@@ -416,9 +440,14 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+    <div className="flex h-full bg-background">
+      {/* Chat Area */}
+      <div className={cn(
+        "flex flex-1 flex-col transition-all duration-300",
+        isPanelOpen ? "mr-0" : ""
+      )}>
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.map((message) => (
             <div
@@ -551,6 +580,54 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
           </p>
         </div>
       </div>
+      </div>
+
+      {/* Artifact Panel */}
+      <ArtifactPanel />
     </div>
   )
+}
+
+// Helper functions for artifact type detection
+function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" {
+  if (artifact?.type) {
+    return artifact.type
+  }
+  if (toolName) {
+    if (toolName.includes("chart") || toolName.includes("analytics")) {
+      return "chart"
+    }
+    if (toolName.includes("code") || toolName.includes("generate")) {
+      return "code"
+    }
+    if (toolName.includes("table") || toolName.includes("data")) {
+      return "table"
+    }
+    if (toolName.includes("report") || toolName.includes("insights") || toolName.includes("performance")) {
+      return "report"
+    }
+  }
+  if (artifact?.data) {
+    if (Array.isArray(artifact.data)) {
+      return "table"
+    }
+    if (typeof artifact.data === "string" && artifact.data.includes("```")) {
+      return "code"
+    }
+  }
+  return "data"
+}
+
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  get_account_insights: "Account Insights",
+  get_content_performance: "Content Performance",
+  search_web: "Web Search Results",
+  analyze_competitors: "Competitor Analysis",
+  generate_content: "Generated Content",
+  schedule_post: "Scheduled Post",
+  get_audience_data: "Audience Data",
+}
+
+function getToolDisplayName(toolName: string): string {
+  return TOOL_DISPLAY_NAMES[toolName] || toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }

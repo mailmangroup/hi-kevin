@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle, Database } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
+import { ArtifactSnippet } from "./artifact-snippet"
 
 // Tool icons mapping
 const TOOL_ICONS: Record<string, string> = {
@@ -118,7 +119,7 @@ export function ToolCallDisplay({ tool, defaultExpanded = false }: ToolCallDispl
                 <Database className="h-3 w-3" />
                 Data
               </div>
-              <ArtifactPreview artifact={tool.artifact} toolName={tool.name} />
+              <ArtifactSnippet artifact={tool.artifact} toolName={tool.name} />
             </div>
           )}
         </div>
@@ -133,11 +134,10 @@ export function ToolCallDisplay({ tool, defaultExpanded = false }: ToolCallDispl
         </div>
       )}
 
-      {/* Artifact indicator when collapsed */}
-      {!isExpanded && tool.artifact && !outputSummary && (
-        <div className="px-3 py-1.5 border-t border-gray-100 bg-white flex items-center gap-1.5 text-xs text-gray-500">
-          <Database className="h-3 w-3" />
-          <span>Data available</span>
+      {/* Artifact snippet when collapsed */}
+      {!isExpanded && tool.artifact && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-white">
+          <ArtifactSnippet artifact={tool.artifact} toolName={tool.name} />
         </div>
       )}
     </div>
@@ -295,72 +295,6 @@ function extractAllSummaries(output: any): Summary[] {
   }
 
   return summaries
-}
-
-// Artifact preview component for inline display
-function ArtifactPreview({ artifact, toolName }: { artifact: any; toolName: string }) {
-  const [showFull, setShowFull] = React.useState(false)
-
-  if (!artifact) return null
-
-  // Try to extract meaningful preview
-  const session = artifact.session
-  const data = artifact.data
-
-  return (
-    <div className="space-y-2">
-      {/* Session info if available */}
-      {session && (
-        <div className="text-xs text-gray-500 flex flex-wrap gap-2">
-          {session.action && <span className="bg-gray-100 px-1.5 py-0.5 rounded">{session.action}</span>}
-          {session.date_start && session.date_end && (
-            <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-              {session.date_start} to {session.date_end}
-            </span>
-          )}
-          {session.networks && session.networks.length > 0 && (
-            <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-              {session.networks.join(", ")}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Data preview */}
-      {data && (
-        <div>
-          <button
-            onClick={() => setShowFull(!showFull)}
-            className="text-xs text-primary hover:underline mb-1"
-          >
-            {showFull ? "Hide raw data" : "Show raw data"}
-          </button>
-          {showFull && (
-            <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600 max-h-[300px] overflow-y-auto">
-              {JSON.stringify(data, null, 2)}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {/* Fallback for unknown artifact structure */}
-      {!session && !data && (
-        <div>
-          <button
-            onClick={() => setShowFull(!showFull)}
-            className="text-xs text-primary hover:underline mb-1"
-          >
-            {showFull ? "Hide raw data" : "Show raw data"}
-          </button>
-          {showFull && (
-            <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600 max-h-[300px] overflow-y-auto">
-              {JSON.stringify(artifact, null, 2)}
-            </pre>
-          )}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // Component for displaying multiple tool calls
