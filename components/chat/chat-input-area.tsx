@@ -86,12 +86,16 @@ export function ChatInputArea({
           
           const { uploadUrl, objectKey } = await res.json()
 
-          // 2. Upload to OSS
+          // 2. Upload to OSS with Content-Type header
+          // IMPORTANT: Content-Type must match what was used to generate the presigned URL
           const uploadRes = await fetch(uploadUrl, {
               method: 'PUT',
+              headers: {
+                'Content-Type': img.file.type
+              },
               body: img.file
           })
-          
+
           if (!uploadRes.ok) {
              throw new Error('Failed to upload to OSS')
           }
