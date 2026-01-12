@@ -3,15 +3,19 @@
 import * as React from "react"
 import { User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { Button } from "@/components/ui/button"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { ChatInputArea, UploadedImage } from "./chat-input-area"
 import { MessageContent } from "./message-content"
-import { ToolCallList, ToolCall } from "./tool-call-display"
+import { ToolCallList, ToolCall, ToolCallDisplay } from "./tool-call-display"
 import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
 import { ArtifactPanel } from "./artifact-panel"
+
+// A content part can be either text or a tool call, maintaining order
+type ContentPart =
+  | { type: "text"; content: string }
+  | { type: "tool"; tool: ToolCall }
 
 interface Message {
   id: string
@@ -19,6 +23,7 @@ interface Message {
   content: string
   timestamp: Date
   toolCalls?: ToolCall[]
+  contentParts?: ContentPart[]  // Ordered list of content parts (text and tool calls)
   isStreaming?: boolean
   thinking?: string
   followUpQuestions?: string[]
@@ -43,12 +48,14 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
   toolCalls: ToolCall[]
   content: string
   images: string[]
+  contentParts: ContentPart[]
 } {
   if (!subContentList || subContentList.length === 0) {
-    return { toolCalls: [], content: "", images: [] }
+    return { toolCalls: [], content: "", images: [], contentParts: [] }
   }
 
   const toolCalls: ToolCall[] = []
+  const contentParts: ContentPart[] = []
   let content = ""
   const images: string[] = []
   
@@ -79,6 +86,8 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
       pendingToolsByName.set(item.tool, pending)
 
       toolCalls.push(toolCall)
+      // Add tool to content parts in order
+      contentParts.push({ type: "tool", tool: toolCall })
     }
 
     if (item.type === "tool_output" && item.tool) {
@@ -93,29 +102,34 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
         if (item.artifact) {
           pendingTool.artifact = item.artifact
         }
+        // Tool is already in contentParts, it will be updated by reference
       } else {
         // Tool output without matching input, create complete tool call
-        toolCalls.push({
+        const newTool: ToolCall = {
           id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
           name: item.tool,
           input: {},
           output: item.tool_output,
           artifact: item.artifact,
           state: "completed"
-        })
+        }
+        toolCalls.push(newTool)
+        contentParts.push({ type: "tool", tool: newTool })
       }
     }
 
     if (item.type === "assistant_message" && item.content) {
       content = item.content
+      contentParts.push({ type: "text", content: item.content })
     }
 
     if (item.type === "assistant_message" && item.content) {
       content = item.content
+      contentParts.push({ type: "text", content: item.content })
     }
   }
 
-  return { toolCalls, content, images }
+  return { toolCalls, content, images, contentParts }
 }
 
 interface ChatInterfaceProps {
@@ -231,17 +245,18 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           const { messages: history } = await aiService.getMessages(id)
           const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent, images } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images, contentParts } = parseSubContentList(msg.sub_content_list)
 
-  return {
-      id: msg.id,
-      role: msg.role,
-      // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
-      content: parsedContent || msg.content || "",
-      timestamp: new Date(msg.created_at),
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      images: images.length > 0 ? images : undefined
-  }
+              return {
+                  id: msg.id,
+                  role: msg.role,
+                  // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
+                  content: parsedContent || msg.content || "",
+                  timestamp: new Date(msg.created_at),
+                  toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                  images: images.length > 0 ? images : undefined,
+                  contentParts: contentParts.length > 0 ? contentParts : undefined
+              }
           })
           // Sort by timestamp ascending (oldest first)
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
@@ -330,6 +345,10 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     let thinkingContent = ""
     let followUpQuestions: string[] | undefined
     let newConversationId: string | undefined
+    // Track content parts in order for proper rendering
+    let contentParts: ContentPart[] = []
+    let currentTextContent = ""  // Track current text segment
+    let lastPartWasText = false  // Track if the last part was text (for appending)
 
     try {
       const stream = aiService.chatStream(text, {
@@ -366,9 +385,24 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
           if (chunk.content) {
               fullContent += chunk.content
+              currentTextContent += chunk.content
+
+              // Update contentParts - append to last text part or create new one
+              if (lastPartWasText && contentParts.length > 0) {
+                  // Update the last text part
+                  const lastPart = contentParts[contentParts.length - 1]
+                  if (lastPart.type === "text") {
+                      lastPart.content = currentTextContent
+                  }
+              } else {
+                  // Create a new text part
+                  contentParts.push({ type: "text", content: currentTextContent })
+                  lastPartWasText = true
+              }
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent }
+                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
                       : msg
               ))
           }
@@ -382,19 +416,24 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               const toolInput = chunk.tool_start.tool_input || chunk.tool_start.input || {}
               const toolId = Date.now().toString() + Math.random().toString().slice(2)
 
+              const newTool: ToolCall = {
+                  id: toolId,
+                  name: toolName,
+                  input: toolInput,
+                  state: 'running' as const
+              }
+
+              // Add tool to contentParts and reset text tracking
+              contentParts.push({ type: "tool", tool: newTool })
+              lastPartWasText = false
+              currentTextContent = ""  // Reset for any text that comes after this tool
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? {
                           ...msg,
-                          toolCalls: [
-                              ...(msg.toolCalls || []),
-                              {
-                                  id: toolId,
-                                  name: toolName,
-                                  input: toolInput,
-                                  state: 'running' as const
-                              }
-                          ]
+                          toolCalls: [...(msg.toolCalls || []), newTool],
+                          contentParts: [...contentParts]
                         }
                       : msg
               ))
@@ -405,24 +444,32 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               const toolOutput = chunk.tool_end.output
               const toolArtifact = chunk.tool_end.artifact
 
-              setMessages((prev) => prev.map(msg =>
-                  msg.id === assistantMsgId
-                      ? {
-                          ...msg,
-                          toolCalls: (msg.toolCalls || []).map(tc =>
-                              // Update the last running tool with this name
-                              tc.name === toolName && tc.state === 'running'
-                                  ? {
-                                      ...tc,
-                                      output: toolOutput,
-                                      artifact: toolArtifact,
-                                      state: 'completed' as const
-                                    }
-                                  : tc
-                          )
-                        }
-                      : msg
-              ))
+              // Update both toolCalls array and the tool in contentParts
+              setMessages((prev) => prev.map(msg => {
+                  if (msg.id !== assistantMsgId) return msg
+
+                  const updatedToolCalls = (msg.toolCalls || []).map(tc =>
+                      tc.name === toolName && tc.state === 'running'
+                          ? { ...tc, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
+                          : tc
+                  )
+
+                  // Also update the tool in contentParts (they share the same reference)
+                  const updatedContentParts = (msg.contentParts || []).map(part => {
+                      if (part.type === "tool" && part.tool.name === toolName && part.tool.state === 'running') {
+                          return {
+                              ...part,
+                              tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
+                          }
+                      }
+                      return part
+                  })
+
+                  // Update our local contentParts reference too
+                  contentParts = updatedContentParts as ContentPart[]
+
+                  return { ...msg, toolCalls: updatedToolCalls, contentParts: updatedContentParts }
+              }))
 
               // Auto-open artifact panel when artifact is received
               if (toolArtifact) {
@@ -440,9 +487,21 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
           if (chunk.error) {
               fullContent += `\n[Error: ${chunk.error}]`
+              currentTextContent += `\n[Error: ${chunk.error}]`
+
+              if (lastPartWasText && contentParts.length > 0) {
+                  const lastPart = contentParts[contentParts.length - 1]
+                  if (lastPart.type === "text") {
+                      lastPart.content = currentTextContent
+                  }
+              } else {
+                  contentParts.push({ type: "text", content: currentTextContent })
+                  lastPartWasText = true
+              }
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent }
+                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
                       : msg
               ))
           }
@@ -508,11 +567,6 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                     : "bg-white text-foreground border border-border rounded-tl-none"
                 )}
               >
-                {/* Tool Calls */}
-                {message.toolCalls && message.toolCalls.length > 0 && (
-                  <ToolCallList toolCalls={message.toolCalls} />
-                )}
-
                 {/* Uploaded Images */}
                 {message.images && message.images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
@@ -532,16 +586,43 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                   </div>
                 )}
 
-                {/* Message Content with Markdown */}
-                {message.content && (
-                  <MessageContent
-                    content={message.content}
-                    isUser={message.role === "user"}
-                  />
+                {/* Content Parts - renders tool calls and text in order */}
+                {message.contentParts && message.contentParts.length > 0 ? (
+                  <>
+                    {message.contentParts.map((part, index) => (
+                      <React.Fragment key={index}>
+                        {part.type === "tool" ? (
+                          <div className="mb-3">
+                            <ToolCallDisplay tool={part.tool} />
+                          </div>
+                        ) : (
+                          <MessageContent
+                            content={part.content}
+                            isUser={message.role === "user"}
+                          />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {/* Fallback: Tool Calls at top (legacy behavior) */}
+                    {message.toolCalls && message.toolCalls.length > 0 && (
+                      <ToolCallList toolCalls={message.toolCalls} />
+                    )}
+
+                    {/* Message Content with Markdown */}
+                    {message.content && (
+                      <MessageContent
+                        content={message.content}
+                        isUser={message.role === "user"}
+                      />
+                    )}
+                  </>
                 )}
 
                 {/* Streaming indicator */}
-                {message.isStreaming && !message.content && (
+                {message.isStreaming && !message.content && !message.contentParts?.length && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span className="inline-flex gap-0.5">
                       <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
