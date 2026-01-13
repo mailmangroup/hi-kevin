@@ -76,8 +76,25 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
     )
   }
 
+  // Check environment variables for local development override
+  const isDev = process.env.NODE_ENV === 'development'
+  const useEnvCredentials = isDev && process.env.KAWO_TOKEN && process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+
+  if (useEnvCredentials) {
+    console.log('[Proxy] Using local environment variables for credentials')
+    token = process.env.KAWO_TOKEN || null
+    orgId = process.env.KAWO_ORG_ID || null
+    brandId = process.env.KAWO_BRAND_ID || null
+    apiUrl = process.env.KAWO_API_URL || profile?.kawo_api_url || null
+  } else if (profile) {
+    token = profile.kawo_token
+    orgId = profile.kawo_org_id
+    brandId = profile.kawo_brand_id
+    apiUrl = profile.kawo_api_url || process.env.KAWO_API_URL || null
+  }
+
   // Check if credentials configured
-  if (!profile || !profile.kawo_token || !profile.kawo_org_id || !profile.kawo_brand_id) {
+  if (!token || !orgId || !brandId) {
     return NextResponse.json(
       { 
         error: 'KAWO credentials not configured. Please complete setup.', 
@@ -86,11 +103,6 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
       { status: 403 }
     )
   }
-
-  token = profile.kawo_token
-  orgId = profile.kawo_org_id
-  brandId = profile.kawo_brand_id
-  apiUrl = profile.kawo_api_url || process.env.KAWO_API_URL
 
   if (!apiUrl) {
     return NextResponse.json(
@@ -139,14 +151,24 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
           )
         }
 
-        console.log('[API] Sending chat query payload:', {
-          query: json.query?.substring(0, 100),
-          hasImages: !!json.images,
-          imageCount: json.images?.length || 0,
-          model: json.model,
-          org_id: json.org_id,
-          brand_id: json.brand_id
-        })
+        // Inject credentials into body if missing (e.g. when using env vars in dev mode)
+          if (!json.org_id && orgId) {
+            console.log('[API] Injecting org_id into request body')
+            json.org_id = orgId
+          }
+          if (!json.brand_id && brandId) {
+            console.log('[API] Injecting brand_id into request body')
+            json.brand_id = brandId
+          }
+
+          console.log('[API] Sending chat query payload:', {
+            query: json.query?.substring(0, 100),
+            hasImages: !!json.images,
+            imageCount: json.images?.length || 0,
+            model: json.model,
+            org_id: json.org_id,
+            brand_id: json.brand_id
+          })
 
         // Dynamic model selection based on images
         if (json.images && json.images.length > 0) {

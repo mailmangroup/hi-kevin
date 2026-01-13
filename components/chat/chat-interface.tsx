@@ -268,7 +268,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
   // Handle initial message (from new chat redirect)
   React.useEffect(() => {
-    if (initialMessage && !initialized.current && !chatId && !credentialsLoading && credentials.orgId) {
+    const isDev = process.env.NODE_ENV === 'development'
+    if (initialMessage && !initialized.current && !chatId && !credentialsLoading && (credentials.orgId || isDev)) {
       initialized.current = true
       
       // Check for pending images from dashboard
@@ -291,7 +292,9 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     if (!text.trim() || isThinking) return
 
     // Don't send if credentials are still loading or missing
-    if (credentialsLoading || !credentials.orgId) {
+    // Bypass check in development mode to allow local testing with env vars
+    const isDev = process.env.NODE_ENV === 'development'
+    if (credentialsLoading || (!credentials.orgId && !isDev)) {
       console.error("Cannot send message: credentials not ready")
       return
     }
