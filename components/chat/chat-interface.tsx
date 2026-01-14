@@ -283,6 +283,17 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     }
   }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
 
+  const handleStop = async () => {
+    if (conversationId) {
+      try {
+        await aiService.stopChat(conversationId)
+      } catch (error) {
+        console.error("Failed to stop chat:", error)
+      }
+    }
+    setIsThinking(false)
+  }
+
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages) => {
     if (!text.trim() || isThinking) return
 
@@ -365,7 +376,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               newConversationId = chunk.conversation_id
               setConversationId(newConversationId)
               // Update URL without reloading
-              window.history.replaceState(null, '', `/chat/${newConversationId}`)
+              window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
 
               // Notify sidebar to refresh chat history
               window.dispatchEvent(new Event('chat-created'))
@@ -673,6 +684,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               input={input}
               setInput={setInput}
               onSend={() => handleSend()}
+              onStop={handleStop}
               thinkingEnabled={thinkingEnabled}
               setThinkingEnabled={setThinkingEnabled}
               includeWebSearch={includeWebSearch}

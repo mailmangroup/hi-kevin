@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2 } from "lucide-react"
+import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2, Square } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +26,7 @@ export interface ChatInputAreaProps {
   input: string
   setInput: (value: string) => void
   onSend: () => void
+  onStop?: () => void
   thinkingEnabled: boolean
   setThinkingEnabled: (enabled: boolean) => void
   includeWebSearch: boolean
@@ -45,6 +46,7 @@ export function ChatInputArea({
   input,
   setInput,
   onSend,
+  onStop,
   thinkingEnabled,
   setThinkingEnabled,
   includeWebSearch,
@@ -267,15 +269,26 @@ export function ChatInputArea({
           >
             <Paperclip className="h-5 w-5" />
           </Button>
-          <Button
-            onClick={onSend}
-            disabled={(!input.trim() && selectedImages.length === 0) || isThinking || disabled || isUploading || hasFailedUploads}
-            size="icon"
-            className="h-8 w-8 rounded-full"
-            title={hasFailedUploads ? "Please remove failed images before sending" : undefined}
-          >
-            <ArrowUp className="h-4 w-4" />
-          </Button>
+          {isThinking && onStop ? (
+            <Button
+              onClick={onStop}
+              size="icon"
+              className="h-8 w-8 rounded-full bg-red-500 hover:bg-red-600 text-white"
+              title="Stop generation"
+            >
+              <Square className="h-3 w-3 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              onClick={onSend}
+              disabled={(!input.trim() && selectedImages.length === 0) || isThinking || disabled || isUploading || hasFailedUploads}
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              title={hasFailedUploads ? "Please remove failed images before sending" : undefined}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -264,6 +264,18 @@ export const aiService = {
   },
 
   /**
+   * Stop chat stream
+   */
+  async stopChat(conversationId: string): Promise<void> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return
+    }
+    return apiCall(`proxy/agent/conversations/${conversationId}/stop`, {
+        method: 'POST'
+    })
+  },
+
+  /**
    * Generate content based on brief
    */
   async generateContent(brief: string, platform: string): Promise<string> {
