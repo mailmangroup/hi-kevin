@@ -95,7 +95,7 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {posts.map((post, idx) => (
         <BrandPostCard key={post.id || `post-${idx}`} post={post} />
       ))}
@@ -114,90 +114,129 @@ function BrandPostCard({ post }: { post: BrandPost }) {
                   (post.body && post.body.trim()) ||
                   null
   const date = post.publishTime ? new Date(post.publishTime) : null
+  
+  const hasMedia = (post.images?.length > 0 || post.videos?.length > 0)
+  const firstImage = post.images?.[0]
+  const firstVideo = post.videos?.[0]
+  const imageUrl = firstImage 
+    ? (typeof firstImage === 'string' ? firstImage : (firstImage.url || firstImage.sizes?.m || firstImage.sizes?.o))
+    : null
+  const videoThumbnail = firstVideo?.image?.sizes?.m
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <PlatformIcon type={post.type} />
-          <span className="text-sm font-medium text-gray-700 capitalize">{post.type}</span>
+    <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100">
+      {/* Image/Video Section - 小红书 style: image first */}
+      {hasMedia && (
+        <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
+          {firstVideo ? (
+            <>
+              {videoThumbnail ? (
+                <img 
+                  src={videoThumbnail} 
+                  alt="Video thumbnail" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                  <Video className="h-12 w-12 text-gray-400" />
+                </div>
+              )}
+              {/* Video play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <div className="w-16 h-16 bg-white/95 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform">
+                  <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-red-500 border-b-[8px] border-b-transparent ml-1" />
+                </div>
+              </div>
+              {firstVideo.urlOri && (
+                <a 
+                  href={firstVideo.urlOri} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="absolute inset-0 z-10"
+                  title="Watch video"
+                />
+              )}
+            </>
+          ) : imageUrl ? (
+            <img 
+              src={imageUrl} 
+              alt={title}
+              className="w-full h-full object-cover"
+            />
+          ) : null}
+          
+          {/* Platform badge - top right corner */}
+          <div className="absolute top-3 right-3 z-20">
+            <PlatformIcon type={post.type} />
+          </div>
+          
+          {/* Status badge - top left corner */}
           {post.status && (
-            <span className={cn(
-              "text-xs px-2 py-0.5 rounded-full border",
-              post.status === "published" ? "bg-green-50 text-green-700 border-green-200" :
-              post.status === "scheduled" ? "bg-blue-50 text-blue-700 border-blue-200" :
-              "bg-gray-100 text-gray-600 border-gray-200"
-            )}>
-              {post.status}
-            </span>
+            <div className="absolute top-3 left-3 z-20">
+              <span className={cn(
+                "text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm",
+                post.status === "published" ? "bg-green-500/90 text-white" :
+                post.status === "scheduled" ? "bg-blue-500/90 text-white" :
+                "bg-gray-500/90 text-white"
+              )}>
+                {post.status}
+              </span>
+            </div>
           )}
-        </div>
-        {date && (
-          <span className="text-xs text-gray-500">
-            {format(date, "MMM d, yyyy h:mm a")}
-          </span>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-4 space-y-4">
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-2">{title}</h3>
-          {content && (
-            <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-              {content}
+          
+          {/* Multiple images indicator */}
+          {post.images?.length > 1 && (
+            <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+              {post.images.length} photos
             </div>
           )}
         </div>
+      )}
 
-        {/* Media */}
-        {(post.images?.length > 0 || post.videos?.length > 0) && (
-          <div className="grid grid-cols-2 gap-2">
-            {post.videos?.map((video: any, idx: number) => (
-              <div key={`video-${idx}`} className="relative aspect-square bg-black rounded-lg overflow-hidden group">
-                {video.image?.sizes?.m ? (
-                  <img 
-                    src={video.image.sizes.m} 
-                    alt="Video thumbnail" 
-                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">
-                    <Video className="h-8 w-8" />
-                  </div>
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                    <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-black border-b-[6px] border-b-transparent ml-1" />
-                  </div>
-                </div>
-                {video.urlOri && (
-                  <a 
-                    href={video.urlOri} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="absolute inset-0 z-10"
-                    title="Watch video"
-                  />
-                )}
-              </div>
-            ))}
-            
-            {post.images?.map((image: any, idx: number) => {
+      {/* Content Section - 小红书 style: text below image */}
+      <div className="p-4 space-y-2">
+        {/* Title */}
+        <h3 className="font-semibold text-gray-900 text-base leading-snug line-clamp-2">
+          {title}
+        </h3>
+        
+        {/* Description/Content */}
+        {content && content !== title && (
+          <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+            {content}
+          </p>
+        )}
+        
+        {/* Additional images grid (if multiple images and no video) */}
+        {!firstVideo && post.images?.length > 1 && (
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {post.images.slice(1, 4).map((image: any, idx: number) => {
               const url = typeof image === 'string' ? image : (image.url || image.sizes?.m || image.sizes?.o);
               if (!url) return null;
-              
               return (
-                <div key={`image-${idx}`} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                <div key={`image-${idx + 1}`} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
                   <img 
                     src={url} 
-                    alt="Post image" 
+                    alt={`Post image ${idx + 2}`}
                     className="w-full h-full object-cover"
                   />
                 </div>
               )
             })}
+            {post.images.length > 4 && (
+              <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                <span className="text-xs text-gray-500 font-medium">+{post.images.length - 4}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Footer with date */}
+        {date && (
+          <div className="pt-2 border-t border-gray-100">
+            <span className="text-xs text-gray-400">
+              {format(date, "MMM d, yyyy")}
+            </span>
           </div>
         )}
       </div>
@@ -206,31 +245,71 @@ function BrandPostCard({ post }: { post: BrandPost }) {
 }
 
 function PlatformIcon({ type }: { type: string }) {
-  if (!type) return <span className="text-gray-400 text-xs border border-gray-400 rounded px-1">SOC</span>
+  if (!type) return (
+    <span className="bg-black/70 text-white text-xs font-semibold px-2 py-1 rounded-lg backdrop-blur-sm">
+      SOC
+    </span>
+  )
   
   switch (type?.toLowerCase()) {
     case 'xhs':
     case 'xiaohongshu':
-      return <span className="text-red-500 font-bold text-xs border border-red-500 rounded px-1">RED</span>
+      return (
+        <span className="bg-red-500/90 text-white text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm shadow-lg">
+          RED
+        </span>
+      )
     case 'instagram':
     case 'ig':
-      return <Instagram className="h-4 w-4 text-pink-600" />
+      return (
+        <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-1.5 rounded-lg backdrop-blur-sm shadow-lg">
+          <Instagram className="h-3.5 w-3.5 text-white" />
+        </div>
+      )
     case 'facebook':
     case 'fb':
-      return <Facebook className="h-4 w-4 text-blue-600" />
+      return (
+        <div className="bg-blue-600/90 p-1.5 rounded-lg backdrop-blur-sm shadow-lg">
+          <Facebook className="h-3.5 w-3.5 text-white" />
+        </div>
+      )
     case 'linkedin':
-      return <Linkedin className="h-4 w-4 text-blue-700" />
+      return (
+        <div className="bg-blue-700/90 p-1.5 rounded-lg backdrop-blur-sm shadow-lg">
+          <Linkedin className="h-3.5 w-3.5 text-white" />
+        </div>
+      )
     case 'twitter':
     case 'x':
-      return <Twitter className="h-4 w-4 text-black" />
+      return (
+        <div className="bg-black/80 p-1.5 rounded-lg backdrop-blur-sm shadow-lg">
+          <Twitter className="h-3.5 w-3.5 text-white" />
+        </div>
+      )
     case 'youtube':
     case 'yt':
-      return <Youtube className="h-4 w-4 text-red-600" />
+      return (
+        <div className="bg-red-600/90 p-1.5 rounded-lg backdrop-blur-sm shadow-lg">
+          <Youtube className="h-3.5 w-3.5 text-white" />
+        </div>
+      )
     case 'douyin':
-      return <span className="text-black font-bold text-xs border border-black rounded px-1">DY</span>
+      return (
+        <span className="bg-black/80 text-white text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm shadow-lg">
+          DY
+        </span>
+      )
     case 'wechat':
-      return <span className="text-green-600 font-bold text-xs border border-green-600 rounded px-1">WC</span>
+      return (
+        <span className="bg-green-600/90 text-white text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm shadow-lg">
+          WC
+        </span>
+      )
     default:
-      return <span className="text-gray-400 text-xs border border-gray-400 rounded px-1">SOC</span>
+      return (
+        <span className="bg-black/70 text-white text-xs font-semibold px-2 py-1 rounded-lg backdrop-blur-sm">
+          SOC
+        </span>
+      )
   }
 }

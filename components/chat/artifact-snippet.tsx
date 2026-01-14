@@ -55,6 +55,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_account_insights: "Account Insights",
   get_content_performance: "Content Performance",
   search_web: "Web Search Results",
+  web_search: "Web Search Results",
   analyze_competitors: "Competitor Analysis",
   generate_content: "Generated Content",
   schedule_post: "Scheduled Post",
@@ -200,14 +201,24 @@ function getArtifactDescription(artifact: any, toolName?: string): string | null
     }
   }
 
+  // Handle web search results
+  const data = artifact?.data || artifact
+  if (toolName === 'search_web' || toolName === 'web_search' || isWebSearchData(data)) {
+    const results = extractWebSearchResults(data)
+    if (results.length > 0) {
+      const query = results[0]?.metadata?.query
+      return query ? `${results.length} results for "${query}"` : `${results.length} search results`
+    }
+  }
+
   // Check data size for arrays
-  if (artifact?.data && Array.isArray(artifact.data)) {
-    return `${artifact.data.length} items`
+  if (data && Array.isArray(data)) {
+    return `${data.length} items`
   }
 
   // Check for summary
-  if (artifact?.data && typeof artifact.data === "object") {
-    const keys = Object.keys(artifact.data)
+  if (data && typeof data === "object") {
+    const keys = Object.keys(data)
     if (keys.length <= 3) {
       return keys.join(", ")
     }
@@ -215,4 +226,44 @@ function getArtifactDescription(artifact: any, toolName?: string): string | null
   }
 
   return "Click to view details"
+}
+
+// Helper to check if data is web search results
+function isWebSearchData(data: any): boolean {
+  if (!data) return false
+  if (Array.isArray(data)) {
+    if (data.length > 0 && data[0]?.type === "web_search_result") return true
+    if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
+      return data[0].cards.some((card: any) => card?.type === "web_search_result")
+    }
+  }
+  if (data.cards && Array.isArray(data.cards)) {
+    return data.cards.some((card: any) => card?.type === "web_search_result")
+  }
+  if (data.type === "web_search_result") return true
+  return false
+}
+
+// Helper to extract web search results from various data structures
+function extractWebSearchResults(data: any): any[] {
+  if (!data) return []
+  
+  if (Array.isArray(data)) {
+    if (data.length > 0 && data[0]?.type === "web_search_result") {
+      return data
+    }
+    if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
+      return data[0].cards.filter((card: any) => card?.type === "web_search_result")
+    }
+  }
+  
+  if (data.cards && Array.isArray(data.cards)) {
+    return data.cards.filter((card: any) => card?.type === "web_search_result")
+  }
+  
+  if (data.type === "web_search_result") {
+    return [data]
+  }
+  
+  return []
 }

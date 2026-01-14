@@ -122,11 +122,6 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
       content = item.content
       contentParts.push({ type: "text", content: item.content })
     }
-
-    if (item.type === "assistant_message" && item.content) {
-      content = item.content
-      contentParts.push({ type: "text", content: item.content })
-    }
   }
 
   return { toolCalls, content, images, contentParts }

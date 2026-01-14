@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
 import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
+import { WebSearchArtifact } from "./web-search-artifact"
 
 const ARTIFACT_ICONS = {
   chart: BarChart3,
@@ -19,6 +20,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_account_insights: "Account Insights",
   get_content_performance: "Content Performance",
   search_web: "Web Search Results",
+  web_search: "Web Search Results",
   analyze_competitors: "Competitor Analysis",
   generate_content: "Generated Content",
   schedule_post: "Scheduled Post",
@@ -154,6 +156,46 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
     return false
   }
 
+  // Check for web search results
+  const isWebSearch = (data: any, toolName?: string) => {
+    // Explicitly check for specific tools
+    if (toolName === 'search_web' || toolName === 'web_search') return true
+
+    if (!data) return false
+    // Check if it's the web search structure
+    if (Array.isArray(data)) {
+      // Check if array elements are web search results
+      if (data.length > 0 && data[0]?.type === "web_search_result") return true
+      // Check if array contains objects with cards property
+      if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
+        return data[0].cards.some((card: any) => card?.type === "web_search_result")
+      }
+    }
+    if (data.cards && Array.isArray(data.cards)) {
+      return data.cards.some((card: any) => card?.type === "web_search_result")
+    }
+    if (data.type === "web_search_result") return true
+    // Check if string and looks like web search
+    if (typeof data === 'string' && (data.includes('web_search_result') || data.includes('"cards"'))) {
+        try {
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed)) {
+              if (parsed.length > 0 && parsed[0]?.type === "web_search_result") return true;
+              if (parsed.length > 0 && parsed[0]?.cards) {
+                return parsed[0].cards.some((card: any) => card?.type === "web_search_result");
+              }
+            }
+            if (parsed.cards && Array.isArray(parsed.cards)) {
+              return parsed.cards.some((card: any) => card?.type === "web_search_result");
+            }
+            if (parsed.type === "web_search_result") return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    return false
+  }
+
   if (isBrandPosts(artifact.data, artifact.toolName)) {
     let data = artifact.data
     if (typeof data === 'string') {
@@ -165,6 +207,19 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
       }
     }
     return <BrandPostsArtifact data={data} />
+  }
+
+  if (isWebSearch(artifact.data, artifact.toolName)) {
+    let data = artifact.data
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data)
+      } catch (e) {
+        console.error("Failed to parse web search data", e)
+        return <div className="p-4 text-red-500">Failed to parse web search data: {String(e)}</div>
+      }
+    }
+    return <WebSearchArtifact data={data} />
   }
 
   switch (artifact.type) {
@@ -230,6 +285,39 @@ function TableContent({ data }: { data: any }) {
     return false
   }
 
+  // Check if this is web search data
+  const isWebSearch = (data: any) => {
+    if (!data) return false
+    if (Array.isArray(data)) {
+      if (data.length > 0 && data[0]?.type === "web_search_result") return true
+      if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
+        return data[0].cards.some((card: any) => card?.type === "web_search_result")
+      }
+    }
+    if (data.cards && Array.isArray(data.cards)) {
+      return data.cards.some((card: any) => card?.type === "web_search_result")
+    }
+    if (data.type === "web_search_result") return true
+    if (typeof data === 'string' && (data.includes('web_search_result') || data.includes('"cards"'))) {
+      try {
+        const parsed = JSON.parse(data)
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && parsed[0]?.type === "web_search_result") return true
+          if (parsed.length > 0 && parsed[0]?.cards) {
+            return parsed[0].cards.some((card: any) => card?.type === "web_search_result")
+          }
+        }
+        if (parsed.cards && Array.isArray(parsed.cards)) {
+          return parsed.cards.some((card: any) => card?.type === "web_search_result")
+        }
+        if (parsed.type === "web_search_result") return true
+      } catch (e) {
+        return false
+      }
+    }
+    return false
+  }
+
   if (isBrandPosts(data)) {
     let brandPostsData = data
     if (typeof data === 'string') {
@@ -241,6 +329,19 @@ function TableContent({ data }: { data: any }) {
       }
     }
     return <BrandPostsArtifact data={brandPostsData} />
+  }
+
+  if (isWebSearch(data)) {
+    let webSearchData = data
+    if (typeof data === 'string') {
+      try {
+        webSearchData = JSON.parse(data)
+      } catch (e) {
+        console.error("Failed to parse web search data in TableContent", e)
+        return <div className="p-4 text-red-500">Failed to parse web search data: {String(e)}</div>
+      }
+    }
+    return <WebSearchArtifact data={webSearchData} />
   }
 
   if (Array.isArray(data) && data.length > 0) {
