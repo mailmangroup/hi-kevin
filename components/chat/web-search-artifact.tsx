@@ -29,11 +29,12 @@ export function WebSearchArtifact({ data }: WebSearchArtifactProps) {
       // Array might contain objects with cards property
       for (const item of data) {
         if (item && typeof item === 'object') {
-          if (Array.isArray(item.cards)) {
-            results = item.cards.filter((card: any) => card?.type === "web_search_result")
+          const itemWithCards = item as any
+          if (Array.isArray(itemWithCards.cards)) {
+            results = itemWithCards.cards.filter((card: any) => card?.type === "web_search_result")
             break
-          } else if (Array.isArray(item.data)) {
-            results = item.data.filter((card: any) => card?.type === "web_search_result")
+          } else if (Array.isArray(itemWithCards.data)) {
+            results = itemWithCards.data.filter((card: any) => card?.type === "web_search_result")
             break
           } else if (item.type === "web_search_result") {
             // Single result in array
@@ -51,7 +52,7 @@ export function WebSearchArtifact({ data }: WebSearchArtifactProps) {
       results = data.data.filter((card: any) => card?.type === "web_search_result")
     } else if (data.type === "web_search_result") {
       // Single result object
-      results = [data]
+      results = [data as WebSearchResult]
     } else {
       // Try to find any array property that might contain results
       const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]))
@@ -62,7 +63,7 @@ export function WebSearchArtifact({ data }: WebSearchArtifactProps) {
           (item?.cards && Array.isArray(item.cards))
         )
         // Flatten if nested
-        if (results.length > 0 && results[0]?.cards) {
+        if (results.length > 0 && (results[0] as any)?.cards) {
           results = results.flatMap((item: any) => item.cards || [])
         }
       }
@@ -79,8 +80,9 @@ export function WebSearchArtifact({ data }: WebSearchArtifactProps) {
           // Look for cards in array elements
           for (const item of parsed) {
             if (item && typeof item === 'object') {
-              if (Array.isArray(item.cards)) {
-                results = item.cards.filter((card: any) => card?.type === "web_search_result")
+              const itemWithCards = item as any
+              if (Array.isArray(itemWithCards.cards)) {
+                results = itemWithCards.cards.filter((card: any) => card?.type === "web_search_result")
                 break
               }
             }
@@ -89,7 +91,7 @@ export function WebSearchArtifact({ data }: WebSearchArtifactProps) {
       } else if (parsed.cards && Array.isArray(parsed.cards)) {
         results = parsed.cards.filter((card: any) => card?.type === "web_search_result")
       } else if (parsed.type === "web_search_result") {
-        results = [parsed]
+        results = [parsed as WebSearchResult]
       }
     } catch (e) {
       console.error("Failed to parse web search data:", e)
