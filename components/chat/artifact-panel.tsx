@@ -1,12 +1,30 @@
 "use client"
 
 import * as React from "react"
-import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw } from "lucide-react"
+import { X, Download, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, ExternalLink, Maximize2, Minimize2, ArrowUp, ArrowDown, Minus } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
 import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
 import { WebSearchArtifact } from "./web-search-artifact"
+import { formatDateRangeDisplay } from "@/lib/utils/date-range"
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area
+} from "recharts"
 
 const ARTIFACT_ICONS = {
   chart: BarChart3,
@@ -387,6 +405,58 @@ function TableContent({ data }: { data: any }) {
 }
 
 function ReportContent({ data }: { data: any }) {
+  // Support for new Report structure with pages
+  if (data?.pages && Array.isArray(data.pages)) {
+    return (
+      <div className="space-y-8 pb-8">
+        {/* Report Header */}
+        <div className="border-b pb-4 space-y-2">
+          {data.title && (
+            <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+          )}
+          {data.metadata && (
+            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-1">
+                <span className="font-medium">Period:</span>
+                <span>
+                  {formatDateRangeDisplay(
+                    new Date(data.metadata.start_date), 
+                    new Date(data.metadata.end_date)
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-medium">Language:</span>
+                <span className="uppercase">{data.metadata.language}</span>
+              </div>
+              {data.metadata.generated_at && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Generated:</span>
+                  <span>{new Date(data.metadata.generated_at).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Pages */}
+        {data.pages.map((page: any, idx: number) => (
+          <div key={idx} className="space-y-6">
+            <h2 className="text-xl font-semibold text-gray-800 pb-2 border-b border-gray-100">
+              {page.title}
+            </h2>
+            <div className="space-y-8">
+              {page.sections.map((section: any, sIdx: number) => (
+                <ReportSectionRenderer key={sIdx} section={section} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Legacy support
   if (data?.sections || data?.content) {
     return (
       <div className="space-y-6">
@@ -417,6 +487,174 @@ function ReportContent({ data }: { data: any }) {
   }
 
   return <DataContent data={data} />
+}
+
+function ReportSectionRenderer({ section }: { section: any }) {
+  const { type, title, content, data } = section
+
+  return (
+    <div className="space-y-3">
+      {title && (
+        <h3 className="text-base font-semibold text-gray-800">{title}</h3>
+      )}
+      
+      {content && (
+        <MessageContent content={content} className="text-sm text-gray-600" />
+      )}
+
+      {type === "CHART" && data && (
+        <div className="h-[300px] w-full border rounded-lg p-4 bg-white shadow-sm">
+          <ReportChart data={data} />
+        </div>
+      )}
+
+      {type === "TABLE" && data && (
+        <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+          <TableContent data={data} />
+        </div>
+      )}
+
+      {type === "STAT_TILES" && data && Array.isArray(data) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {data.map((tile: any, idx: number) => (
+            <StatTile key={idx} data={tile} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatTile({ data }: { data: any }) {
+  const { label, value, change, trend } = data
+  
+  return (
+    <div className="p-4 rounded-lg bg-white border shadow-sm">
+      <div className="text-xs text-gray-500 font-medium truncate" title={label}>
+        {label}
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <div className="text-2xl font-bold text-gray-900">{value}</div>
+      </div>
+      {typeof change !== 'undefined' && (
+        <div className={cn(
+          "mt-1 text-xs font-medium flex items-center gap-0.5",
+          trend === 'up' ? "text-green-600" : 
+          trend === 'down' ? "text-red-600" : 
+          "text-gray-500"
+        )}>
+          {trend === 'up' && <ArrowUp className="h-3 w-3" />}
+          {trend === 'down' && <ArrowDown className="h-3 w-3" />}
+          {trend === 'neutral' && <Minus className="h-3 w-3" />}
+          {Math.abs(change)}%
+        </div>
+      )}
+    </div>
+  )
+}
+
+const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+
+function ReportChart({ data }: { data: any }) {
+  const { chartType, labels, datasets } = data
+
+  // Transform data for Recharts
+  // Recharts expects array of objects: [{ name: 'Label1', dataset1: 10, dataset2: 20 }, ...]
+  const chartData = labels.map((label: string, idx: number) => {
+    const item: any = { name: label }
+    datasets.forEach((ds: any) => {
+      item[ds.label] = ds.data[idx]
+    })
+    return item
+  })
+
+  if (chartType === 'pie') {
+    // Pie chart needs different format
+    const pieData = labels.map((label: string, idx: number) => ({
+      name: label,
+      value: datasets[0].data[idx]
+    }))
+
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            outerRadius={80}
+            fill="#8884d8"
+            dataKey="value"
+          >
+            {pieData.map((entry: any, index: number) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    )
+  }
+
+  const ChartComponent = chartType === 'line' ? LineChart : 
+                         chartType === 'area' ? AreaChart : 
+                         BarChart
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <ChartComponent
+        data={chartData}
+        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis fontSize={12} tickLine={false} axisLine={false} />
+        <Tooltip 
+          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+        />
+        <Legend />
+        {datasets.map((ds: any, idx: number) => {
+          if (chartType === 'line') {
+            return (
+              <Line 
+                key={idx} 
+                type="monotone" 
+                dataKey={ds.label} 
+                stroke={ds.borderColor || COLORS[idx % COLORS.length]} 
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            )
+          }
+          if (chartType === 'area') {
+            return (
+              <Area 
+                key={idx} 
+                type="monotone" 
+                dataKey={ds.label} 
+                stackId="1" 
+                stroke={ds.borderColor || COLORS[idx % COLORS.length]} 
+                fill={ds.backgroundColor || COLORS[idx % COLORS.length]} 
+                fillOpacity={0.6}
+              />
+            )
+          }
+          return (
+            <Bar 
+              key={idx} 
+              dataKey={ds.label} 
+              fill={ds.backgroundColor || COLORS[idx % COLORS.length]} 
+              radius={[4, 4, 0, 0]} 
+            />
+          )
+        })}
+      </ChartComponent>
+    </ResponsiveContainer>
+  )
 }
 
 function DataContent({ data }: { data: any }) {

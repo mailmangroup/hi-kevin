@@ -28,6 +28,7 @@ interface Message {
   thinking?: string
   followUpQuestions?: string[]
   images?: string[]
+  report?: any
 }
 
 interface SubContentItem {
@@ -250,7 +251,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                   timestamp: new Date(msg.created_at),
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   images: images.length > 0 ? images : undefined,
-                  contentParts: contentParts.length > 0 ? contentParts : undefined
+                  contentParts: contentParts.length > 0 ? contentParts : undefined,
+                  report: msg.report
               }
           })
           // Sort by timestamp ascending (oldest first)
@@ -492,6 +494,36 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                 }
                 openArtifact(artifactData)
               }
+          }
+
+          if (chunk.report) {
+              const reportData = chunk.report
+              
+              // Update message with report data
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, report: reportData }
+                      : msg
+              ))
+
+              // Create artifact and open it
+              const reportArtifact: ArtifactData = {
+                  id: reportData.id || Date.now().toString(),
+                  type: 'report',
+                  title: reportData.title || 'Brand Report',
+                  data: reportData
+              }
+              openArtifact(reportArtifact)
+          }
+
+          if (chunk.progress) {
+             // Optional: Show progress in thinking or content
+             // For now we just log it as we primarily rely on the dialog for progress
+             // But if generated from chat, we could show it.
+             const progressMsg = `Generating report: ${Math.round(chunk.progress * 100)}% - ${chunk.current_section || ''}`
+             
+             // If we want to show it in the UI, we could update a temporary status
+             // or append to thinking
           }
 
           if (chunk.error) {

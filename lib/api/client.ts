@@ -123,6 +123,15 @@ export interface Message {
   type?: string
 }
 
+export interface ReportFromTemplate {
+  name: "brand_report"
+  start_date: number  // Unix timestamp in ms
+  end_date: number
+  prev_start_date?: number
+  prev_end_date?: number
+  language: "en" | "cn"
+}
+
 /**
  * AI Service
  * Handles all AI-related operations
@@ -182,7 +191,8 @@ export const aiService = {
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
         toolSelectionEnabled?: boolean,
-        images?: string[]
+        images?: string[],
+        reportFromTemplate?: ReportFromTemplate
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -194,7 +204,7 @@ export const aiService = {
         return
     }
 
-    const payload = {
+    const payload: any = {
         query: message,
         conversation_id: options.conversationId,
         org_id: options.orgId,
@@ -204,7 +214,8 @@ export const aiService = {
         include_web_search: options.includeWebSearch ?? true,
         thinking_enabled: options.thinkingEnabled ?? false,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
-        images: options.images
+        images: options.images,
+        report_from_template: options.reportFromTemplate
     }
 
     const payloadString = JSON.stringify(payload)
