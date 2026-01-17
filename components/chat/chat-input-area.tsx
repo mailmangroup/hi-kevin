@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2, Square } from "lucide-react"
+import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2, Square, File, FileText, CheckCircle2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { compressImage } from "@/lib/utils/image-compression"
+import {
+  validateFile,
+  formatFileSize,
+  getFileTypeDisplay,
+  getFileColor,
+  truncateFilename
+} from "@/lib/utils/file-helpers"
+import { aiService } from "@/lib/api/client"
 
 export interface UploadedImage {
   id: string
@@ -20,6 +28,19 @@ export interface UploadedImage {
   file?: File
   uploading: boolean
   error?: boolean
+}
+
+export interface UploadedDocument {
+  id: string
+  documentId?: string // Backend document ID
+  filename: string
+  file: File
+  key?: string // OSS Key
+  uploading: boolean
+  processing: boolean
+  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed'
+  chunkStrategy?: 'full_text' | 'vectorized'
+  error?: string
 }
 
 export interface ChatInputAreaProps {
@@ -35,6 +56,9 @@ export interface ChatInputAreaProps {
   setModel: (model: string) => void
   selectedImages: UploadedImage[]
   setSelectedImages: (images: UploadedImage[] | ((prev: UploadedImage[]) => UploadedImage[])) => void
+  selectedDocuments?: UploadedDocument[]
+  setSelectedDocuments?: (documents: UploadedDocument[] | ((prev: UploadedDocument[]) => UploadedDocument[])) => void
+  conversationId?: string // Needed for document upload
   className?: string
   placeholder?: string
   disabled?: boolean
@@ -55,17 +79,25 @@ export function ChatInputArea({
   setModel,
   selectedImages,
   setSelectedImages,
+  selectedDocuments = [],
+  setSelectedDocuments,
+  conversationId,
   className,
   placeholder = "Message Kevin...",
   disabled = false,
   isThinking = false,
   showBorder = true
 }: ChatInputAreaProps) {
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
-  // Track global uploading state to disable send button if any image is uploading
-  const isUploading = selectedImages.some(img => img.uploading)
-  // Track if any images have failed to upload
-  const hasFailedUploads = selectedImages.some(img => img.error)
+  const imageInputRef = React.useRef<HTMLInputElement>(null)
+  const documentInputRef = React.useRef<HTMLInputElement>(null)
+
+  // Track global uploading state to disable send button if any file is uploading
+  const isImageUploading = selectedImages.some(img => img.uploading)
+  const isDocumentUploading = selectedDocuments.some(doc => doc.uploading || doc.processing)
+  const isUploading = isImageUploading || isDocumentUploading
+
+  // Track if any files have failed to upload
+  const hasFailedUploads = selectedImages.some(img => img.error) || selectedDocuments.some(doc => doc.error)
 
   // Model constants
   const AVAILABLE_MODELS = ["qwen-max", "qwen-plus"]
@@ -114,7 +146,7 @@ export function ChatInputArea({
       }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
 
@@ -136,8 +168,8 @@ export function ChatInputArea({
     setSelectedImages((prev) => [...prev, ...newImages])
 
     // Reset input
-    if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+    if (imageInputRef.current) {
+        imageInputRef.current.value = ''
     }
 
     // Start uploads
@@ -146,8 +178,123 @@ export function ChatInputArea({
     }
   }
 
+  const uploadDocument = async (doc: UploadedDocument) => {
+      if (!setSelectedDocuments) return
+
+      try {
+          // Validate file
+          const validationError = validateFile(doc.file)
+          if (validationError) {
+              throw new Error(validationError)
+          }
+
+          // 1. Get signed URL and document ID
+          if (!conversationId) {
+              throw new Error('No conversation ID available')
+          }
+
+          const { upload_url, object_key, document_id } = await aiService.signDocumentUpload(
+              conversationId,
+              doc.file.name,
+              doc.file.type
+          )
+
+          // 2. Upload to OSS
+          const uploadRes = await fetch(upload_url, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': doc.file.type
+              },
+              body: doc.file
+          })
+
+          if (!uploadRes.ok) {
+              throw new Error('Failed to upload to OSS')
+          }
+
+          // 3. Update state with OSS key and document ID
+          setSelectedDocuments(prev => prev.map(d =>
+              d.id === doc.id
+                  ? { ...d, uploading: false, processing: true, key: object_key, documentId: document_id, processingStatus: 'pending' }
+                  : d
+          ))
+
+          // 4. Trigger processing
+          const processResult = await aiService.processDocument(conversationId, document_id)
+
+          // 5. Update with processing result
+          setSelectedDocuments(prev => prev.map(d =>
+              d.id === doc.id
+                  ? {
+                      ...d,
+                      processing: false,
+                      processingStatus: processResult.processing_status as any,
+                      chunkStrategy: processResult.chunk_strategy as any,
+                      error: processResult.error
+                  }
+                  : d
+          ))
+      } catch (e: any) {
+          console.error('Document upload failed:', e)
+          setSelectedDocuments(prev => prev.map(d =>
+              d.id === doc.id
+                  ? { ...d, uploading: false, processing: false, error: e.message || 'Upload failed' }
+                  : d
+          ))
+      }
+  }
+
+  const handleDocumentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!setSelectedDocuments) return
+
+      const files = e.target.files
+      if (!files || files.length === 0) return
+
+      const newDocuments: UploadedDocument[] = []
+
+      for (const file of Array.from(files)) {
+          // Validate file
+          const validationError = validateFile(file)
+          if (validationError) {
+              alert(validationError)
+              continue
+          }
+
+          const id = Math.random().toString(36).substring(7)
+          const docObj: UploadedDocument = {
+              id,
+              filename: file.name,
+              file,
+              uploading: true,
+              processing: false
+          }
+          newDocuments.push(docObj)
+      }
+
+      if (newDocuments.length === 0) return
+
+      // Add to state
+      setSelectedDocuments(prev => [...prev, ...newDocuments])
+
+      // Reset input
+      if (documentInputRef.current) {
+          documentInputRef.current.value = ''
+      }
+
+      // Start uploads
+      for (const doc of newDocuments) {
+          uploadDocument(doc)
+      }
+  }
+
   const removeImage = (index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeDocument = (index: number) => {
+    if (setSelectedDocuments) {
+      setSelectedDocuments(prev => prev.filter((_, i) => i !== index))
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -159,22 +306,37 @@ export function ChatInputArea({
     }
   }
 
+  // Get file color class based on color name
+  const getFileColorClass = (color: string) => {
+    const colorMap: Record<string, string> = {
+      red: 'bg-red-100 text-red-700 border-red-200',
+      blue: 'bg-blue-100 text-blue-700 border-blue-200',
+      orange: 'bg-orange-100 text-orange-700 border-orange-200',
+      green: 'bg-green-100 text-green-700 border-green-200',
+      gray: 'bg-gray-100 text-gray-700 border-gray-200',
+      purple: 'bg-purple-100 text-purple-700 border-purple-200',
+      yellow: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    }
+    return colorMap[color] || colorMap['gray']
+  }
+
   return (
     <div className={cn("relative bg-white", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
-      {/* Image Preview */}
-      {selectedImages.length > 0 && (
+      {/* Image & Document Preview */}
+      {(selectedImages.length > 0 || selectedDocuments.length > 0) && (
           <div className="flex gap-2 p-4 pb-0 overflow-x-auto">
+              {/* Images */}
               {selectedImages.map((img, idx) => (
-                  <div key={idx} className="relative group flex-shrink-0">
+                  <div key={`img-${idx}`} className="relative group flex-shrink-0">
                       <div className="relative">
-                        <img 
-                          src={img.url} 
-                          alt="Selected" 
+                        <img
+                          src={img.url}
+                          alt="Selected"
                           className={cn(
                             "h-16 w-16 object-cover rounded-lg border border-border transition-opacity",
                             img.uploading ? "opacity-50" : "opacity-100",
                             img.error ? "border-red-500" : ""
-                          )} 
+                          )}
                         />
                         {img.uploading && (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -195,6 +357,58 @@ export function ChatInputArea({
                       </button>
                   </div>
               ))}
+
+              {/* Documents */}
+              {selectedDocuments.map((doc, idx) => {
+                  const fileColor = getFileColor(doc.filename)
+                  const colorClass = getFileColorClass(fileColor)
+
+                  return (
+                      <div key={`doc-${idx}`} className="relative group flex-shrink-0">
+                          <div className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-opacity min-w-[200px]",
+                              colorClass,
+                              (doc.uploading || doc.processing) && "opacity-60"
+                          )}>
+                              {/* File Icon */}
+                              <FileText className="h-4 w-4 flex-shrink-0" />
+
+                              {/* File Info */}
+                              <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium truncate">
+                                      {truncateFilename(doc.filename, 20)}
+                                  </div>
+                                  <div className="text-[10px] opacity-70">
+                                      {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file.size)}
+                                  </div>
+                              </div>
+
+                              {/* Status Icon */}
+                              <div className="flex-shrink-0">
+                                  {doc.uploading && (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                  {doc.processing && (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                  {doc.error && (
+                                      <AlertCircle className="h-3 w-3 text-red-600" />
+                                  )}
+                                  {doc.processingStatus === 'completed' && !doc.error && (
+                                      <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                  )}
+                              </div>
+                          </div>
+
+                          <button
+                              onClick={() => removeDocument(idx)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+                          >
+                              <X className="h-3 w-3" />
+                          </button>
+                      </div>
+                  )
+              })}
           </div>
       )}
 
@@ -252,23 +466,50 @@ export function ChatInputArea({
         </div>
 
         <div className="flex gap-2">
+          {/* Image Upload Input */}
           <input
               type="file"
-              ref={fileInputRef}
+              ref={imageInputRef}
               className="hidden"
               accept="image/*"
               multiple
-              onChange={handleFileSelect}
+              onChange={handleImageSelect}
           />
+
+          {/* Document Upload Input */}
+          <input
+              type="file"
+              ref={documentInputRef}
+              className="hidden"
+              accept=".pdf,.docx,.doc,.pptx,.xlsx,.xls,.txt,.md,.html,.csv,.json,.xml"
+              multiple
+              onChange={handleDocumentSelect}
+          />
+
+          {/* Image Upload Button (default) */}
           <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:bg-muted"
               disabled={disabled || isUploading}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => imageInputRef.current?.click()}
+              title="Upload images"
           >
             <Paperclip className="h-5 w-5" />
           </Button>
+
+          {/* Document Upload Button */}
+          <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:bg-muted"
+              disabled={disabled || isUploading || !conversationId}
+              onClick={() => documentInputRef.current?.click()}
+              title={!conversationId ? "Start a conversation to upload documents" : "Upload documents"}
+          >
+            <File className="h-5 w-5" />
+          </Button>
+
           {isThinking && onStop ? (
             <Button
               onClick={onStop}
@@ -281,10 +522,10 @@ export function ChatInputArea({
           ) : (
             <Button
               onClick={onSend}
-              disabled={(!input.trim() && selectedImages.length === 0) || isThinking || disabled || isUploading || hasFailedUploads}
+              disabled={(!input.trim() && selectedImages.length === 0 && selectedDocuments.length === 0) || isThinking || disabled || isUploading || hasFailedUploads}
               size="icon"
               className="h-8 w-8 rounded-full"
-              title={hasFailedUploads ? "Please remove failed images before sending" : undefined}
+              title={hasFailedUploads ? "Please remove failed uploads before sending" : undefined}
             >
               <ArrowUp className="h-4 w-4" />
             </Button>

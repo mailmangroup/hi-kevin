@@ -182,16 +182,17 @@ export const aiService = {
    * Stream chat response
    */
   async *chatStream(
-    message: string, 
-    options: { 
-        conversationId?: string, 
-        orgId?: string, 
+    message: string,
+    options: {
+        conversationId?: string,
+        orgId?: string,
         brandId?: string,
         model?: string,
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
         toolSelectionEnabled?: boolean,
         images?: string[],
+        documentIds?: string[],
         reportFromTemplate?: ReportFromTemplate
     }
   ): AsyncGenerator<any, void, unknown> {
@@ -215,6 +216,7 @@ export const aiService = {
         thinking_enabled: options.thinkingEnabled ?? false,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
         images: options.images,
+        document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate
     }
 
@@ -402,6 +404,70 @@ export const aiService = {
     return apiCall<any>('proxy/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, context }),
+    })
+  },
+
+  /**
+   * Sign presigned URL for document upload
+   */
+  async signDocumentUpload(conversationId: string, filename: string, filetype: string): Promise<{
+    upload_url: string
+    object_key: string
+    document_id: string
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/sign`, {
+      method: 'POST',
+      body: JSON.stringify({ filename, filetype }),
+    })
+  },
+
+  /**
+   * Trigger document processing after upload
+   */
+  async processDocument(conversationId: string, documentId: string): Promise<{
+    success: boolean
+    document_id: string
+    filename: string
+    processing_status: string
+    chunk_strategy?: string
+    char_count?: number
+    page_count?: number
+    error?: string
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}/process`, {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * List documents in a conversation
+   */
+  async listDocuments(conversationId: string): Promise<{
+    documents: any[]
+    total: number
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents`)
+  },
+
+  /**
+   * Get document details
+   */
+  async getDocument(conversationId: string, documentId: string): Promise<{
+    document: any
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`)
+  },
+
+  /**
+   * Delete document
+   */
+  async deleteDocument(conversationId: string, documentId: string): Promise<{
+    success: boolean
+    document_id: string
+    message: string
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`, {
+      method: 'DELETE',
     })
   },
 }

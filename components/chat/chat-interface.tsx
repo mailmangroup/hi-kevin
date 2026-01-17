@@ -1,12 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { User, Bot } from "lucide-react"
+import { User, Bot, FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { ChatInputArea, UploadedImage } from "./chat-input-area"
+import { ChatInputArea, UploadedImage, UploadedDocument } from "./chat-input-area"
+import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { MessageContent } from "./message-content"
 import { ToolCallList, ToolCall, ToolCallDisplay } from "./tool-call-display"
 import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
@@ -28,17 +29,31 @@ interface Message {
   thinking?: string
   followUpQuestions?: string[]
   images?: string[]
+  documents?: DocumentAttachment[]
   report?: any
 }
 
 interface SubContentItem {
-  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image"
+  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image" | "user_document"
   tool?: string
   tool_input?: any
   tool_output?: any
   artifact?: any
   content?: string
   image_url?: string
+  document_id?: string
+  filename?: string
+  file_size?: number
+  processing_status?: string
+  chunk_strategy?: string
+}
+
+interface DocumentAttachment {
+  id: string
+  filename: string
+  file_size: number
+  processing_status: string
+  chunk_strategy?: string
 }
 
 /**
@@ -49,17 +64,19 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
   toolCalls: ToolCall[]
   content: string
   images: string[]
+  documents: DocumentAttachment[]
   contentParts: ContentPart[]
 } {
   if (!subContentList || subContentList.length === 0) {
-    return { toolCalls: [], content: "", images: [], contentParts: [] }
+    return { toolCalls: [], content: "", images: [], documents: [], contentParts: [] }
   }
 
   const toolCalls: ToolCall[] = []
   const contentParts: ContentPart[] = []
   let content = ""
   const images: string[] = []
-  
+  const documents: DocumentAttachment[] = []
+
   // Track tool inputs by name to match with outputs (using array to handle multiple calls to same tool)
   const pendingToolsByName: Map<string, ToolCall[]> = new Map()
 
@@ -68,9 +85,19 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
     if (item.type === "user_message" && item.content) {
       content = item.content
     }
-    
+
     if (item.type === "user_image" && item.image_url) {
         images.push(item.image_url)
+    }
+
+    if (item.type === "user_document" && item.document_id && item.filename) {
+        documents.push({
+            id: item.document_id,
+            filename: item.filename,
+            file_size: item.file_size || 0,
+            processing_status: item.processing_status || 'unknown',
+            chunk_strategy: item.chunk_strategy
+        })
     }
 
     if (item.type === "tool_input" && item.tool) {
@@ -125,7 +152,7 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
     }
   }
 
-  return { toolCalls, content, images, contentParts }
+  return { toolCalls, content, images, documents, contentParts }
 }
 
 interface ChatInterfaceProps {
@@ -170,6 +197,9 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
   // Image upload
   const [selectedImages, setSelectedImages] = React.useState<UploadedImage[]>([])
+
+  // Document upload
+  const [selectedDocuments, setSelectedDocuments] = React.useState<UploadedDocument[]>([])
 
   // Load credentials and chat history in parallel
   React.useEffect(() => {
@@ -241,7 +271,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           const { messages: history } = await aiService.getMessages(id)
           const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent, images, contentParts } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images, documents, contentParts } = parseSubContentList(msg.sub_content_list)
 
               return {
                   id: msg.id,
@@ -251,6 +281,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                   timestamp: new Date(msg.created_at),
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   images: images.length > 0 ? images : undefined,
+                  documents: documents.length > 0 ? documents : undefined,
                   contentParts: contentParts.length > 0 ? contentParts : undefined,
                   report: msg.report
               }
@@ -296,7 +327,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     setIsThinking(false)
   }
 
-  const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages) => {
+  const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
     if (!text.trim() || isThinking) return
 
     // Don't send if credentials are still loading or missing
@@ -311,7 +342,13 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     const uploadingImages = images.filter(img => img.uploading)
     if (uploadingImages.length > 0) {
       console.warn("Cannot send message: images are still uploading")
-      // You can add a toast notification here if you have a toast system
+      return
+    }
+
+    // Check if any documents are still uploading/processing
+    const uploadingDocs = documents.filter(doc => doc.uploading || doc.processing)
+    if (uploadingDocs.length > 0) {
+      console.warn("Cannot send message: documents are still processing")
       return
     }
 
@@ -319,24 +356,41 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     const failedImages = images.filter(img => !img.uploading && !img.key)
     if (failedImages.length > 0) {
       console.error("Cannot send message: some images failed to upload. Please remove them and try again.")
-      // You can add a toast notification here
+      return
+    }
+
+    // Check if any documents failed
+    const failedDocs = documents.filter(doc => doc.error || doc.processingStatus === 'failed')
+    if (failedDocs.length > 0) {
+      console.error("Cannot send message: some documents failed to process. Please remove them and try again.")
       return
     }
 
     // Filter images to only those with successful OSS keys
     const validImages = images.filter(img => img.key)
 
+    // Filter documents to only successfully processed ones
+    const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus === 'completed')
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: text,
       timestamp: new Date(),
-      images: validImages.length > 0 ? validImages.map(img => img.url) : undefined
+      images: validImages.length > 0 ? validImages.map(img => img.url) : undefined,
+      documents: validDocuments.length > 0 ? validDocuments.map(doc => ({
+        id: doc.documentId!,
+        filename: doc.filename,
+        file_size: doc.file.size,
+        processing_status: doc.processingStatus!,
+        chunk_strategy: doc.chunkStrategy
+      })) : undefined
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setSelectedImages([])
+    setSelectedDocuments([])
     setIsThinking(true)
 
     // Create a placeholder for assistant message
@@ -369,7 +423,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
         thinkingEnabled,
         includeWebSearch,
         model,
-        images: validImages.map(img => img.key!) // Only send OSS keys
+        images: validImages.map(img => img.key!), // Only send OSS keys
+        documentIds: validDocuments.map(doc => doc.documentId!) // Send document IDs
       })
 
       for await (const chunk of stream) {
@@ -617,6 +672,61 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                   </div>
                 )}
 
+                {/* Uploaded Documents */}
+                {message.documents && message.documents.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {message.documents.map((doc, i) => {
+                      const fileColor = getFileColor(doc.filename)
+                      const getColorClass = (color: string) => {
+                        const colorMap: Record<string, string> = {
+                          red: 'bg-red-50 text-red-700 border-red-200',
+                          blue: 'bg-blue-50 text-blue-700 border-blue-200',
+                          orange: 'bg-orange-50 text-orange-700 border-orange-200',
+                          green: 'bg-green-50 text-green-700 border-green-200',
+                          gray: 'bg-gray-50 text-gray-700 border-gray-200',
+                          purple: 'bg-purple-50 text-purple-700 border-purple-200',
+                          yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                        }
+                        return colorMap[color] || colorMap['gray']
+                      }
+
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-lg border",
+                            getColorClass(fileColor)
+                          )}
+                        >
+                          <FileText className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium truncate">
+                              {truncateFilename(doc.filename, 25)}
+                            </div>
+                            <div className="text-[10px] opacity-70">
+                              {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
+                              {doc.chunk_strategy && (
+                                <span className="ml-1">
+                                  • {doc.chunk_strategy === 'full_text' ? 'Full text' : 'Vectorized'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {doc.processing_status === 'completed' && (
+                            <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                          )}
+                          {doc.processing_status === 'processing' && (
+                            <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
+                          )}
+                          {doc.processing_status === 'failed' && (
+                            <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Thinking Content */}
                 {message.thinking && (
                   <div className="mb-3 pb-3 border-b border-gray-200">
@@ -712,7 +822,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           )}
 
           <div className="relative rounded-2xl border border-border bg-white shadow-sm focus-within:ring-1 focus-within:ring-primary">
-            <ChatInputArea 
+            <ChatInputArea
               input={input}
               setInput={setInput}
               onSend={() => handleSend()}
@@ -725,6 +835,9 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               setModel={setModel}
               selectedImages={selectedImages}
               setSelectedImages={setSelectedImages}
+              selectedDocuments={selectedDocuments}
+              setSelectedDocuments={setSelectedDocuments}
+              conversationId={conversationId}
               placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
               disabled={credentialsLoading || !!credentialsError || isThinking}
               isThinking={isThinking}
