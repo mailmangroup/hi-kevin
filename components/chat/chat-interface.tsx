@@ -357,10 +357,11 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
       return
     }
 
-    // Check if any documents are still uploading/processing
-    const uploadingDocs = documents.filter(doc => doc.uploading || doc.processing)
+    // Check if any documents are still uploading
+    // We allow sending while processing (vectorization), but not while uploading to OSS
+    const uploadingDocs = documents.filter(doc => doc.uploading)
     if (uploadingDocs.length > 0) {
-      console.warn("Cannot send message: documents are still processing")
+      console.warn("Cannot send message: documents are still uploading")
       return
     }
 
@@ -381,8 +382,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     // Filter images to only those with successful OSS keys
     const validImages = images.filter(img => img.key)
 
-    // Filter documents to only successfully processed ones
-    const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus === 'completed')
+    // Filter documents to only successfully uploaded ones (including processing)
+    const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus !== 'failed')
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -431,7 +432,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
     try {
       // Ensure conversation exists and documents are attached
-      const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus === 'completed')
+      // We attach even if processing, so the backend knows about them
+      const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus !== 'failed')
       
       if (validDocuments.length > 0) {
           if (!activeConversationId) {
@@ -753,7 +755,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                           {doc.processing_status === 'completed' && (
                             <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
                           )}
-                          {doc.processing_status === 'processing' && (
+                          {(doc.processing_status === 'processing' || doc.processing_status === 'pending') && (
                             <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
                           )}
                           {doc.processing_status === 'failed' && (

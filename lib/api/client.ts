@@ -447,7 +447,6 @@ export const aiService = {
     processing_status: string
     chunk_strategy?: string
     char_count?: number
-    page_count?: number
     error?: string
   }> {
     if (conversationId) {
@@ -484,7 +483,16 @@ export const aiService = {
   },
 
   /**
-   * Get document details
+   * Get document details (standalone, no conversation required)
+   */
+  async getDocumentStandalone(documentId: string): Promise<{
+    document: any
+  }> {
+    return apiCall(`proxy/documents/${documentId}`)
+  },
+
+  /**
+   * Get document details (requires conversation)
    */
   async getDocument(conversationId: string, documentId: string): Promise<{
     document: any

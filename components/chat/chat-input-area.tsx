@@ -93,7 +93,8 @@ export function ChatInputArea({
 
   // Track global uploading state to disable send button if any file is uploading
   const isImageUploading = selectedImages.some(img => img.uploading)
-  const isDocumentUploading = selectedDocuments.some(doc => doc.uploading || doc.processing)
+  // We allow sending while processing (vectorization), but not while uploading to OSS
+  const isDocumentUploading = selectedDocuments.some(doc => doc.uploading)
   const isUploading = isImageUploading || isDocumentUploading
 
   // Track if any files have failed to upload
@@ -217,9 +218,41 @@ export function ChatInputArea({
           ))
 
           // 4. Trigger processing
-          const processResult = await aiService.processDocument(document_id, conversationId)
+          let processResult = await aiService.processDocument(document_id, conversationId)
 
-          // 5. Update with processing result
+          // 5. Poll for completion if still processing
+          const maxPolls = 30 // 30 seconds max
+          let pollCount = 0
+          while (processResult.processing_status === 'processing' && pollCount < maxPolls) {
+              await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+
+              // Check document status
+              try {
+                  const docDetail = conversationId
+                      ? await aiService.getDocument(conversationId, document_id)
+                      : await aiService.getDocumentStandalone(document_id)
+
+                  processResult = {
+                      success: true,
+                      document_id: document_id,
+                      filename: docDetail.document.filename,
+                      processing_status: docDetail.document.processing_status,
+                      chunk_strategy: docDetail.document.chunk_strategy,
+                      char_count: docDetail.document.char_count
+                  }
+
+                  if (processResult.processing_status === 'completed' || processResult.processing_status === 'failed') {
+                      break
+                  }
+              } catch (e) {
+                  console.error('Error polling document status:', e)
+                  break
+              }
+
+              pollCount++
+          }
+
+          // 6. Update with final processing result
           setSelectedDocuments(prev => prev.map(d =>
               d.id === doc.id
                   ? {
@@ -385,7 +418,7 @@ export function ChatInputArea({
                                   {doc.uploading && (
                                       <Loader2 className="h-3 w-3 animate-spin" />
                                   )}
-                                  {doc.processing && (
+                                  {(doc.processing || doc.processingStatus === 'processing') && (
                                       <Loader2 className="h-3 w-3 animate-spin" />
                                   )}
                                   {doc.error && (
