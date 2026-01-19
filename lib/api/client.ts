@@ -179,19 +179,30 @@ export const aiService = {
   },
 
   /**
+   * Create a new conversation
+   */
+  async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {
+      return apiCall('proxy/agent/conversations', {
+          method: 'POST',
+          body: JSON.stringify({ org_id: orgId, brand_id: brandId })
+      })
+  },
+
+  /**
    * Stream chat response
    */
   async *chatStream(
-    message: string, 
-    options: { 
-        conversationId?: string, 
-        orgId?: string, 
+    message: string,
+    options: {
+        conversationId?: string,
+        orgId?: string,
         brandId?: string,
         model?: string,
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
         toolSelectionEnabled?: boolean,
         images?: string[],
+        documentIds?: string[],
         reportFromTemplate?: ReportFromTemplate
     }
   ): AsyncGenerator<any, void, unknown> {
@@ -215,6 +226,7 @@ export const aiService = {
         thinking_enabled: options.thinkingEnabled ?? false,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
         images: options.images,
+        document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate
     }
 
@@ -402,6 +414,102 @@ export const aiService = {
     return apiCall<any>('proxy/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, context }),
+    })
+  },
+
+  /**
+   * Sign presigned URL for document upload
+   */
+  async signDocumentUpload(filename: string, filetype: string, conversationId?: string): Promise<{
+    upload_url: string
+    object_key: string
+    document_id: string
+  }> {
+    if (conversationId) {
+        return apiCall(`proxy/conversations/${conversationId}/documents/sign`, {
+          method: 'POST',
+          body: JSON.stringify({ filename, filetype }),
+        })
+    }
+    return apiCall(`proxy/documents/sign`, {
+      method: 'POST',
+      body: JSON.stringify({ filename, filetype }),
+    })
+  },
+
+  /**
+   * Trigger document processing after upload
+   */
+  async processDocument(documentId: string, conversationId?: string): Promise<{
+    success: boolean
+    document_id: string
+    filename: string
+    processing_status: string
+    chunk_strategy?: string
+    char_count?: number
+    error?: string
+  }> {
+    if (conversationId) {
+        return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}/process`, {
+          method: 'POST',
+        })
+    }
+    return apiCall(`proxy/documents/${documentId}/process`, {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * Attach documents to a conversation
+   */
+  async attachDocuments(conversationId: string, documentIds: string[]): Promise<{
+      success: boolean,
+      attached_count: number
+  }> {
+      return apiCall(`proxy/conversations/${conversationId}/documents/attach`, {
+          method: 'POST',
+          body: JSON.stringify({ document_ids: documentIds })
+      })
+  },
+
+  /**
+   * List documents in a conversation
+   */
+  async listDocuments(conversationId: string): Promise<{
+    documents: any[]
+    total: number
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents`)
+  },
+
+  /**
+   * Get document details (standalone, no conversation required)
+   */
+  async getDocumentStandalone(documentId: string): Promise<{
+    document: any
+  }> {
+    return apiCall(`proxy/documents/${documentId}`)
+  },
+
+  /**
+   * Get document details (requires conversation)
+   */
+  async getDocument(conversationId: string, documentId: string): Promise<{
+    document: any
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`)
+  },
+
+  /**
+   * Delete document
+   */
+  async deleteDocument(conversationId: string, documentId: string): Promise<{
+    success: boolean
+    document_id: string
+    message: string
+  }> {
+    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`, {
+      method: 'DELETE',
     })
   },
 }
