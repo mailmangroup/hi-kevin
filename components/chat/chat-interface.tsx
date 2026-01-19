@@ -294,12 +294,12 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
       }
   }
 
-  // Handle initial message (from new chat redirect)
+  // Handle initial message (from new chat redirect or dashboard with documents)
   React.useEffect(() => {
     const isDev = process.env.NODE_ENV === 'development'
-    if (initialMessage && !initialized.current && !chatId && !credentialsLoading && (credentials.orgId || isDev)) {
+    if (initialMessage && !initialized.current && !credentialsLoading && (credentials.orgId || isDev)) {
       initialized.current = true
-      
+
       // Check for pending images from dashboard
       const pendingImages = sessionStorage.getItem('pending_chat_images')
       let images: UploadedImage[] = []
@@ -312,7 +312,19 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           }
       }
 
-      handleSend(initialMessage, images)
+      // Check for pending documents from dashboard
+      const pendingDocuments = sessionStorage.getItem('pending_chat_documents')
+      let documents: UploadedDocument[] = []
+      if (pendingDocuments) {
+          try {
+              documents = JSON.parse(pendingDocuments)
+              sessionStorage.removeItem('pending_chat_documents')
+          } catch (e) {
+              console.error("Failed to parse pending documents", e)
+          }
+      }
+
+      handleSend(initialMessage, images, documents)
     }
   }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
 
@@ -415,9 +427,35 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
     let currentTextContent = ""  // Track current text segment
     let lastPartWasText = false  // Track if the last part was text (for appending)
 
+    let activeConversationId = conversationId;
+
     try {
+      // Ensure conversation exists and documents are attached
+      const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus === 'completed')
+      
+      if (validDocuments.length > 0) {
+          if (!activeConversationId) {
+              // Create new conversation explicitly to attach documents
+              const resp = await aiService.createConversation(credentials.orgId, credentials.brandId);
+              activeConversationId = resp.conversation_id;
+              setConversationId(activeConversationId);
+              
+              // Update URL without reloading
+              window.history.replaceState(window.history.state, '', `/chat/${activeConversationId}`);
+              
+              // Notify sidebar
+              window.dispatchEvent(new Event('chat-created'));
+          }
+          
+          // Attach documents
+          await aiService.attachDocuments(
+              activeConversationId,
+              validDocuments.map(doc => doc.documentId!)
+          );
+      }
+
       const stream = aiService.chatStream(text, {
-        conversationId,
+        conversationId: activeConversationId,
         orgId: credentials.orgId,
         brandId: credentials.brandId,
         thinkingEnabled,

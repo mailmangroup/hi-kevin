@@ -189,14 +189,11 @@ export function ChatInputArea({
           }
 
           // 1. Get signed URL and document ID
-          if (!conversationId) {
-              throw new Error('No conversation ID available')
-          }
-
+          // We can now upload without a conversation ID
           const { upload_url, object_key, document_id } = await aiService.signDocumentUpload(
-              conversationId,
               doc.file.name,
-              doc.file.type
+              doc.file.type,
+              conversationId
           )
 
           // 2. Upload to OSS
@@ -220,7 +217,7 @@ export function ChatInputArea({
           ))
 
           // 4. Trigger processing
-          const processResult = await aiService.processDocument(conversationId, document_id)
+          const processResult = await aiService.processDocument(document_id, conversationId)
 
           // 5. Update with processing result
           setSelectedDocuments(prev => prev.map(d =>
@@ -503,9 +500,9 @@ export function ChatInputArea({
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:bg-muted"
-              disabled={disabled || isUploading || !conversationId}
+              disabled={disabled || isUploading}
               onClick={() => documentInputRef.current?.click()}
-              title={!conversationId ? "Start a conversation to upload documents" : "Upload documents"}
+              title="Upload documents"
           >
             <File className="h-5 w-5" />
           </Button>

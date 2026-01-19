@@ -179,6 +179,16 @@ export const aiService = {
   },
 
   /**
+   * Create a new conversation
+   */
+  async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {
+      return apiCall('proxy/agent/conversations', {
+          method: 'POST',
+          body: JSON.stringify({ org_id: orgId, brand_id: brandId })
+      })
+  },
+
+  /**
    * Stream chat response
    */
   async *chatStream(
@@ -410,12 +420,18 @@ export const aiService = {
   /**
    * Sign presigned URL for document upload
    */
-  async signDocumentUpload(conversationId: string, filename: string, filetype: string): Promise<{
+  async signDocumentUpload(filename: string, filetype: string, conversationId?: string): Promise<{
     upload_url: string
     object_key: string
     document_id: string
   }> {
-    return apiCall(`proxy/conversations/${conversationId}/documents/sign`, {
+    if (conversationId) {
+        return apiCall(`proxy/conversations/${conversationId}/documents/sign`, {
+          method: 'POST',
+          body: JSON.stringify({ filename, filetype }),
+        })
+    }
+    return apiCall(`proxy/documents/sign`, {
       method: 'POST',
       body: JSON.stringify({ filename, filetype }),
     })
@@ -424,7 +440,7 @@ export const aiService = {
   /**
    * Trigger document processing after upload
    */
-  async processDocument(conversationId: string, documentId: string): Promise<{
+  async processDocument(documentId: string, conversationId?: string): Promise<{
     success: boolean
     document_id: string
     filename: string
@@ -434,9 +450,27 @@ export const aiService = {
     page_count?: number
     error?: string
   }> {
-    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}/process`, {
+    if (conversationId) {
+        return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}/process`, {
+          method: 'POST',
+        })
+    }
+    return apiCall(`proxy/documents/${documentId}/process`, {
       method: 'POST',
     })
+  },
+
+  /**
+   * Attach documents to a conversation
+   */
+  async attachDocuments(conversationId: string, documentIds: string[]): Promise<{
+      success: boolean,
+      attached_count: number
+  }> {
+      return apiCall(`proxy/conversations/${conversationId}/documents/attach`, {
+          method: 'POST',
+          body: JSON.stringify({ document_ids: documentIds })
+      })
   },
 
   /**
