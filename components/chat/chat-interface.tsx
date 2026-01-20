@@ -201,6 +201,9 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
   // Document upload
   const [selectedDocuments, setSelectedDocuments] = React.useState<UploadedDocument[]>([])
 
+  // Report context (for chatting with reports)
+  const [reportId, setReportId] = React.useState<string | undefined>()
+
   // Load credentials and chat history in parallel
   React.useEffect(() => {
     async function loadCredentials() {
@@ -289,6 +292,16 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           // Sort by timestamp ascending (oldest first)
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
           setMessages(formattedMessages)
+
+          // Detect if this conversation contains a report
+          const reportMessage = history.find((msg: ApiMessage) => msg.report_id || msg.report)
+          if (reportMessage) {
+              const detectedReportId = reportMessage.report_id || reportMessage.report?.id
+              if (detectedReportId) {
+                  setReportId(detectedReportId)
+                  console.log('[Chat] Detected report in conversation:', detectedReportId)
+              }
+          }
       } catch (error) {
           console.error("Failed to load history:", error)
       }
@@ -464,7 +477,8 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
         includeWebSearch,
         model,
         images: validImages.map(img => img.key!), // Only send OSS keys
-        documentIds: validDocuments.map(doc => doc.documentId!) // Send document IDs
+        documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
+        reportContext: reportId ? { report_id: reportId } : undefined // Include report context if available
       })
 
       for await (const chunk of stream) {
@@ -593,13 +607,20 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
           if (chunk.report) {
               const reportData = chunk.report
-              
+
               // Update message with report data
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? { ...msg, report: reportData }
                       : msg
               ))
+
+              // Set report ID for future messages in this conversation
+              const detectedReportId = reportData.id || chunk.report_id
+              if (detectedReportId && !reportId) {
+                  setReportId(detectedReportId)
+                  console.log('[Chat] Report generated in conversation:', detectedReportId)
+              }
 
               // Create artifact and open it
               const reportArtifact: ArtifactData = {

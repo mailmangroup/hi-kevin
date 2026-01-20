@@ -203,7 +203,12 @@ export const aiService = {
         toolSelectionEnabled?: boolean,
         images?: string[],
         documentIds?: string[],
-        reportFromTemplate?: ReportFromTemplate
+        reportFromTemplate?: ReportFromTemplate,
+        reportContext?: {
+            report_id: string,
+            report_page_number?: number,
+            report_section_indexes?: number[]
+        }
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -227,7 +232,8 @@ export const aiService = {
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
         images: options.images,
         document_ids: options.documentIds,
-        report_from_template: options.reportFromTemplate
+        report_from_template: options.reportFromTemplate,
+        report_context: options.reportContext
     }
 
     const payloadString = JSON.stringify(payload)
