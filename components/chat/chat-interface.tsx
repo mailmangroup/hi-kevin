@@ -964,7 +964,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               disabled={credentialsLoading || !!credentialsError || isThinking}
               isThinking={isThinking}
               showBorder={false}
-              className="border-none shadow-none focus-within:ring-0"
+              className="border-none shadow-none focus-within:ring-0 bg-transparent"
             />
           </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">

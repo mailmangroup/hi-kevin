@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Paperclip, Brain, Globe, X, ArrowUp, Loader2, Square, File, FileText, CheckCircle2, AlertCircle } from "lucide-react"
+import { Send, Brain, Globe, X, ArrowUp, Loader2, Square, File, FileText, CheckCircle2, AlertCircle, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -565,7 +565,7 @@ export function ChatInputArea({
               onClick={() => imageInputRef.current?.click()}
               title="Upload images"
           >
-            <Paperclip className="h-5 w-5" />
+            <ImageIcon className="h-5 w-5" />
           </Button>
 
           {/* Document Upload Button */}
