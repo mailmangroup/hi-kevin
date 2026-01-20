@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { X, Download, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, ExternalLink, Maximize2, Minimize2, ArrowUp, ArrowDown, Minus } from "lucide-react"
+import { X, Download, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, ExternalLink, Maximize2, Minimize2, ArrowUp, ArrowDown, Minus, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { useArtifact, ArtifactData } from "./artifact-context"
+import { Button } from "@/components/ui/button"
+import { useArtifact, ArtifactData, ReportNavigation } from "./artifact-context"
 import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
 import { WebSearchArtifact } from "./web-search-artifact"
@@ -393,6 +394,37 @@ function TableContent({ data }: { data: any }) {
     )
   }
 
+  // Handle structured table data { headers: [], rows: [] }
+  if (data && typeof data === 'object' && Array.isArray(data.headers) && Array.isArray(data.rows)) {
+    const { headers, rows } = data
+    return (
+      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <table className="min-w-full text-sm divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              {headers.map((header: any, idx: number) => (
+                <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  {formatCellValue(header)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-100">
+            {rows.map((row: any[], idx: number) => (
+              <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                {row.map((cell: any, cIdx: number) => (
+                  <td key={cIdx} className="px-4 py-3 text-sm text-gray-600">
+                    {formatCellValue(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   if (typeof data === "string" && data.includes("|")) {
     return (
       <div className="prose prose-sm max-w-none">
@@ -405,53 +437,108 @@ function TableContent({ data }: { data: any }) {
 }
 
 function ReportContent({ data }: { data: any }) {
+  const { reportNavigation, setReportNavigation } = useArtifact()
+  const [activePage, setActivePage] = React.useState(0)
+
+  // Sync activePage with reportNavigation from context
+  React.useEffect(() => {
+      if (reportNavigation.pageNumber > 0 && reportNavigation.pageNumber - 1 !== activePage) {
+          // Only switch if the page actually exists
+          if (data?.pages && data.pages[reportNavigation.pageNumber - 1]) {
+              setActivePage(reportNavigation.pageNumber - 1)
+          }
+      }
+  }, [reportNavigation.pageNumber, data])
+
   // Support for new Report structure with pages
   if (data?.pages && Array.isArray(data.pages)) {
+    // Note: We removed IntersectionObserver for auto-tracking sections 
+    // to support "manual attach" mode as requested.
+    // Navigation is now updated via Tabs (for page) and "Chat" button (for section).
+
+    const handleTabChange = (index: number) => {
+        setActivePage(index)
+        setReportNavigation(prev => ({
+            ...prev,
+            pageNumber: index + 1,
+            sectionIndexes: []
+        }))
+        // Scroll parent to top
+        const panel = document.querySelector('.overflow-y-auto')
+        if (panel) panel.scrollTop = 0
+    }
+
     return (
       <div className="space-y-8 pb-8">
-        {/* Report Header */}
-        <div className="border-b pb-4 space-y-2">
-          {data.title && (
-            <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
-          )}
-          {data.metadata && (
-            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Period:</span>
-                <span>
-                  {formatDateRangeDisplay(
-                    new Date(data.metadata.start_date), 
-                    new Date(data.metadata.end_date)
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Language:</span>
-                <span className="uppercase">{data.metadata.language}</span>
-              </div>
-              {data.metadata.generated_at && (
+        {/* Report Header - Sticky */}
+        <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 backdrop-blur z-10 border-b shadow-sm space-y-4">
+          <div className="space-y-2">
+            {data.title && (
+                <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+            )}
+            {data.metadata && (
+                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                 <div className="flex items-center gap-1">
-                  <span className="font-medium">Generated:</span>
-                  <span>{new Date(data.metadata.generated_at).toLocaleDateString()}</span>
+                    <span className="font-medium">Period:</span>
+                    <span>
+                    {formatDateRangeDisplay(
+                        new Date(data.metadata.start_date), 
+                        new Date(data.metadata.end_date)
+                    )}
+                    </span>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="flex items-center gap-1">
+                    <span className="font-medium">Language:</span>
+                    <span className="uppercase">{data.metadata.language}</span>
+                </div>
+                {data.metadata.generated_at && (
+                    <div className="flex items-center gap-1">
+                    <span className="font-medium">Generated:</span>
+                    <span>{new Date(data.metadata.generated_at).toLocaleDateString()}</span>
+                    </div>
+                )}
+                </div>
+            )}
+          </div>
+
+          {/* Page Tabs */}
+          <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar">
+              {data.pages.map((page: any, idx: number) => (
+                  <Button
+                      key={idx}
+                      variant={activePage === idx ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleTabChange(idx)}
+                      className={cn(
+                          "whitespace-nowrap flex-shrink-0 h-8 text-xs",
+                          activePage === idx ? "bg-primary text-white" : "text-gray-600 bg-gray-50 border-gray-200"
+                      )}
+                  >
+                      {page.title || `Page ${idx + 1}`}
+                  </Button>
+              ))}
+          </div>
         </div>
 
-        {/* Pages */}
-        {data.pages.map((page: any, idx: number) => (
-          <div key={idx} className="space-y-6">
+        {/* Active Page Content */}
+        {data.pages[activePage] && (
+          <div className="space-y-6" data-page={activePage + 1}>
             <h2 className="text-xl font-semibold text-gray-800 pb-2 border-b border-gray-100">
-              {page.title}
+              {data.pages[activePage].title}
             </h2>
-            <div className="space-y-8">
-              {page.sections.map((section: any, sIdx: number) => (
-                <ReportSectionRenderer key={sIdx} section={section} />
+            <div className="space-y-12">
+              {data.pages[activePage].sections.map((section: any, sIdx: number) => (
+                <div key={sIdx} data-section={sIdx + 1} data-page={activePage + 1}>
+                    <ReportSectionRenderer 
+                        section={section} 
+                        pageIndex={activePage + 1}
+                        sectionIndex={sIdx + 1}
+                    />
+                </div>
               ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
     )
   }
@@ -489,34 +576,121 @@ function ReportContent({ data }: { data: any }) {
   return <DataContent data={data} />
 }
 
-function ReportSectionRenderer({ section }: { section: any }) {
-  const { type, title, content, data } = section
+const NETWORK_ICONS: Record<string, string> = {
+  wechat: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/wechat.svg",
+  sweibo: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/weibo.svg",
+  douyin: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/douyin.svg",
+  kuaishou: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/kuaishou.svg",
+  bilibili: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/bilibili.svg",
+  xhs: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/xhs.svg",
+  instagram: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/instagram.svg",
+  facebook: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/facebook.svg",
+  linkedin: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/linkedin.svg",
+  twitter: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/twitter.svg",
+  youtube: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/youtube.svg",
+  tiktok: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/tiktok.svg",
+  sph: "https://raw.githubusercontent.com/kawo-platform/kawo-icons/master/networks/channels.svg",
+}
+
+function SectionTitle({ title }: { title: string }) {
+  if (!title) return null
+
+  // Check for network icon tag: <network-icon network="xyz" />
+  const match = title.match(/<network-icon network="([^"]+)"\s*\/>\s*(.*)/)
+  
+  if (match) {
+    const network = match[1]
+    const text = match[2]
+    const iconUrl = NETWORK_ICONS[network.toLowerCase()]
+
+    return (
+      <div className="flex items-center gap-2 text-base font-semibold text-gray-800">
+        {iconUrl ? (
+           <img src={iconUrl} alt={network} className="w-5 h-5 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+        ) : (
+           <span className="capitalize">{network}</span>
+        )}
+        <span>{text}</span>
+      </div>
+    )
+  }
+
+  return <h3 className="text-base font-semibold text-gray-800">{title}</h3>
+}
+
+function ReportSectionRenderer({ section, pageIndex, sectionIndex }: { section: any, pageIndex?: number, sectionIndex?: number }) {
+  const { type, title, description, content, data, insights, stat_tiles, table_data, chart_spec } = section
+  const { setReportNavigation } = useArtifact()
+
+  const handleChatToKevin = () => {
+      // 1. Update navigation context
+      if (pageIndex && sectionIndex) {
+          setReportNavigation({
+              pageNumber: pageIndex,
+              sectionIndexes: [sectionIndex]
+          })
+      }
+      
+      // 2. Focus chat and set text
+      const event = new CustomEvent('chat-focus-input', {
+          detail: { text: `Regarding "${title?.replace(/<[^>]+>/g, '').trim() || 'this section'}": ` }
+      })
+      window.dispatchEvent(event)
+  }
 
   return (
-    <div className="space-y-3">
-      {title && (
-        <h3 className="text-base font-semibold text-gray-800">{title}</h3>
-      )}
+    <div className="space-y-4 group relative">
+      <div className="flex items-start justify-between gap-4">
+          <SectionTitle title={title} />
+          {/* Chat Button */}
+          <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleChatToKevin}
+              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 px-2 text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+              title="Chat with Kevin about this section"
+          >
+              <MessageSquare className="h-4 w-4" />
+              <span className="text-xs font-medium">Chat</span>
+          </Button>
+      </div>
       
+      {description && (
+        <p className="text-sm text-gray-500">{description}</p>
+      )}
+
+      {insights && Array.isArray(insights) && insights.length > 0 && (
+        <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
+          <div className="space-y-2">
+            {insights.map((insight: string, idx: number) => (
+               <MessageContent key={idx} content={insight} className="text-sm text-gray-700" />
+            ))}
+          </div>
+        </div>
+      )}
+
       {content && (
         <MessageContent content={content} className="text-sm text-gray-600" />
       )}
 
-      {type === "CHART" && data && (
+      {/* Handle Charts */}
+      {(type === "chart" || type === "CHART") && (chart_spec || data) && (
         <div className="h-[300px] w-full border rounded-lg p-4 bg-white shadow-sm">
-          <ReportChart data={data} />
+          <ReportChart data={chart_spec || data} />
         </div>
       )}
 
-      {type === "TABLE" && data && (
+      {/* Handle Tables */}
+      {(type === "table" || type === "TABLE") && (table_data || data) && (
         <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-          <TableContent data={data} />
+          <TableContent data={table_data || data} />
         </div>
       )}
 
-      {type === "STAT_TILES" && data && Array.isArray(data) && (
+      {/* Handle Stat Tiles */}
+      {(type === "stat_tiles" || type === "STAT_TILES") && (stat_tiles || data) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {data.map((tile: any, idx: number) => (
+          {(stat_tiles || data).map((tile: any, idx: number) => (
             <StatTile key={idx} data={tile} />
           ))}
         </div>
@@ -556,24 +730,64 @@ function StatTile({ data }: { data: any }) {
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 function ReportChart({ data }: { data: any }) {
-  const { chartType, labels, datasets } = data
+  const { chartType: legacyType, labels: legacyLabels, datasets: legacyDatasets, chart_type: newType, series } = data
+  
+  const chartType = legacyType || newType
+  
+  // Normalize data to Recharts format
+  let chartData: any[] = []
+  let datasets: any[] = []
 
-  // Transform data for Recharts
-  // Recharts expects array of objects: [{ name: 'Label1', dataset1: 10, dataset2: 20 }, ...]
-  const chartData = labels.map((label: string, idx: number) => {
-    const item: any = { name: label }
-    datasets.forEach((ds: any) => {
-      item[ds.label] = ds.data[idx]
-    })
-    return item
-  })
+  if (series && Array.isArray(series)) {
+      // New format: series with x and y
+      // Assuming all series share the same x-axis values (or we take the first one)
+      if (series.length > 0 && series[0].x) {
+          const xValues = series[0].x
+          chartData = xValues.map((xVal: any, idx: number) => {
+              const item: any = { name: xVal }
+              series.forEach((s: any) => {
+                  item[s.name] = s.y[idx]
+              })
+              return item
+          })
+          
+          datasets = series.map((s: any) => ({
+              label: s.name,
+              data: s.y, // Not strictly needed for Recharts but good for reference
+              borderColor: s.color,
+              backgroundColor: s.color
+          }))
+      }
+  } else if (legacyLabels && legacyDatasets) {
+      // Legacy format
+      chartData = legacyLabels.map((label: string, idx: number) => {
+        const item: any = { name: label }
+        legacyDatasets.forEach((ds: any) => {
+          item[ds.label] = ds.data[idx]
+        })
+        return item
+      })
+      datasets = legacyDatasets
+  }
 
   if (chartType === 'pie') {
     // Pie chart needs different format
-    const pieData = labels.map((label: string, idx: number) => ({
-      name: label,
-      value: datasets[0].data[idx]
-    }))
+    // For new format, we might need to adapt if it comes as series
+    // But usually pie chart series is just one series with labels as x and values as y
+    let pieData: any[] = []
+    
+    if (series && series.length > 0) {
+        // Assume first series has x as labels and y as values
+        pieData = series[0].x.map((label: string, idx: number) => ({
+            name: label,
+            value: series[0].y[idx]
+        }))
+    } else if (legacyLabels && legacyDatasets) {
+        pieData = legacyLabels.map((label: string, idx: number) => ({
+          name: label,
+          value: legacyDatasets[0].data[idx]
+        }))
+    }
 
     return (
       <ResponsiveContainer width="100%" height="100%">

@@ -218,6 +218,12 @@ function getArtifactDescription(artifact: any, toolName?: string): string | null
 
   // Check for summary
   if (data && typeof data === "object") {
+    // Handle report type specifically
+    const isReport = toolName === 'report' || data.type === 'report' || data.title === 'Brand Report'
+    if (isReport) {
+        return "Click to view report"
+    }
+
     const keys = Object.keys(data)
     if (keys.length <= 3) {
       return keys.join(", ")

@@ -66,6 +66,8 @@ export interface ChatInputAreaProps {
   showBorder?: boolean
 }
 
+import { useArtifact } from "./artifact-context"
+
 export function ChatInputArea({
   input,
   setInput,
@@ -90,6 +92,7 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const imageInputRef = React.useRef<HTMLInputElement>(null)
   const documentInputRef = React.useRef<HTMLInputElement>(null)
+  const { reportNavigation, selectedArtifact } = useArtifact()
 
   // Track global uploading state to disable send button if any file is uploading
   const isImageUploading = selectedImages.some(img => img.uploading)
@@ -350,8 +353,45 @@ export function ChatInputArea({
     return colorMap[color] || colorMap['gray']
   }
 
+  // Determine if we should show citation context
+  const showCitationContext = React.useMemo(() => {
+    if (!selectedArtifact || selectedArtifact.type !== 'report' || !selectedArtifact.data?.pages) return null
+    
+    if (reportNavigation.pageNumber > 0 && reportNavigation.sectionIndexes.length > 0) {
+        const page = selectedArtifact.data.pages.find((p: any) => p.page_number === reportNavigation.pageNumber)
+        if (page) {
+            // Find the first visible section to use as title
+            // sectionIndexes are 1-based, array is 0-based
+            const firstSectionIdx = reportNavigation.sectionIndexes[0] - 1
+            const section = page.sections && page.sections[firstSectionIdx]
+            
+            if (section) {
+                let title = section.title || page.title || "Report Section"
+                // Clean up title (remove tags if any)
+                title = title.replace(/<[^>]+>/g, '').trim()
+                return {
+                    title,
+                    page: page.title || `Page ${reportNavigation.pageNumber}`
+                }
+            }
+        }
+    }
+    return null
+  }, [selectedArtifact, reportNavigation])
+
   return (
     <div className={cn("relative bg-white", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
+      {/* Citation Context Indicator */}
+      {showCitationContext && (
+          <div className="absolute -top-8 left-0 right-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-primary/10 text-primary text-xs font-medium px-3 py-1 rounded-full backdrop-blur-sm border border-primary/20 shadow-sm flex items-center gap-1.5 max-w-[90%] truncate">
+                  <FileText className="h-3 w-3 flex-shrink-0" />
+                  <span className="opacity-70">Chatting about:</span>
+                  <span className="truncate font-semibold">{showCitationContext.title}</span>
+              </div>
+          </div>
+      )}
+
       {/* Image & Document Preview */}
       {(selectedImages.length > 0 || selectedDocuments.length > 0) && (
           <div className="flex gap-2 p-4 pb-0 overflow-x-auto">

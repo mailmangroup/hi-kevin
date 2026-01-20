@@ -12,6 +12,7 @@ import { MessageContent } from "./message-content"
 import { ToolCallList, ToolCall, ToolCallDisplay } from "./tool-call-display"
 import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
 import { ArtifactPanel } from "./artifact-panel"
+import { ArtifactSnippet } from "./artifact-snippet"
 
 // A content part can be either text or a tool call, maintaining order
 type ContentPart =
@@ -169,7 +170,7 @@ export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
 }
 
 function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
-  const { openArtifact, isPanelOpen } = useArtifact()
+  const { openArtifact, isPanelOpen, reportNavigation } = useArtifact()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
@@ -181,6 +182,31 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
   const [credentials, setCredentials] = React.useState<{orgId?: string, brandId?: string}>({})
   const [credentialsLoading, setCredentialsLoading] = React.useState(true)
   const [credentialsError, setCredentialsError] = React.useState<string | null>(null)
+
+  // Listen for external requests to focus input (e.g. from artifact panel)
+  React.useEffect(() => {
+      const handleFocusInput = (e: Event) => {
+          const customEvent = e as CustomEvent<{ text?: string }>
+          if (customEvent.detail?.text) {
+              setInput(prev => {
+                  if (!prev.trim()) return customEvent.detail.text!
+                  return prev + "\n" + customEvent.detail.text
+              })
+          }
+          
+          setTimeout(() => {
+              const textarea = document.querySelector('textarea')
+              if (textarea) {
+                  textarea.focus()
+                  // Move cursor to end
+                  textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+              }
+          }, 100)
+      }
+
+      window.addEventListener('chat-focus-input', handleFocusInput)
+      return () => window.removeEventListener('chat-focus-input', handleFocusInput)
+  }, [])
 
   // Chat options
   const [thinkingEnabled, setThinkingEnabled] = React.useState(() => {
@@ -300,6 +326,22 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
               if (detectedReportId) {
                   setReportId(detectedReportId)
                   console.log('[Chat] Detected report in conversation:', detectedReportId)
+
+                  // Fetch full report content
+                  try {
+                      const reportData = await aiService.getReport(id, detectedReportId)
+                      if (reportData) {
+                          const reportArtifact: ArtifactData = {
+                              id: reportData.id || detectedReportId,
+                              type: 'report',
+                              title: reportData.title || 'Brand Report',
+                              data: reportData
+                          }
+                          openArtifact(reportArtifact)
+                      }
+                  } catch (err) {
+                      console.error("Failed to fetch report content:", err)
+                  }
               }
           }
       } catch (error) {
@@ -478,7 +520,11 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
         model,
         images: validImages.map(img => img.key!), // Only send OSS keys
         documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
-        reportContext: reportId ? { report_id: reportId } : undefined // Include report context if available
+        reportContext: reportId ? { 
+            report_id: reportId,
+            report_page_number: reportNavigation?.pageNumber,
+            report_section_indexes: reportNavigation?.sectionIndexes
+        } : undefined // Include report context if available
       })
 
       for await (const chunk of stream) {
@@ -785,6 +831,21 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {/* Report Snippet */}
+                {message.report && (
+                  <div className="mb-3">
+                    <ArtifactSnippet 
+                      artifact={{
+                        type: 'report',
+                        title: message.report.title || "Brand Report",
+                        data: message.report,
+                        id: message.report.id
+                      }}
+                      toolName="report"
+                    />
                   </div>
                 )}
 

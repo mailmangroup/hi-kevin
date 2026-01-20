@@ -179,6 +179,20 @@ export const aiService = {
   },
 
   /**
+   * Get report details
+   */
+  async getReport(conversationId: string, reportId: string): Promise<any> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return {
+            id: reportId,
+            title: 'Mock Report',
+            pages: []
+        }
+    }
+    return apiCall(`proxy/agent/conversations/${conversationId}/report/${reportId}`)
+  },
+
+  /**
    * Create a new conversation
    */
   async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {

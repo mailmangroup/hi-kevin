@@ -16,6 +16,11 @@ export interface ArtifactData {
   }
 }
 
+export interface ReportNavigation {
+  pageNumber: number
+  sectionIndexes: number[]
+}
+
 interface ArtifactContextValue {
   // Currently selected artifact for the panel
   selectedArtifact: ArtifactData | null
@@ -27,6 +32,9 @@ interface ArtifactContextValue {
   closePanel: () => void
   // Toggle panel visibility
   togglePanel: () => void
+  // Report navigation state
+  reportNavigation: ReportNavigation
+  setReportNavigation: React.Dispatch<React.SetStateAction<ReportNavigation>>
 }
 
 const ArtifactContext = React.createContext<ArtifactContextValue | undefined>(undefined)
@@ -34,6 +42,7 @@ const ArtifactContext = React.createContext<ArtifactContextValue | undefined>(un
 export function ArtifactProvider({ children }: { children: React.ReactNode }) {
   const [selectedArtifact, setSelectedArtifact] = React.useState<ArtifactData | null>(null)
   const [isPanelOpen, setIsPanelOpen] = React.useState(false)
+  const [reportNavigation, setReportNavigation] = React.useState<ReportNavigation>({ pageNumber: 1, sectionIndexes: [] })
 
   const openArtifact = React.useCallback((artifact: ArtifactData) => {
     setSelectedArtifact(artifact)
@@ -54,7 +63,9 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     openArtifact,
     closePanel,
     togglePanel,
-  }), [selectedArtifact, isPanelOpen, openArtifact, closePanel, togglePanel])
+    reportNavigation,
+    setReportNavigation
+  }), [selectedArtifact, isPanelOpen, openArtifact, closePanel, togglePanel, reportNavigation])
 
   return (
     <ArtifactContext.Provider value={value}>
