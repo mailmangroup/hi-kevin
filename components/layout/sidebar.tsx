@@ -19,6 +19,7 @@ import { BetaBadge } from "@/components/ui/beta-badge"
 import { Button } from "@/components/ui/button"
 import { frostService } from "@/lib/api/frost"
 import { aiService, Conversation } from "@/lib/api/client"
+import { ModeToggle } from "@/components/mode-toggle"
 
 // Simple cache to avoid refetching on every navigation
 const sidebarCache = {
@@ -234,7 +235,19 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
       </nav>
 
-      {/* Bottom Section - Settings moved to profile */}
+      {/* Footer Section */}
+      <div className="border-t border-sidebar-border p-4">
+        <div className="flex items-center justify-between">
+            <Link
+              href="/dashboard/settings"
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </Link>
+            <ModeToggle />
+        </div>
+      </div>
     </div>
   )
 }
