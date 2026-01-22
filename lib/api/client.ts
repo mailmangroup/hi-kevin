@@ -222,7 +222,9 @@ export const aiService = {
             report_id: string,
             report_page_number?: number,
             report_section_indexes?: number[]
-        }
+        },
+        analyzePost?: boolean,
+        helpcenterQuery?: boolean
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -247,7 +249,9 @@ export const aiService = {
         images: options.images,
         document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate,
-        report_context: options.reportContext
+        report_context: options.reportContext,
+        analyzePost: options.analyzePost ?? false,
+        helpcenterQuery: options.helpcenterQuery ?? false
     }
 
     const payloadString = JSON.stringify(payload)

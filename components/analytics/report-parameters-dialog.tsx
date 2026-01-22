@@ -217,7 +217,7 @@ export function ReportParametersDialog({
         <DialogHeader>
           <DialogTitle>Generate Brand Report</DialogTitle>
           <DialogDescription>
-            Create a comprehensive analysis of your brand's performance.
+            Create a comprehensive analysis of your brand&apos;s performance.
           </DialogDescription>
         </DialogHeader>
 

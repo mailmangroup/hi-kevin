@@ -16,7 +16,7 @@ const TOOL_ICONS: Record<string, string> = {
   schedule_post: "📅",
   get_audience_data: "👥",
   list_available_documents: "📂",
-  retrieve_knowledge: "📄",
+  retrieve_document: "📄",
   default: "⚡",
 }
 
@@ -30,7 +30,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   schedule_post: "Scheduling Post",
   get_audience_data: "Getting Audience Data",
   list_available_documents: "Checking Documents",
-  retrieve_knowledge: "Reading Document",
+  retrieve_document: "Reading Document",
 }
 
 export interface ToolCall {

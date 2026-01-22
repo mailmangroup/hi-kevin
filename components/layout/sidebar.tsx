@@ -16,6 +16,7 @@ import {
   MessageSquare
 } from "lucide-react"
 import { BetaBadge } from "@/components/ui/beta-badge"
+import { Button } from "@/components/ui/button"
 import { frostService } from "@/lib/api/frost"
 import { aiService, Conversation } from "@/lib/api/client"
 
@@ -201,10 +202,17 @@ export function Sidebar({ className }: { className?: string }) {
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground/70">
                     Chat History
                 </h3>
-                <Link href="/chat/new">
-                    <MessageSquare className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-                </Link>
             </div>
+
+            {/* New Chat Button */}
+            <Link href="/dashboard">
+                <div className="mb-3 px-3">
+                    <Button className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-white">
+                        <MessageSquare className="h-4 w-4" />
+                        New Chat
+                    </Button>
+                </div>
+            </Link>
           
           <div className="space-y-1">
             {chatHistory.map((chat) => {

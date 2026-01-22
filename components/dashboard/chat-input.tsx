@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
 import { ArtifactProvider } from "@/components/chat/artifact-context"
-import { BetaBadge } from "@/components/ui/beta-badge"
 import { useUserStore } from "@/lib/store/user-store"
 import { aiService } from "@/lib/api/client"
+import { ReportParametersDialog } from "@/components/analytics/report-parameters-dialog"
 
 export function ChatInput() {
   const [input, setInput] = useState("")
@@ -17,6 +17,9 @@ export function ChatInput() {
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
   const [conversationId, setConversationId] = useState<string>()
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [analyzePost, setAnalyzePost] = useState(false)
+  const [helpcenterQuery, setHelpcenterQuery] = useState(false)
   const router = useRouter()
 
   const { profile, fetchProfile } = useUserStore()
@@ -83,6 +86,14 @@ export function ChatInput() {
       model
     })
 
+    // Add one-time flags if active
+    if (analyzePost) {
+      params.set('analyzePost', 'true')
+    }
+    if (helpcenterQuery) {
+      params.set('helpcenterQuery', 'true')
+    }
+
     if (conversationId) {
       router.push(`/chat/${conversationId}?${params.toString()}`)
     } else {
@@ -92,12 +103,44 @@ export function ChatInput() {
 
   const greeting = fullName ? `Hi ${fullName}, how can I help you today?` : "How can I help you today?"
 
+  const handleAnalyzeVideo = () => {
+    setAnalyzePost(true)
+    setHelpcenterQuery(false)
+  }
+
+  const handleGetHelp = () => {
+    setHelpcenterQuery(true)
+    setAnalyzePost(false)
+  }
+
+  const handleCreateReport = () => {
+    setIsReportDialogOpen(true)
+  }
+
   return (
     <ArtifactProvider>
       <div className="flex flex-col items-center justify-center space-y-8 py-10">
         <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
-        
+
         <div className="w-full max-w-2xl relative">
+          {/* Mode Indicators */}
+          {(analyzePost || helpcenterQuery) && (
+            <div className="mb-3 flex gap-2">
+              {analyzePost && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                  Analyze Video Mode
+                </div>
+              )}
+              {helpcenterQuery && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                  Help Center Mode
+                </div>
+              )}
+            </div>
+          )}
+
           <ChatInputArea
             input={input}
             setInput={setInput}
@@ -117,20 +160,35 @@ export function ChatInput() {
           />
         </div>
 
-        <div className="flex flex-col items-center gap-2">
-          <BetaBadge />
-          <div className="flex flex-wrap justify-center gap-3">
-            {["Analyze video", "Create campaign", "Research competitors", "Generate content", "Track performance"].map((action) => (
-              <Button key={action} variant="outline" className="rounded-full bg-white/50 hover:bg-white">
-                {action}
-              </Button>
-            ))}
-            <Button variant="outline" className="rounded-full bg-white/50 hover:bg-white">
-                More
-            </Button>
-          </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button
+            variant="outline"
+            className="rounded-full bg-white/50 hover:bg-white"
+            onClick={handleAnalyzeVideo}
+          >
+            Analyze Video
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-full bg-white/50 hover:bg-white"
+            onClick={handleGetHelp}
+          >
+            Get Help
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-full bg-white/50 hover:bg-white"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </div>
+
+      <ReportParametersDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+      />
     </ArtifactProvider>
   )
 }

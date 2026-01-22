@@ -8,6 +8,7 @@ import { useArtifact, ArtifactData, ReportNavigation } from "./artifact-context"
 import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
 import { WebSearchArtifact } from "./web-search-artifact"
+import { HelpCenterArtifact } from "./help-center-artifact"
 import { formatDateRangeDisplay } from "@/lib/utils/date-range"
 import { 
   BarChart, 
@@ -215,6 +216,50 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
     return false
   }
 
+  const isHelpCenter = (data: any, toolName?: string) => {
+    if (toolName === 'kawo_website_search') return true
+    if (!data) return false
+    if (data.data && Array.isArray(data.data)) {
+      const hasHelpCenterCards = data.data.some((section: any) =>
+        section.cards && Array.isArray(section.cards) &&
+        section.cards.some((card: any) => card.type === "helpcenter_article")
+      )
+      if (hasHelpCenterCards) return true
+    }
+    if (Array.isArray(data)) {
+      if (data.length > 0 && data[0]?.type === "helpcenter_article") return true
+      if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
+        return data[0].cards.some((card: any) => card?.type === "helpcenter_article")
+      }
+    }
+    if (data.cards && Array.isArray(data.cards)) {
+      return data.cards.some((card: any) => card?.type === "helpcenter_article")
+    }
+    if (data.type === "helpcenter_article") return true
+    try {
+      const str = JSON.stringify(data);
+      if (str.includes('"type":"helpcenter_article"')) return true;
+    } catch (e) {}
+    if (typeof data === 'string' && (data.includes('helpcenter_article'))) {
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && parsed[0]?.type === "helpcenter_article") return true;
+          if (parsed.length > 0 && parsed[0]?.cards) {
+            return parsed[0].cards.some((card: any) => card?.type === "helpcenter_article");
+          }
+        }
+        if (parsed.cards && Array.isArray(parsed.cards)) {
+          return parsed.cards.some((card: any) => card?.type === "helpcenter_article");
+        }
+        if (parsed.type === "helpcenter_article") return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false
+  }
+
   if (isBrandPosts(artifact.data, artifact.toolName)) {
     let data = artifact.data
     if (typeof data === 'string') {
@@ -239,6 +284,19 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
       }
     }
     return <WebSearchArtifact data={data} />
+  }
+
+  if (isHelpCenter(artifact.data, artifact.toolName)) {
+    let data = artifact.data
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data)
+      } catch (e) {
+        console.error("Failed to parse help center data", e)
+        return <div className="p-4 text-red-500">Failed to parse help center data: {String(e)}</div>
+      }
+    }
+    return <HelpCenterArtifact data={data} />
   }
 
   switch (artifact.type) {
