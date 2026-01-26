@@ -8,8 +8,16 @@ import { ArtifactProvider } from "@/components/chat/artifact-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { aiService } from "@/lib/api/client"
 import { ReportParametersDialog } from "@/components/analytics/report-parameters-dialog"
+import { useCreateProjectConversation } from "@/lib/hooks/use-projects"
 
-export function ChatInput() {
+interface ChatInputProps {
+  projectId?: string
+  projectName?: string
+  projectDescription?: string
+  hideActions?: boolean
+}
+
+export function ChatInput({ projectId, projectName, projectDescription, hideActions = false }: ChatInputProps = {}) {
   const [input, setInput] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
@@ -21,6 +29,7 @@ export function ChatInput() {
   const [analyzePost, setAnalyzePost] = useState(false)
   const [helpcenterQuery, setHelpcenterQuery] = useState(false)
   const router = useRouter()
+  const createProjectConversation = useCreateProjectConversation()
 
   const { profile, fetchProfile } = useUserStore()
 
@@ -77,8 +86,6 @@ export function ChatInput() {
         sessionStorage.setItem('pending_chat_documents', JSON.stringify(validDocuments))
     }
 
-    // If we have a conversationId (from document uploads), navigate to that conversation
-    // Otherwise, create a new chat
     const params = new URLSearchParams({
       q: input,
       thinking: thinkingEnabled.toString(),
@@ -94,14 +101,27 @@ export function ChatInput() {
       params.set('helpcenterQuery', 'true')
     }
 
-    if (conversationId) {
+    // If this is for a project, create a project conversation first
+    if (projectId) {
+      createProjectConversation.mutate(projectId, {
+        onSuccess: (data) => {
+          router.push(`/chat/${data.conversation_id}?${params.toString()}`)
+        }
+      })
+    } else if (conversationId) {
+      // If we have a conversationId (from document uploads), navigate to that conversation
       router.push(`/chat/${conversationId}?${params.toString()}`)
     } else {
+      // Otherwise, create a new chat
       router.push(`/chat/new?${params.toString()}`)
     }
   }
 
-  const greeting = fullName ? `Hi ${fullName}, how can I help you today?` : "How can I help you today?"
+  const greeting = projectName
+    ? projectName
+    : fullName
+      ? `Hi ${fullName}, how can I help you today?`
+      : "How can I help you today?"
 
   const handleAnalyzeVideo = () => {
     setAnalyzePost(true)
@@ -119,76 +139,107 @@ export function ChatInput() {
 
   return (
     <ArtifactProvider>
-      <div className="flex flex-col items-center justify-center space-y-8 py-10">
-        <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
+      <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-8 py-10"}>
+        {projectId ? (
+          // Project page layout
+          <div className="w-full">
+            <ChatInputArea
+                input={input}
+                setInput={setInput}
+                onSend={handleSend}
+                thinkingEnabled={thinkingEnabled}
+                setThinkingEnabled={setThinkingEnabled}
+                includeWebSearch={includeWebSearch}
+                setIncludeWebSearch={setIncludeWebSearch}
+                model={model}
+                setModel={setModel}
+                selectedImages={selectedImages}
+                setSelectedImages={setSelectedImages}
+                selectedDocuments={selectedDocuments}
+                setSelectedDocuments={setSelectedDocuments}
+                conversationId={conversationId}
+                placeholder="Reply..."
+                disabled={createProjectConversation.isPending}
+              />
+          </div>
+        ) : (
+          // Dashboard layout
+          <>
+            <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
 
-        <div className="w-full max-w-2xl relative">
-          {/* Mode Indicators */}
-          {(analyzePost || helpcenterQuery) && (
-            <div className="mb-3 flex gap-2">
-              {analyzePost && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                  Analyze Video Mode
+            <div className="w-full max-w-2xl relative">
+              {/* Mode Indicators */}
+              {(analyzePost || helpcenterQuery) && (
+                <div className="mb-3 flex gap-2">
+                  {analyzePost && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                      Analyze Video Mode
+                    </div>
+                  )}
+                  {helpcenterQuery && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                      Help Center Mode
+                    </div>
+                  )}
                 </div>
               )}
-              {helpcenterQuery && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                  Help Center Mode
-                </div>
-              )}
+
+              <ChatInputArea
+                input={input}
+                setInput={setInput}
+                onSend={handleSend}
+                thinkingEnabled={thinkingEnabled}
+                setThinkingEnabled={setThinkingEnabled}
+                includeWebSearch={includeWebSearch}
+                setIncludeWebSearch={setIncludeWebSearch}
+                model={model}
+                setModel={setModel}
+                selectedImages={selectedImages}
+                setSelectedImages={setSelectedImages}
+                selectedDocuments={selectedDocuments}
+                setSelectedDocuments={setSelectedDocuments}
+                conversationId={conversationId}
+                placeholder=""
+              />
             </div>
-          )}
 
-          <ChatInputArea
-            input={input}
-            setInput={setInput}
-            onSend={handleSend}
-            thinkingEnabled={thinkingEnabled}
-            setThinkingEnabled={setThinkingEnabled}
-            includeWebSearch={includeWebSearch}
-            setIncludeWebSearch={setIncludeWebSearch}
-            model={model}
-            setModel={setModel}
-            selectedImages={selectedImages}
-            setSelectedImages={setSelectedImages}
-            selectedDocuments={selectedDocuments}
-            setSelectedDocuments={setSelectedDocuments}
-            conversationId={conversationId}
-            placeholder=""
-          />
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button
-            variant="outline"
-            className="rounded-full bg-white/50 hover:bg-white"
-            onClick={handleAnalyzeVideo}
-          >
-            Analyze Video
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-full bg-white/50 hover:bg-white"
-            onClick={handleGetHelp}
-          >
-            Get Help
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-full bg-white/50 hover:bg-white"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
-        </div>
+            {!hideActions && (
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/50 hover:bg-white"
+                  onClick={handleAnalyzeVideo}
+                >
+                  Analyze Video
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/50 hover:bg-white"
+                  onClick={handleGetHelp}
+                >
+                  Get Help
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/50 hover:bg-white"
+                  onClick={handleCreateReport}
+                >
+                  Create Report
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      <ReportParametersDialog
-        open={isReportDialogOpen}
-        onOpenChange={setIsReportDialogOpen}
-      />
+      {!projectId && (
+        <ReportParametersDialog
+          open={isReportDialogOpen}
+          onOpenChange={setIsReportDialogOpen}
+        />
+      )}
     </ArtifactProvider>
   )
 }

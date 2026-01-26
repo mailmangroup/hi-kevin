@@ -13,7 +13,8 @@ import {
   Megaphone,
   Shield,
   Settings,
-  MessageSquare
+  MessageSquare,
+  FolderKanban
 } from "lucide-react"
 import { BetaBadge } from "@/components/ui/beta-badge"
 import { Button } from "@/components/ui/button"
@@ -43,6 +44,12 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     isBeta: false,
+  },
+  {
+    title: "Projects",
+    href: "/projects",
+    icon: FolderKanban,
+    isBeta: true,
   },
   {
     title: "Content",

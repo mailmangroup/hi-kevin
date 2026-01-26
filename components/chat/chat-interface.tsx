@@ -159,17 +159,18 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
 interface ChatInterfaceProps {
   initialMessage?: string
   chatId?: string
+  projectId?: string
 }
 
-export function ChatInterface({ initialMessage, chatId }: ChatInterfaceProps) {
+export function ChatInterface({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
   return (
     <ArtifactProvider>
-      <ChatInterfaceInner initialMessage={initialMessage} chatId={chatId} />
+      <ChatInterfaceInner initialMessage={initialMessage} chatId={chatId} projectId={projectId} />
     </ArtifactProvider>
   )
 }
 
-function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
+function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
   const { openArtifact, isPanelOpen, reportNavigation } = useArtifact()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
@@ -370,6 +371,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           try {
               images = JSON.parse(pendingImages)
               sessionStorage.removeItem('pending_chat_images')
+              setSelectedImages(images)
           } catch (e) {
               console.error("Failed to parse pending images", e)
           }
@@ -382,12 +384,14 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
           try {
               documents = JSON.parse(pendingDocuments)
               sessionStorage.removeItem('pending_chat_documents')
+              setSelectedDocuments(documents)
           } catch (e) {
               console.error("Failed to parse pending documents", e)
           }
       }
 
-      handleSend(initialMessage, images, documents)
+      // Set the input text but don't send automatically
+      setInput(initialMessage)
     }
   }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
 
@@ -521,6 +525,7 @@ function ChatInterfaceInner({ initialMessage, chatId }: ChatInterfaceProps) {
 
       const stream = aiService.chatStream(text, {
         conversationId: activeConversationId,
+        projectId: projectId,
         orgId: credentials.orgId,
         brandId: credentials.brandId,
         thinkingEnabled,
