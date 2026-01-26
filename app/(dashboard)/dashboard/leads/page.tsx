@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { LoadingState } from "@/components/ui/loading"
 import { Download, Calendar, ChevronDown, ChevronRight, UserPlus } from "lucide-react"
+import ExcelJS from 'exceljs'
 import { 
   DndContext, 
   useSensor, 
@@ -25,6 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const TIME_PERIODS = [
   { value: "current_week", label: "Current Week" },
@@ -121,6 +128,156 @@ export default function LeadsPage() {
     setDialogOpen(true)
   }
 
+  const downloadExcel = async (type: 'summary' | 'details') => {
+    if (!dashboardData) return
+
+    const workbook = new ExcelJS.Workbook()
+
+    if (type === 'summary') {
+      const worksheet = workbook.addWorksheet('Source Breakdown')
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'Main Category', key: 'mainCategory', width: 25 },
+        { header: 'Sub-category', key: 'subCategory', width: 25 },
+        { header: 'Count', key: 'count', width: 12 },
+        { header: 'Percentage', key: 'percentage', width: 15 }
+      ]
+
+      // Style header row
+      worksheet.getRow(1).font = { bold: true, size: 11 }
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' }
+      }
+      worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'left' }
+
+      // Add data rows
+      Object.entries(dashboardData.sources).forEach(([source, sourceData]) => {
+        // Source total row
+        const sourceRow = worksheet.addRow({
+          mainCategory: source,
+          subCategory: '',
+          count: sourceData.total,
+          percentage: `${sourceData.percentage}%`
+        })
+
+        // Style source row - bold with light background
+        sourceRow.font = { bold: true }
+        sourceRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF9FAFB' }
+        }
+
+        // Stage rows
+        Object.entries(sourceData.stages).forEach(([stage, stageData]) => {
+          if (stageData.count > 0) {
+            const stageRow = worksheet.addRow({
+              mainCategory: source,
+              subCategory: `  ${STAGE_LABELS[stage] || stage}`, // Indent with spaces
+              count: stageData.count,
+              percentage: `${stageData.percentage}%`
+            })
+
+            // Style stage rows - lighter text
+            stageRow.font = { color: { argb: 'FF6B7280' } }
+          }
+        })
+      })
+
+      // Grand Total row
+      const totalRow = worksheet.addRow({
+        mainCategory: 'GRAND TOTAL',
+        subCategory: '',
+        count: dashboardData.total_leads,
+        percentage: '100%'
+      })
+
+      totalRow.font = { bold: true, size: 11 }
+      totalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' }
+      }
+
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+          }
+        })
+      })
+
+    } else {
+      const worksheet = workbook.addWorksheet('Lead Details')
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'First Name', key: 'firstName', width: 15 },
+        { header: 'Last Name', key: 'lastName', width: 15 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Company', key: 'company', width: 25 },
+        { header: 'Title', key: 'title', width: 20 },
+        { header: 'Status', key: 'status', width: 20 },
+        { header: 'Source', key: 'source', width: 20 },
+        { header: 'Date', key: 'date', width: 15 }
+      ]
+
+      // Style header row
+      worksheet.getRow(1).font = { bold: true, size: 11 }
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' }
+      }
+
+      // Add data rows
+      dashboardData.leads.forEach((lead: any) => {
+        const p = lead.properties || {}
+        const date = p.createdate ? new Date(p.createdate).toLocaleDateString() : ''
+
+        worksheet.addRow({
+          firstName: p.firstname || '',
+          lastName: p.lastname || '',
+          email: p.email || '',
+          company: p.company || '',
+          title: p.jobtitle || '',
+          status: p.hs_lead_status || '',
+          source: p.hs_analytics_source || p.lead_source || '',
+          date: date
+        })
+      })
+
+      // Add borders to all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+          }
+        })
+      })
+    }
+
+    // Generate buffer and download
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `leads_${type}_${selectedPeriod}.xlsx`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   const downloadCSV = (type: 'summary' | 'details') => {
     if (!dashboardData) return
 
@@ -129,27 +286,27 @@ export default function LeadsPage() {
     if (type === 'summary') {
       // Header
       csvContent += "Source,Stage,Count,Percentage\n"
-      
+
       // Rows
       Object.entries(dashboardData.sources).forEach(([source, data]) => {
         // Source Total Row
-        csvContent += `"${source} (Total)",,${data.total},${data.percentage}%\n`
-        
-        // Stage Rows
+        csvContent += `"${source}",,${data.total},${data.percentage}%\n`
+
+        // Stage Rows (without source name)
         Object.entries(data.stages).forEach(([stage, stageData]) => {
           if (stageData.count > 0) {
-            csvContent += `"${source}","${STAGE_LABELS[stage] || stage}",${stageData.count},${stageData.percentage}%\n`
+            csvContent += `,"${STAGE_LABELS[stage] || stage}",${stageData.count},${stageData.percentage}%\n`
           }
         })
       })
-      
+
       // Grand Total
-      csvContent += `GRAND TOTAL,,${dashboardData.total_leads},100%\n`
-      
+      csvContent += `"GRAND TOTAL",,${dashboardData.total_leads},100%\n`
+
     } else {
       // Header
       csvContent += "First Name,Last Name,Email,Company,Title,Status,Source,Date\n"
-      
+
       // Rows
       dashboardData.leads.forEach((lead: any) => {
         const p = lead.properties || {}
@@ -164,7 +321,7 @@ export default function LeadsPage() {
           p.hs_analytics_source || p.lead_source || '',
           date
         ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
-        
+
         csvContent += row + "\n"
       })
     }
@@ -273,9 +430,22 @@ export default function LeadsPage() {
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="p-6 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold">Source Breakdown</h2>
-          <Button variant="outline" size="sm" onClick={() => downloadCSV('summary')} title="Export Summary">
-            <Download className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" title="Export Summary">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => downloadExcel('summary')}>
+                Download as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => downloadCSV('summary')}>
+                Download as CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -345,9 +515,22 @@ export default function LeadsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">Details Board</h2>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => downloadCSV('details')} title="Export Details">
-              <Download className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" title="Export Details">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => downloadExcel('details')}>
+                  Download as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadCSV('details')}>
+                  Download as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
