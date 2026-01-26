@@ -1,4 +1,4 @@
-import { apiCall } from './client'
+import { directApiCall } from './client'
 
 export interface AnalyticsDateRange {
   start: Date
@@ -77,8 +77,8 @@ export const analyticsService = {
     if (prevDateEnd) params.append('prev_date_end', prevDateEnd)
 
     // Call backend analytics endpoint
-    const response = await apiCall<AnalyticsDashboardResponse>(
-      `proxy/analytics/dashboard?${params.toString()}`
+    const response = await directApiCall<AnalyticsDashboardResponse>(
+      `analytics/dashboard?${params.toString()}`
     )
 
     if (!response.success) {

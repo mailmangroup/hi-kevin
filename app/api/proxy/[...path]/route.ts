@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 // Configure route segment config for larger payloads
 export const runtime = 'nodejs'
 export const maxDuration = 60 // 60 seconds timeout
+export const dynamic = 'force-dynamic' // Disable caching for all requests
 // Note: Body size limits are controlled at the platform level (Vercel has 4.5MB limit on Hobby, 100MB on Pro)
 
 // Handle GET, POST, PUT, DELETE, etc.

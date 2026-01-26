@@ -5,31 +5,71 @@
  * This allows for easy transition from demo to production.
  */
 
+import { useUserStore } from '@/lib/store/user-store'
+
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false' // Default to mock
 
-export async function apiCall<T>(
+// Check if we're in local development mode with env vars
+const isLocalDev = process.env.KAWO_TOKEN !== undefined
+
+/**
+ * Helper function to get KAWO configuration
+ * Uses environment variables in development, user profile in production
+ */
+export function getKawoConfig() {
+  if (isLocalDev) {
+    return {
+      token: process.env.KAWO_TOKEN!,
+      orgId: process.env.KAWO_ORG_ID!,
+      brandId: process.env.KAWO_BRAND_ID!,
+      apiUrl: process.env.KAWO_API_URL!,
+    }
+  } else {
+    const { profile } = useUserStore.getState()
+    return {
+      token: profile?.kawo_token,
+      orgId: profile?.kawo_org_id,
+      brandId: profile?.kawo_brand_id,
+      apiUrl: profile?.kawo_api_url,
+    }
+  }
+}
+
+/**
+ * Direct API call to KAWO backend (bypasses Vercel proxy)
+ * Used for all backend API calls to avoid serverless timeouts
+ */
+export async function directApiCall<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  if (USE_MOCK) {
-    // Simulate network delay for realistic experience
-    await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 400))
-
-    // In demo mode, we'll call mock functions directly from components
-    // This is a placeholder for future real API calls
-    // For now, if we are in mock mode but want to test backend, we can comment this out or set USE_MOCK to false
-    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_FORCE_MOCK !== 'true') {
-        // fall through to real API call if in dev and not forced mock
-    } else {
-        throw new Error(`Mock mode: Call mock functions directly for ${endpoint}`)
+  // Ensure user profile is loaded if not in local dev mode
+  if (!isLocalDev) {
+    const { profile, fetchProfile } = useUserStore.getState()
+    if (!profile) {
+      await fetchProfile()
     }
   }
 
-  // Real API call
-  const response = await fetch(`/api/${endpoint}`, {
+  // Get KAWO configuration
+  const config = getKawoConfig()
+
+  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+    throw new Error('KAWO credentials not configured. Please complete setup.')
+  }
+
+  // Build full backend URL
+  const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`
+
+  console.log('[API] Direct backend call:', targetUrl)
+
+  const response = await fetch(targetUrl, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.token}`,
+      'X-KAWO-Org-Id': config.orgId,
+      'X-KAWO-Brand-Id': config.brandId,
       ...options?.headers,
     },
   })
@@ -42,16 +82,7 @@ export async function apiCall<T>(
       errorData = { error: response.statusText }
     }
 
-    // Handle specific error codes
-    if (errorData.code === 'CREDENTIALS_MISSING' && errorData.redirect && typeof window !== 'undefined') {
-      // Only redirect if we're not already on the target page
-      if (window.location.pathname !== errorData.redirect) {
-        window.location.href = errorData.redirect
-      }
-    }
-
-    // Log detailed error information for debugging
-    console.error('API Error:', {
+    console.error('[API] Backend error:', {
       status: response.status,
       endpoint,
       errorData
@@ -60,13 +91,13 @@ export async function apiCall<T>(
     const error: any = new Error(errorData.error || errorData.message || response.statusText)
     error.status = response.status
     error.code = errorData.code
-    error.redirect = errorData.redirect
     error.details = errorData
     throw error
   }
 
   return response.json()
 }
+
 
 /**
  * Map user-friendly platform names to backend network keys
@@ -132,6 +163,30 @@ export interface ReportFromTemplate {
   language: "en" | "cn"
 }
 
+export interface Project {
+  id: string
+  name: string
+  description?: string
+  instructions?: string
+  status: 'ACTIVE' | 'ARCHIVED'
+  retrieval_strategy?: string
+  total_tokens: number
+  document_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectDocument {
+  id: string
+  project_id: string
+  filename: string
+  file_size: number
+  file_type: string
+  ingestion_status: 'pending' | 'loading' | 'completed' | 'failed'
+  token_count: number
+  created_at: string
+}
+
 /**
  * AI Service
  * Handles all AI-related operations
@@ -150,7 +205,7 @@ export const aiService = {
             total: 2
         }
     }
-    return apiCall(`proxy/agent/conversations?limit=${limit}&skip=${skip}`)
+    return directApiCall(`agent/conversations?limit=${limit}&skip=${skip}`)
   },
 
   /**
@@ -160,7 +215,7 @@ export const aiService = {
       if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
           return { id: conversationId, title: 'Mock Conversation', updated_at: new Date().toISOString(), message_count: 5, is_favorite: false }
       }
-      return apiCall(`proxy/agent/conversations/${conversationId}`)
+      return directApiCall(`agent/conversations/${conversationId}`)
   },
 
   /**
@@ -175,7 +230,7 @@ export const aiService = {
               total: 1
           }
       }
-      return apiCall(`proxy/agent/conversations/${conversationId}/messages?limit=${limit}&skip=${skip}`)
+      return directApiCall(`agent/conversations/${conversationId}/messages?limit=${limit}&skip=${skip}`)
   },
 
   /**
@@ -189,14 +244,14 @@ export const aiService = {
             pages: []
         }
     }
-    return apiCall(`proxy/agent/conversations/${conversationId}/report/${reportId}`)
+    return directApiCall(`agent/conversations/${conversationId}/report/${reportId}`)
   },
 
   /**
    * Create a new conversation
    */
   async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {
-      return apiCall('proxy/agent/conversations', {
+      return directApiCall('agent/conversations', {
           method: 'POST',
           body: JSON.stringify({ org_id: orgId, brand_id: brandId })
       })
@@ -209,6 +264,7 @@ export const aiService = {
     message: string,
     options: {
         conversationId?: string,
+        projectId?: string,
         orgId?: string,
         brandId?: string,
         model?: string,
@@ -239,6 +295,7 @@ export const aiService = {
     const payload: any = {
         query: message,
         conversation_id: options.conversationId,
+        project_id: options.projectId,
         org_id: options.orgId,
         brand_id: options.brandId,
         stream: true,
@@ -254,18 +311,45 @@ export const aiService = {
         helpcenterQuery: options.helpcenterQuery ?? false
     }
 
+    // Ensure user profile is loaded if not in local dev mode
+    if (!isLocalDev) {
+      const { profile, fetchProfile } = useUserStore.getState()
+      if (!profile) {
+        await fetchProfile()
+      }
+    }
+
+    // Get KAWO configuration for direct backend call
+    const config = getKawoConfig()
+
+    if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+      throw new Error('KAWO credentials not configured. Please complete setup.')
+    }
+
+    // Inject org_id and brand_id if not provided in options
+    if (!payload.org_id) payload.org_id = config.orgId
+    if (!payload.brand_id) payload.brand_id = config.brandId
+
     const payloadString = JSON.stringify(payload)
     const payloadSizeKB = (payloadString.length / 1024).toFixed(2)
 
     console.log('[API] Sending chat query payload:', payload)
     console.log(`[API] Payload size: ${payloadSizeKB} KB`)
-    console.log('[API] Initiating fetch to /api/proxy/agent/query...')
+
+    // Make direct call to backend API instead of proxy
+    const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
+    console.log('[API] Initiating direct fetch to backend:', targetUrl)
 
     let response
     try {
-        response = await fetch('/api/proxy/agent/query', {
+        response = await fetch(targetUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${config.token}`,
+              'X-KAWO-Org-Id': config.orgId,
+              'X-KAWO-Brand-Id': config.brandId,
+            },
             body: payloadString
         })
         console.log('[API] Fetch completed, status:', response.status)
@@ -317,7 +401,7 @@ export const aiService = {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
         return
     }
-    return apiCall(`proxy/agent/conversations/${conversationId}/stop`, {
+    return directApiCall(`agent/conversations/${conversationId}/stop`, {
         method: 'POST'
     })
   },
@@ -351,7 +435,7 @@ export const aiService = {
       // brand_id will be injected by the proxy if not present, or we can fetch it here if we had the user context
     }
 
-    const response = await apiCall<{ text: string; language: string }>('proxy/content/write', {
+    const response = await directApiCall<{ text: string; language: string }>('content/write', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
@@ -372,7 +456,7 @@ export const aiService = {
       return `[Localized for ${targetPlatform}]\n${content}`
     }
 
-    return apiCall<string>('ai/localize', {
+    return directApiCall<string>('ai/localize', {
       method: 'POST',
       body: JSON.stringify({ content, sourcePlatform, targetPlatform }),
     })
@@ -387,7 +471,7 @@ export const aiService = {
       return checkCompliance(content)
     }
 
-    return apiCall<any[]>('ai/compliance', {
+    return directApiCall<any[]>('ai/compliance', {
       method: 'POST',
       body: JSON.stringify({ content }),
     })
@@ -403,7 +487,7 @@ export const aiService = {
       return "Hi there, following up on our previous conversation. I noticed you checked out our pricing page. Do you have any questions I can answer?";
     }
 
-    return apiCall<string>('ai/follow-up', {
+    return directApiCall<string>('ai/follow-up', {
       method: 'POST',
       body: JSON.stringify({ leadId }),
     })
@@ -418,7 +502,7 @@ export const aiService = {
       return `This week saw strong performance on Xiaohongshu (+12% engagement) driven by skincare content. Douyin showed slight decline (-3%) due to algorithm changes affecting video reach.`
     }
 
-    return apiCall<string>('ai/report', {
+    return directApiCall<string>('ai/report', {
       method: 'POST',
       body: JSON.stringify({ dateRange }),
     })
@@ -430,12 +514,12 @@ export const aiService = {
   async chat(message: string, context?: any): Promise<any> {
     if (USE_MOCK) {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      return { 
+      return {
           message: `I'd be happy to help with "${message}". In the full version, I'll provide detailed assistance based on your data and context.`
       }
     }
 
-    return apiCall<any>('proxy/ai/chat', {
+    return directApiCall<any>('ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, context }),
     })
@@ -450,12 +534,12 @@ export const aiService = {
     document_id: string
   }> {
     if (conversationId) {
-        return apiCall(`proxy/conversations/${conversationId}/documents/sign`, {
+        return directApiCall(`conversations/${conversationId}/documents/sign`, {
           method: 'POST',
           body: JSON.stringify({ filename, filetype }),
         })
     }
-    return apiCall(`proxy/documents/sign`, {
+    return directApiCall(`documents/sign`, {
       method: 'POST',
       body: JSON.stringify({ filename, filetype }),
     })
@@ -474,11 +558,11 @@ export const aiService = {
     error?: string
   }> {
     if (conversationId) {
-        return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}/process`, {
+        return directApiCall(`conversations/${conversationId}/documents/${documentId}/process`, {
           method: 'POST',
         })
     }
-    return apiCall(`proxy/documents/${documentId}/process`, {
+    return directApiCall(`documents/${documentId}/process`, {
       method: 'POST',
     })
   },
@@ -490,7 +574,7 @@ export const aiService = {
       success: boolean,
       attached_count: number
   }> {
-      return apiCall(`proxy/conversations/${conversationId}/documents/attach`, {
+      return directApiCall(`conversations/${conversationId}/documents/attach`, {
           method: 'POST',
           body: JSON.stringify({ document_ids: documentIds })
       })
@@ -503,7 +587,7 @@ export const aiService = {
     documents: any[]
     total: number
   }> {
-    return apiCall(`proxy/conversations/${conversationId}/documents`)
+    return directApiCall(`conversations/${conversationId}/documents`)
   },
 
   /**
@@ -512,7 +596,7 @@ export const aiService = {
   async getDocumentStandalone(documentId: string): Promise<{
     document: any
   }> {
-    return apiCall(`proxy/documents/${documentId}`)
+    return directApiCall(`documents/${documentId}`)
   },
 
   /**
@@ -521,7 +605,7 @@ export const aiService = {
   async getDocument(conversationId: string, documentId: string): Promise<{
     document: any
   }> {
-    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`)
+    return directApiCall(`conversations/${conversationId}/documents/${documentId}`)
   },
 
   /**
@@ -532,10 +616,122 @@ export const aiService = {
     document_id: string
     message: string
   }> {
-    return apiCall(`proxy/conversations/${conversationId}/documents/${documentId}`, {
+    return directApiCall(`conversations/${conversationId}/documents/${documentId}`, {
       method: 'DELETE',
     })
   },
-}
 
-export default apiCall
+  // =========================================================================
+  // Project Management
+  // =========================================================================
+
+  /**
+   * Get list of projects
+   */
+  async getProjects(limit = 50, offset = 0): Promise<{ projects: Project[], total: number }> {
+    return directApiCall(`projects?limit=${limit}&offset=${offset}`)
+  },
+
+  /**
+   * Get a single project
+   */
+  async getProject(projectId: string): Promise<Project> {
+    return directApiCall(`projects/${projectId}`)
+  },
+
+  /**
+   * Create a new project
+   */
+  async createProject(data: { name: string; description?: string; instructions?: string }): Promise<Project> {
+    return directApiCall('projects', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  },
+
+  /**
+   * Update a project
+   */
+  async updateProject(projectId: string, data: Partial<Project>): Promise<Project> {
+    return directApiCall(`projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    })
+  },
+
+  /**
+   * Delete a project
+   */
+  async deleteProject(projectId: string): Promise<{ success: boolean }> {
+    return directApiCall(`projects/${projectId}`, {
+      method: 'DELETE'
+    })
+  },
+
+  // =========================================================================
+  // Project Documents
+  // =========================================================================
+
+  /**
+   * Sign project document upload
+   */
+  async signProjectDocumentUpload(projectId: string, filename: string, filetype: string): Promise<{
+    upload_url: string
+    object_key: string
+    document_id: string
+  }> {
+    return directApiCall(`projects/${projectId}/documents/sign`, {
+      method: 'POST',
+      body: JSON.stringify({ filename, filetype })
+    })
+  },
+
+  /**
+   * Ingest project document
+   */
+  async ingestProjectDocument(projectId: string, documentId: string): Promise<{
+    success: boolean
+    document_id: string
+    ingestion_status: string
+  }> {
+    return directApiCall(`projects/${projectId}/documents/${documentId}/ingest`, {
+      method: 'POST'
+    })
+  },
+
+  /**
+   * Get project documents
+   */
+  async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
+    return directApiCall(`projects/${projectId}/documents`)
+  },
+
+  /**
+   * Delete project document
+   */
+  async deleteProjectDocument(projectId: string, documentId: string): Promise<{ success: boolean }> {
+    return directApiCall(`projects/${projectId}/documents/${documentId}`, {
+      method: 'DELETE'
+    })
+  },
+
+  // =========================================================================
+  // Project Conversations
+  // =========================================================================
+
+  /**
+   * Get project conversations
+   */
+  async getProjectConversations(projectId: string, limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number }> {
+    return directApiCall(`projects/${projectId}/conversations?limit=${limit}&offset=${skip}`)
+  },
+
+  /**
+   * Create project conversation
+   */
+  async createProjectConversation(projectId: string): Promise<{ conversation_id: string }> {
+    return directApiCall(`projects/${projectId}/conversations`, {
+      method: 'POST'
+    })
+  },
+}

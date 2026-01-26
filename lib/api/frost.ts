@@ -2,11 +2,11 @@
  * Frost API Client
  *
  * Client for HubSpot CRM integration via the Frost service.
- * Uses the proxy pattern similar to content generation - routes through /api/proxy
- * which handles Supabase authentication and injects KAWO credentials.
+ * Makes direct calls to the KAWO backend API, bypassing Vercel serverless functions
+ * to avoid timeout limitations.
  */
 
-import apiCall from './client'
+import { directApiCall } from './client'
 
 // Type definitions matching backend response models
 export interface DateRange {
@@ -38,11 +38,10 @@ export interface DashboardData {
 /**
  * Frost/HubSpot Service
  *
- * All endpoints route through /api/proxy/frost/... which:
- * 1. Authenticates user via Supabase
- * 2. Fetches KAWO credentials from profiles table
- * 3. Forwards to backend API (configured via kawo_api_url in profile or KAWO_API_URL env var)
- * 4. Backend uses HUBSPOT_KEY from its environment
+ * All endpoints call the KAWO backend API directly with:
+ * 1. KAWO credentials from Supabase profiles table (or env vars in dev)
+ * 2. Proper Authorization and X-KAWO headers
+ * 3. Backend uses HUBSPOT_KEY from its environment to access HubSpot
  */
 export const frostService = {
   /**
@@ -53,7 +52,7 @@ export const frostService = {
    * Backend endpoint: GET /frost/dashboard
    */
   async getDashboard(period: string = 'current_week'): Promise<DashboardData> {
-    return apiCall<DashboardData>(`proxy/frost/dashboard?period=${period}`)
+    return directApiCall<DashboardData>(`frost/dashboard?period=${period}`)
   },
 
   /**
@@ -62,7 +61,7 @@ export const frostService = {
    * Backend endpoint: GET /frost/leads/new-count
    */
   async getNewLeadsCount() {
-    return apiCall<{ count: number; contacts: any[] }>('proxy/frost/leads/new-count')
+    return directApiCall<{ count: number; contacts: any[] }>('frost/leads/new-count')
   },
 
   /**
@@ -71,7 +70,7 @@ export const frostService = {
    * Backend endpoint: POST /frost/contacts/search
    */
   async searchContacts(filters: any[], properties?: string[]) {
-    return apiCall('proxy/frost/contacts/search', {
+    return directApiCall('frost/contacts/search', {
       method: 'POST',
       body: JSON.stringify({
         filters,
@@ -106,6 +105,6 @@ export const frostService = {
    * Backend endpoint: GET /frost/health
    */
   async healthCheck() {
-    return apiCall('proxy/frost/health')
+    return directApiCall('frost/health')
   },
 }
