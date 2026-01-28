@@ -86,3 +86,22 @@ export function useCreateProjectConversation() {
     },
   })
 }
+
+export function useProjectMemory(projectId: string) {
+  return useQuery({
+    queryKey: ['project-memory', projectId],
+    queryFn: () => aiService.getProjectMemory(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export function useEditProjectMemory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ projectId, instruction }: { projectId: string; instruction: string }) =>
+      aiService.editProjectMemoryWithLLM(projectId, instruction),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['project-memory', variables.projectId] })
+    },
+  })
+}

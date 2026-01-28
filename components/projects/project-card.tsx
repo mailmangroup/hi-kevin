@@ -16,8 +16,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <CardHeader>
           <div className="flex justify-between items-start">
             <CardTitle className="text-xl truncate pr-2">{project.name}</CardTitle>
-            <Badge variant={project.status === 'ACTIVE' ? 'default' : 'secondary'}>
-              {project.status.toLowerCase()}
+            <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
+              {project.status}
             </Badge>
           </div>
         </CardHeader>

@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { useUpdateProject, useProject } from "@/lib/hooks/use-projects"
+import { useEditProjectMemory, useProjectMemory } from "@/lib/hooks/use-projects"
 import { Pencil, Lock, X } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -14,38 +14,48 @@ interface ProjectMemorySectionProps {
 }
 
 const formSchema = z.object({
-  description: z.string().optional(),
+  instruction: z.string().min(1).max(500),
 })
 
 export function ProjectMemorySection({ projectId }: ProjectMemorySectionProps) {
-  const { data: project } = useProject(projectId)
-  const updateProject = useUpdateProject()
+  const { data: memory, isLoading } = useProjectMemory(projectId)
+  const editProjectMemory = useEditProjectMemory()
   const [isEditing, setIsEditing] = useState(false)
+  const [lastMessage, setLastMessage] = useState<string | null>(null)
 
   const { register, handleSubmit, reset } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      description: project?.description || "",
+      instruction: "",
     },
   })
 
-  useEffect(() => {
-    if (project) {
-      reset({ description: project.description || "" })
-    }
-  }, [project, reset])
+  const sortedFacts = useMemo(() => {
+    if (!memory?.facts) return []
+    return [...memory.facts].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  }, [memory?.facts])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    updateProject.mutate({ id: projectId, data: { description: values.description } }, {
-      onSuccess: () => {
+    editProjectMemory.mutate({ projectId, instruction: values.instruction }, {
+      onSuccess: (data) => {
         setIsEditing(false)
+        reset({ instruction: "" })
+        setLastMessage(data.message || data.explanation || null)
+      },
+      onError: () => {
+        setLastMessage("Memory update failed. Please try again.")
       }
     })
   }
 
   const handleCancel = () => {
-    reset({ description: project?.description || "" })
+    reset({ instruction: "" })
     setIsEditing(false)
+    setLastMessage(null)
+  }
+
+  const formatCategory = (category: string) => {
+    return category.replace(/_/g, " ")
   }
 
   return (
@@ -70,12 +80,44 @@ export function ProjectMemorySection({ projectId }: ProjectMemorySectionProps) {
         )}
       </div>
 
+      {memory?.last_extraction_at && (
+        <p className="text-xs text-muted-foreground">
+          Last extracted {formatDistanceToNow(new Date(memory.last_extraction_at), { addSuffix: true })}
+        </p>
+      )}
+
+      {isLoading ? (
+        <div className="text-xs text-muted-foreground">Loading memory...</div>
+      ) : sortedFacts.length === 0 ? (
+        <div className="text-xs text-muted-foreground text-center py-2">
+          No memory facts yet
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sortedFacts.map((fact) => (
+            <div key={fact.id} className="rounded-md border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
+                  {formatCategory(fact.category)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(fact.confidence * 100)}% confidence
+                </span>
+              </div>
+              <p className="text-sm text-foreground leading-relaxed">
+                {fact.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {isEditing ? (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
           <Textarea
-            placeholder="Describe the project purpose and context..."
+            placeholder="Describe how to add, update, or remove a memory fact..."
             className="min-h-[120px] resize-y text-sm"
-            {...register("description")}
+            {...register("instruction")}
             autoFocus
           />
           <div className="flex justify-end gap-2">
@@ -91,24 +133,16 @@ export function ProjectMemorySection({ projectId }: ProjectMemorySectionProps) {
             <Button
               type="submit"
               size="sm"
-              disabled={updateProject.isPending}
+              disabled={editProjectMemory.isPending}
             >
               Save
             </Button>
           </div>
         </form>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Purpose & context</p>
-          <p className="text-sm text-foreground leading-relaxed line-clamp-3">
-            {project?.description || "No description provided yet."}
-          </p>
-          {project?.updated_at && (
-            <p className="text-xs text-muted-foreground">
-              Last updated {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}
-            </p>
-          )}
-        </div>
+      ) : null}
+
+      {lastMessage && (
+        <p className="text-xs text-muted-foreground">{lastMessage}</p>
       )}
     </div>
   )

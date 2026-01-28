@@ -168,7 +168,7 @@ export interface Project {
   name: string
   description?: string
   instructions?: string
-  status: 'ACTIVE' | 'ARCHIVED'
+  status: 'active' | 'archived'
   retrieval_strategy?: string
   total_tokens: number
   document_count: number
@@ -178,13 +178,52 @@ export interface Project {
 
 export interface ProjectDocument {
   id: string
-  project_id: string
   filename: string
   file_size: number
   file_type: string
-  ingestion_status: 'pending' | 'loading' | 'completed' | 'failed'
+  ingestion_status: 'pending' | 'completed' | 'failed'
+  char_count: number
   token_count: number
+  chunk_count: number
+  document_summary?: string
+  has_contextual_enrichment: boolean
   created_at: string
+  processed_at?: string
+}
+
+export interface MemoryFact {
+  id: string
+  content: string
+  category: string
+  confidence: number
+  created_at: string
+  updated_at: string
+  expires_at?: string
+  source_conversation_id?: string
+}
+
+export interface GlobalMemoryResponse {
+  user_id: string
+  facts: MemoryFact[]
+  last_extraction_at?: string
+  extraction_count: number
+}
+
+export interface ProjectMemoryResponse {
+  project_id: string
+  user_id: string
+  facts: MemoryFact[]
+  last_extraction_at?: string
+  extraction_count: number
+}
+
+export interface EditMemoryWithLLMResponse {
+  success: boolean
+  action: string
+  fact_id?: string
+  new_content?: string
+  explanation?: string
+  message?: string
 }
 
 /**
@@ -692,7 +731,13 @@ export const aiService = {
   async ingestProjectDocument(projectId: string, documentId: string): Promise<{
     success: boolean
     document_id: string
+    filename: string
     ingestion_status: string
+    char_count: number
+    token_count: number
+    chunk_count: number
+    document_summary?: string
+    error?: string
   }> {
     return directApiCall(`projects/${projectId}/documents/${documentId}/ingest`, {
       method: 'POST'
@@ -722,7 +767,7 @@ export const aiService = {
   /**
    * Get project conversations
    */
-  async getProjectConversations(projectId: string, limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number }> {
+  async getProjectConversations(projectId: string, limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number, limit: number, skip: number }> {
     return directApiCall(`projects/${projectId}/conversations?limit=${limit}&offset=${skip}`)
   },
 
@@ -732,6 +777,44 @@ export const aiService = {
   async createProjectConversation(projectId: string): Promise<{ conversation_id: string }> {
     return directApiCall(`projects/${projectId}/conversations`, {
       method: 'POST'
+    })
+  },
+
+  // =========================================================================
+  // Memory
+  // =========================================================================
+
+  async getGlobalMemory(): Promise<GlobalMemoryResponse> {
+    return directApiCall('memory/me')
+  },
+
+  async clearGlobalMemory(): Promise<{ success: boolean; message: string }> {
+    return directApiCall('memory/me', {
+      method: 'DELETE'
+    })
+  },
+
+  async editGlobalMemoryWithLLM(instruction: string): Promise<EditMemoryWithLLMResponse> {
+    return directApiCall('memory/me/edit', {
+      method: 'POST',
+      body: JSON.stringify({ instruction })
+    })
+  },
+
+  async getProjectMemory(projectId: string): Promise<ProjectMemoryResponse> {
+    return directApiCall(`memory/projects/${projectId}`)
+  },
+
+  async clearProjectMemory(projectId: string): Promise<{ success: boolean; message: string }> {
+    return directApiCall(`memory/projects/${projectId}`, {
+      method: 'DELETE'
+    })
+  },
+
+  async editProjectMemoryWithLLM(projectId: string, instruction: string): Promise<EditMemoryWithLLMResponse> {
+    return directApiCall(`memory/projects/${projectId}/edit`, {
+      method: 'POST',
+      body: JSON.stringify({ instruction })
     })
   },
 }
