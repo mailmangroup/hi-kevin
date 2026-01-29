@@ -206,11 +206,13 @@ export function Sidebar({ className }: { className?: string }) {
 
         {/* Chat History Section */}
         <div className="mt-8">
-            <div className="flex items-center justify-between px-3 mb-2">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground/70">
-                    Chat History
-                </h3>
-            </div>
+            {chatHistory.length > 0 && (
+                <div className="flex items-center justify-between px-3 mb-2">
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground/70">
+                        Chat History
+                    </h3>
+                </div>
+            )}
 
             {/* New Chat Button */}
             <Link href="/dashboard">

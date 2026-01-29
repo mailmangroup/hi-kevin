@@ -36,14 +36,52 @@ export function getKawoConfig() {
 }
 
 /**
- * Direct API call to KAWO backend (bypasses Vercel proxy)
- * Used for all backend API calls to avoid serverless timeouts
+ * Direct API call to KAWO backend.
+ * In development mode, routes through Next.js API proxy to avoid CORS issues.
+ * In production, calls the backend directly for performance.
  */
 export async function directApiCall<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  // Ensure user profile is loaded if not in local dev mode
+  // In development, route through Next.js proxy to avoid CORS and keep credentials server-side
+  if (typeof window !== 'undefined') {
+    const proxyUrl = `/api/proxy/${endpoint.replace(/^\//, '')}`
+    console.log('[API] Routing through proxy:', proxyUrl)
+
+    const response = await fetch(proxyUrl, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    })
+
+    if (!response.ok) {
+      let errorData: any = {}
+      try {
+        errorData = await response.json()
+      } catch {
+        errorData = { error: response.statusText }
+      }
+
+      console.error('[API] Proxy error:', {
+        status: response.status,
+        endpoint,
+        errorData
+      })
+
+      const error: any = new Error(errorData.error || errorData.message || response.statusText)
+      error.status = response.status
+      error.code = errorData.code
+      error.details = errorData
+      throw error
+    }
+
+    return response.json()
+  }
+
+  // Production: direct backend call
   if (!isLocalDev) {
     const { profile, fetchProfile } = useUserStore.getState()
     if (!profile) {
@@ -195,10 +233,8 @@ export interface MemoryFact {
   id: string
   content: string
   category: string
-  confidence: number
   created_at: string
   updated_at: string
-  expires_at?: string
   source_conversation_id?: string
 }
 
@@ -318,8 +354,7 @@ export const aiService = {
             report_page_number?: number,
             report_section_indexes?: number[]
         },
-        analyzePost?: boolean,
-        helpcenterQuery?: boolean
+        fastPath?: string
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -346,28 +381,8 @@ export const aiService = {
         document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate,
         report_context: options.reportContext,
-        analyzePost: options.analyzePost ?? false,
-        helpcenterQuery: options.helpcenterQuery ?? false
+        fast_path: options.fastPath
     }
-
-    // Ensure user profile is loaded if not in local dev mode
-    if (!isLocalDev) {
-      const { profile, fetchProfile } = useUserStore.getState()
-      if (!profile) {
-        await fetchProfile()
-      }
-    }
-
-    // Get KAWO configuration for direct backend call
-    const config = getKawoConfig()
-
-    if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
-      throw new Error('KAWO credentials not configured. Please complete setup.')
-    }
-
-    // Inject org_id and brand_id if not provided in options
-    if (!payload.org_id) payload.org_id = config.orgId
-    if (!payload.brand_id) payload.brand_id = config.brandId
 
     const payloadString = JSON.stringify(payload)
     const payloadSizeKB = (payloadString.length / 1024).toFixed(2)
@@ -375,23 +390,53 @@ export const aiService = {
     console.log('[API] Sending chat query payload:', payload)
     console.log(`[API] Payload size: ${payloadSizeKB} KB`)
 
-    // Make direct call to backend API instead of proxy
-    const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
-    console.log('[API] Initiating direct fetch to backend:', targetUrl)
-
     let response
     try {
-        response = await fetch(targetUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${config.token}`,
-              'X-KAWO-Org-Id': config.orgId,
-              'X-KAWO-Brand-Id': config.brandId,
-            },
-            body: payloadString
+      if (typeof window !== 'undefined') {
+        // In development, route through Next.js proxy to avoid CORS issues
+        // The proxy injects credentials and org_id/brand_id automatically
+        const proxyUrl = '/api/proxy/agent/query'
+        console.log('[API] Routing chat stream through proxy:', proxyUrl)
+
+        response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadString,
         })
-        console.log('[API] Fetch completed, status:', response.status)
+      } else {
+        // Production: direct backend call
+        if (!isLocalDev) {
+          const { profile, fetchProfile } = useUserStore.getState()
+          if (!profile) {
+            await fetchProfile()
+          }
+        }
+
+        const config = getKawoConfig()
+
+        if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+          throw new Error('KAWO credentials not configured. Please complete setup.')
+        }
+
+        // Inject org_id and brand_id if not provided in options
+        if (!payload.org_id) payload.org_id = config.orgId
+        if (!payload.brand_id) payload.brand_id = config.brandId
+
+        const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
+        console.log('[API] Initiating direct fetch to backend:', targetUrl)
+
+        response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.token}`,
+            'X-KAWO-Org-Id': config.orgId,
+            'X-KAWO-Brand-Id': config.brandId,
+          },
+          body: JSON.stringify(payload),
+        })
+      }
+      console.log('[API] Fetch completed, status:', response.status)
     } catch (fetchError) {
         console.error('[API] Fetch failed:', fetchError)
         throw new Error(`Network error: ${fetchError}`)
@@ -794,13 +839,6 @@ export const aiService = {
     })
   },
 
-  async editGlobalMemoryWithLLM(instruction: string): Promise<EditMemoryWithLLMResponse> {
-    return directApiCall('memory/me/edit', {
-      method: 'POST',
-      body: JSON.stringify({ instruction })
-    })
-  },
-
   async getProjectMemory(projectId: string): Promise<ProjectMemoryResponse> {
     return directApiCall(`memory/projects/${projectId}`)
   },
@@ -808,13 +846,6 @@ export const aiService = {
   async clearProjectMemory(projectId: string): Promise<{ success: boolean; message: string }> {
     return directApiCall(`memory/projects/${projectId}`, {
       method: 'DELETE'
-    })
-  },
-
-  async editProjectMemoryWithLLM(projectId: string, instruction: string): Promise<EditMemoryWithLLMResponse> {
-    return directApiCall(`memory/projects/${projectId}/edit`, {
-      method: 'POST',
-      body: JSON.stringify({ instruction })
     })
   },
 }

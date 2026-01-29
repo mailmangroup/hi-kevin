@@ -20,7 +20,12 @@ install:
 # Run development server
 dev:
 	@echo "Checking for process on port 3000..."
-	@-lsof -t -i:3000 | xargs kill -9 2>/dev/null || true
+	@if lsof -t -i:3000 > /dev/null 2>&1; then \
+		echo "Port 3000 is in use, killing process..."; \
+		lsof -t -i:3000 | xargs kill -9; \
+	else \
+		echo "Port 3000 is available"; \
+	fi
 	npm run dev
 
 # Build for production
@@ -29,6 +34,13 @@ build:
 
 # Start production server (requires build first)
 start:
+	@echo "Checking for process on port 3000..."
+	@if lsof -t -i:3000 > /dev/null 2>&1; then \
+		echo "Port 3000 is in use, killing process..."; \
+		lsof -t -i:3000 | xargs kill -9; \
+	else \
+		echo "Port 3000 is available"; \
+	fi
 	npm run start
 
 # Run linter

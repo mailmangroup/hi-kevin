@@ -15,6 +15,14 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['recharts', 'framer-motion', 'lucide-react'],
   },
+  env: {
+    // Expose KAWO credentials to the client for local development
+    // This allows the client-side API calls to work with .env.local
+    KAWO_TOKEN: process.env.KAWO_TOKEN,
+    KAWO_ORG_ID: process.env.KAWO_ORG_ID,
+    KAWO_BRAND_ID: process.env.KAWO_BRAND_ID,
+    KAWO_API_URL: process.env.KAWO_API_URL,
+  },
 }
 
 module.exports = nextConfig

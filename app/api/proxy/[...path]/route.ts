@@ -52,46 +52,48 @@ async function handleProxy(request: NextRequest, pathSegments: string[]) {
   let brandId: string | null = null
   let apiUrl: string | null = null
 
-  if (!user) {
+  // Check if we can use local dev env vars (no Supabase auth needed)
+  const hasEnvCredentials = process.env.KAWO_TOKEN && process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+
+  if (!user && !hasEnvCredentials) {
     return NextResponse.json(
       { error: 'Authentication required' },
       { status: 401 }
     )
   }
 
-  // 2. Fetch Profile & Credentials
-  console.log('[Proxy] Fetching profile for user:', user.id)
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  console.log('[Proxy] Profile result:', { profile: profile ? 'exists' : 'null', profileError })
-
-  if (profileError) {
-    console.error('[Proxy] Profile fetch error:', profileError)
-    return NextResponse.json(
-      { error: 'Failed to load profile', code: 'PROFILE_FETCH_FAILED' },
-      { status: 500 }
-    )
-  }
-
-  // Check environment variables for local development override
-  const isDev = process.env.NODE_ENV === 'development'
-  const useEnvCredentials = isDev && process.env.KAWO_TOKEN && process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
-
-  if (useEnvCredentials) {
+  if (hasEnvCredentials) {
+    // Local dev mode: use env vars directly, skip profile fetch
     console.log('[Proxy] Using local environment variables for credentials')
     token = process.env.KAWO_TOKEN || null
     orgId = process.env.KAWO_ORG_ID || null
     brandId = process.env.KAWO_BRAND_ID || null
-    apiUrl = process.env.KAWO_API_URL || profile?.kawo_api_url || null
-  } else if (profile) {
-    token = profile.kawo_token
-    orgId = profile.kawo_org_id
-    brandId = profile.kawo_brand_id
-    apiUrl = profile.kawo_api_url || process.env.KAWO_API_URL || null
+    apiUrl = process.env.KAWO_API_URL || null
+  } else {
+    // Production mode: fetch credentials from user profile
+    console.log('[Proxy] Fetching profile for user:', user!.id)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+      .eq('id', user!.id)
+      .maybeSingle()
+
+    console.log('[Proxy] Profile result:', { profile: profile ? 'exists' : 'null', profileError })
+
+    if (profileError) {
+      console.error('[Proxy] Profile fetch error:', profileError)
+      return NextResponse.json(
+        { error: 'Failed to load profile', code: 'PROFILE_FETCH_FAILED' },
+        { status: 500 }
+      )
+    }
+
+    if (profile) {
+      token = profile.kawo_token
+      orgId = profile.kawo_org_id
+      brandId = profile.kawo_brand_id
+      apiUrl = profile.kawo_api_url || process.env.KAWO_API_URL || null
+    }
   }
 
   // Check if credentials configured

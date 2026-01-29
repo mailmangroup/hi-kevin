@@ -13,11 +13,13 @@ import { ToolCallList, ToolCall, ToolCallDisplay } from "./tool-call-display"
 import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
 import { ArtifactPanel } from "./artifact-panel"
 import { ArtifactSnippet } from "./artifact-snippet"
+import { ThinkingDisplay } from "./thinking-display"
 
 // A content part can be either text or a tool call, maintaining order
 type ContentPart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
+  | { type: "thinking"; content: string }
 
 interface Message {
   id: string
@@ -35,7 +37,7 @@ interface Message {
 }
 
 interface SubContentItem {
-  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image" | "user_document"
+  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image" | "user_document" | "thinking"
   tool?: string
   tool_input?: any
   tool_output?: any
@@ -147,6 +149,10 @@ function parseSubContentList(subContentList: SubContentItem[] | undefined): {
       }
     }
 
+    if (item.type === "thinking" && item.content) {
+      contentParts.push({ type: "thinking", content: item.content })
+    }
+
     if (item.type === "assistant_message" && item.content) {
       content = item.content
       contentParts.push({ type: "text", content: item.content })
@@ -180,6 +186,9 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const initialized = React.useRef(false)
   const searchParams = useSearchParams()
+  const initialQuery = React.useMemo(() => {
+    return initialMessage ?? searchParams?.get('q') ?? undefined
+  }, [initialMessage, searchParams])
   const [credentials, setCredentials] = React.useState<{orgId?: string, brandId?: string}>({})
   const [credentialsLoading, setCredentialsLoading] = React.useState(true)
   const [credentialsError, setCredentialsError] = React.useState<string | null>(null)
@@ -221,13 +230,15 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [model, setModel] = React.useState(() => {
     return searchParams?.get('model') || "qwen-max"
   })
-  const [analyzePost, setAnalyzePost] = React.useState(() => {
-    const param = searchParams?.get('analyzePost')
-    return param === 'true'
-  })
-  const [helpcenterQuery, setHelpcenterQuery] = React.useState(() => {
-    const param = searchParams?.get('helpcenterQuery')
-    return param === 'true'
+  const [fastPath, setFastPath] = React.useState<string | undefined>(() => {
+    // Check for legacy params first for backward compatibility
+    const analyzePost = searchParams?.get('analyzePost') === 'true'
+    const helpcenterQuery = searchParams?.get('helpcenterQuery') === 'true'
+    
+    if (analyzePost) return 'analyze_video'
+    if (helpcenterQuery) return 'helpcenter'
+    
+    return searchParams?.get('fastPath') || undefined
   })
 
   // Image upload
@@ -272,7 +283,19 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     }
 
     // Load credentials and history in parallel
-    loadCredentials()
+    const isDev = process.env.NODE_ENV === 'development'
+    
+    // In dev mode, we can skip loading credentials if they are provided via env
+    if (isDev && process.env.KAWO_ORG_ID) {
+        setCredentials({
+            orgId: process.env.KAWO_ORG_ID,
+            brandId: process.env.KAWO_BRAND_ID
+        })
+        setCredentialsLoading(false)
+    } else {
+        loadCredentials()
+    }
+    
     if (chatId) {
       setConversationId(chatId)
       // Load history and title in parallel
@@ -361,39 +384,50 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   // Handle initial message (from new chat redirect or dashboard with documents)
   React.useEffect(() => {
     const isDev = process.env.NODE_ENV === 'development'
-    if (initialMessage && !initialized.current && !credentialsLoading && (credentials.orgId || isDev)) {
-      initialized.current = true
-
-      // Check for pending images from dashboard
-      const pendingImages = sessionStorage.getItem('pending_chat_images')
-      let images: UploadedImage[] = []
-      if (pendingImages) {
-          try {
-              images = JSON.parse(pendingImages)
-              sessionStorage.removeItem('pending_chat_images')
-              setSelectedImages(images)
-          } catch (e) {
-              console.error("Failed to parse pending images", e)
-          }
-      }
-
-      // Check for pending documents from dashboard
-      const pendingDocuments = sessionStorage.getItem('pending_chat_documents')
-      let documents: UploadedDocument[] = []
-      if (pendingDocuments) {
-          try {
-              documents = JSON.parse(pendingDocuments)
-              sessionStorage.removeItem('pending_chat_documents')
-              setSelectedDocuments(documents)
-          } catch (e) {
-              console.error("Failed to parse pending documents", e)
-          }
-      }
-
-      // Set the input text but don't send automatically
-      setInput(initialMessage)
+    
+    if (initialized.current || credentialsLoading || (!credentials.orgId && !isDev)) {
+        return
     }
-  }, [initialMessage, chatId, credentialsLoading, credentials.orgId])
+
+    // Check for pending images from dashboard
+    const pendingImages = sessionStorage.getItem('pending_chat_images')
+    let images: UploadedImage[] = []
+    if (pendingImages) {
+        try {
+            images = JSON.parse(pendingImages)
+            sessionStorage.removeItem('pending_chat_images')
+            setSelectedImages(images)
+        } catch (e) {
+            console.error("Failed to parse pending images", e)
+        }
+    }
+
+    // Check for pending documents from dashboard
+    const pendingDocuments = sessionStorage.getItem('pending_chat_documents')
+    let documents: UploadedDocument[] = []
+    if (pendingDocuments) {
+        try {
+            documents = JSON.parse(pendingDocuments)
+            sessionStorage.removeItem('pending_chat_documents')
+            setSelectedDocuments(documents)
+        } catch (e) {
+            console.error("Failed to parse pending documents", e)
+        }
+    }
+
+    // If we have content to send (text or files)
+    // Check initialMessage !== undefined to allow empty string (for file-only messages)
+    if (initialQuery !== undefined || images.length > 0 || documents.length > 0) {
+        initialized.current = true
+        
+        if (initialQuery) {
+            setInput(initialQuery)
+        }
+
+        // Automatically send the message
+        handleSend(initialQuery || "", images, documents)
+    }
+  }, [initialQuery, chatId, credentialsLoading, credentials.orgId])
 
   const handleStop = async () => {
     if (conversationId) {
@@ -407,7 +441,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   }
 
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
-    if (!text.trim() || isThinking) return
+    if ((!text.trim() && images.length === 0 && documents.length === 0) || isThinking) return
 
     // Don't send if credentials are still loading or missing
     // Bypass check in development mode to allow local testing with env vars
@@ -494,6 +528,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let contentParts: ContentPart[] = []
     let currentTextContent = ""  // Track current text segment
     let lastPartWasText = false  // Track if the last part was text (for appending)
+    let currentThinkingContent = "" // Track current thinking segment
+    let lastPartWasThinking = false // Track if the last part was thinking
 
     let activeConversationId = conversationId;
 
@@ -538,8 +574,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             report_page_number: reportNavigation?.pageNumber,
             report_section_indexes: reportNavigation?.sectionIndexes
         } : undefined, // Include report context if available
-        analyzePost,
-        helpcenterQuery
+        fastPath
       })
 
       for await (const chunk of stream) {
@@ -554,12 +589,28 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               window.dispatchEvent(new Event('chat-created'))
           }
 
-          // Handle thinking chunks - accumulate them
+          // Handle thinking chunks - accumulate them and add to contentParts
           if (chunk.thinking !== undefined && chunk.thinking !== null) {
               thinkingContent += chunk.thinking || ""
+              currentThinkingContent += chunk.thinking || ""
+
+              // Update contentParts - append to last thinking part or create new one
+              if (lastPartWasThinking && contentParts.length > 0) {
+                  // Update the last thinking part
+                  const lastPart = contentParts[contentParts.length - 1]
+                  if (lastPart.type === "thinking") {
+                      lastPart.content = currentThinkingContent
+                  }
+              } else {
+                  // Create a new thinking part
+                  contentParts.push({ type: "thinking", content: currentThinkingContent })
+                  lastPartWasThinking = true
+                  lastPartWasText = false
+              }
+
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, thinking: thinkingContent }
+                      ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts] }
                       : msg
               ))
           }
@@ -579,6 +630,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   // Create a new text part
                   contentParts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
+                  lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
@@ -607,7 +659,9 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               // Add tool to contentParts and reset text tracking
               contentParts.push({ type: "tool", tool: newTool })
               lastPartWasText = false
+              lastPartWasThinking = false
               currentTextContent = ""  // Reset for any text that comes after this tool
+              currentThinkingContent = "" // Reset for any thinking that comes after this tool
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
@@ -715,6 +769,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               } else {
                   contentParts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
+                  lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
@@ -741,12 +796,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       ))
 
       // Clear one-time flags after first use
-      if (analyzePost || helpcenterQuery) {
-        setAnalyzePost(false)
-        setHelpcenterQuery(false)
+      if (fastPath) {
+        setFastPath(undefined)
 
         // Remove flags from URL to keep it clean
         const currentUrl = new URL(window.location.href)
+        currentUrl.searchParams.delete('fastPath')
         currentUrl.searchParams.delete('analyzePost')
         currentUrl.searchParams.delete('helpcenterQuery')
         window.history.replaceState(window.history.state, '', currentUrl.toString())
@@ -780,21 +835,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 message.role === "user" ? "flex-row-reverse" : "flex-row"
               )}
             >
-              {/* Avatar */}
-              <div className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                  message.role === "user" ? "bg-primary text-white" : "bg-green-600 text-white"
-              )}>
-                  {message.role === "user" ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
-              </div>
-
               {/* Content */}
               <div
                 className={cn(
-                  "relative max-w-[80%] rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm",
+                  "relative max-w-[80%] text-sm leading-relaxed",
                   message.role === "user"
-                    ? "bg-primary text-white rounded-tr-none"
-                    : "bg-white text-foreground border border-border rounded-tl-none"
+                    ? "bg-primary text-white rounded-2xl rounded-tr-none px-5 py-3 shadow-sm"
+                    : "bg-transparent text-foreground px-0 py-0"
                 )}
               >
                 {/* Uploaded Images */}
@@ -876,17 +923,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   </div>
                 )}
 
-                {/* Thinking Content */}
-                {message.thinking && (
-                  <div className="mb-3 pb-3 border-b border-gray-200">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Thinking:</div>
-                    <div className="text-xs text-gray-600 italic whitespace-pre-wrap">
-                      {message.thinking}
-                    </div>
-                  </div>
-                )}
 
-                {/* Content Parts - renders tool calls and text in order */}
+                {/* Content Parts - renders tool calls, thinking, and text in order */}
                 {message.contentParts && message.contentParts.length > 0 ? (
                   <>
                     {message.contentParts.map((part, index) => (
@@ -895,6 +933,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                           <div className="mb-3">
                             <ToolCallDisplay tool={part.tool} />
                           </div>
+                        ) : part.type === "thinking" ? (
+                          <ThinkingDisplay
+                            content={part.content}
+                            isStreaming={message.isStreaming}
+                          />
                         ) : (
                           <MessageContent
                             content={part.content}
@@ -971,18 +1014,30 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           )}
 
           {/* Mode Indicators */}
-          {(analyzePost || helpcenterQuery) && (
+          {(fastPath) && (
             <div className="mb-3 flex gap-2">
-              {analyzePost && (
+              {fastPath === 'analyze_video' && (
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                   Analyze Video Mode
                 </div>
               )}
-              {helpcenterQuery && (
+              {fastPath === 'helpcenter' && (
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
                   Help Center Mode
+                </div>
+              )}
+              {fastPath === 'extract_video_script' && (
+                 <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
+                  Extract Video Script Mode
+                </div>
+              )}
+              {fastPath === 'analyze_audio' && (
+                 <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-xs font-medium text-orange-700">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
+                  Analyze Audio Mode
                 </div>
               )}
             </div>

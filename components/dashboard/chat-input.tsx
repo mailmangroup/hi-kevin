@@ -26,8 +26,7 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
   const [conversationId, setConversationId] = useState<string>()
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
-  const [analyzePost, setAnalyzePost] = useState(false)
-  const [helpcenterQuery, setHelpcenterQuery] = useState(false)
+  const [fastPath, setFastPath] = useState<string | null>(null)
   const router = useRouter()
   const createProjectConversation = useCreateProjectConversation()
 
@@ -39,7 +38,7 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
 
   const fullName = profile?.full_name
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() && selectedImages.length === 0 && selectedDocuments.length === 0) return
 
     // Check if any images are still uploading
@@ -94,11 +93,8 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
     })
 
     // Add one-time flags if active
-    if (analyzePost) {
-      params.set('analyzePost', 'true')
-    }
-    if (helpcenterQuery) {
-      params.set('helpcenterQuery', 'true')
+    if (fastPath) {
+      params.set('fastPath', fastPath)
     }
 
     // If this is for a project, create a project conversation first
@@ -108,12 +104,23 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
           router.push(`/chat/${data.conversation_id}?${params.toString()}`)
         }
       })
-    } else if (conversationId) {
-      // If we have a conversationId (from document uploads), navigate to that conversation
+      return
+    }
+
+    if (conversationId) {
       router.push(`/chat/${conversationId}?${params.toString()}`)
-    } else {
-      // Otherwise, create a new chat
-      router.push(`/chat/new?${params.toString()}`)
+      return
+    }
+
+    try {
+      const resp = await aiService.createConversation(
+        profile?.kawo_org_id || undefined,
+        profile?.kawo_brand_id || undefined
+      )
+      window.dispatchEvent(new Event('chat-created'))
+      router.push(`/chat/${resp.conversation_id}?${params.toString()}`)
+    } catch (error) {
+      console.error("Failed to create conversation:", error)
     }
   }
 
@@ -124,13 +131,19 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
       : "How can I help you today?"
 
   const handleAnalyzeVideo = () => {
-    setAnalyzePost(true)
-    setHelpcenterQuery(false)
+    setFastPath("analyze_video")
   }
 
   const handleGetHelp = () => {
-    setHelpcenterQuery(true)
-    setAnalyzePost(false)
+    setFastPath("helpcenter")
+  }
+
+  const handleExtractScript = () => {
+    setFastPath("extract_video_script")
+  }
+
+  const handleAnalyzeAudio = () => {
+    setFastPath("analyze_audio")
   }
 
   const handleCreateReport = () => {
@@ -169,18 +182,30 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
 
             <div className="w-full max-w-2xl relative">
               {/* Mode Indicators */}
-              {(analyzePost || helpcenterQuery) && (
+              {(fastPath) && (
                 <div className="mb-3 flex gap-2">
-                  {analyzePost && (
+                  {fastPath === 'analyze_video' && (
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                       Analyze Video Mode
                     </div>
                   )}
-                  {helpcenterQuery && (
+                  {fastPath === 'helpcenter' && (
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
                       Help Center Mode
+                    </div>
+                  )}
+                  {fastPath === 'extract_video_script' && (
+                     <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
+                      Extract Video Script Mode
+                    </div>
+                  )}
+                  {fastPath === 'analyze_audio' && (
+                     <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-xs font-medium text-orange-700">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
+                      Analyze Audio Mode
                     </div>
                   )}
                 </div>
@@ -213,6 +238,20 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
                   onClick={handleAnalyzeVideo}
                 >
                   Analyze Video
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/50 hover:bg-white"
+                  onClick={handleExtractScript}
+                >
+                  Extract Script
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/50 hover:bg-white"
+                  onClick={handleAnalyzeAudio}
+                >
+                  Analyze Audio
                 </Button>
                 <Button
                   variant="outline"
