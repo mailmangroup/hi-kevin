@@ -93,9 +93,9 @@ export function ToolCallDisplay({ tool, defaultExpanded = false }: ToolCallDispl
           </span>
         </div>
         {isExpanded ? (
-          <ChevronDown className="h-3 w-3 text-gray-400 flex-shrink-0" />
+          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 transform rotate-180 transition-transform" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-gray-400 flex-shrink-0" />
+          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 transition-transform" />
         )}
       </button>
 

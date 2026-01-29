@@ -157,7 +157,7 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
   // Check for brand posts
   const isBrandPosts = (data: any, toolName?: string) => {
     // Explicitly check for specific tools
-    if (toolName === 'analyze_brand_content' || toolName === 'search_post' || toolName === 'get_brand_posts') return true
+    if (toolName === 'analyze_brand_content' || toolName === 'search_post' || toolName === 'get_brand_posts' || toolName === 'extract_post_analysis') return true
 
     if (!data) return false
     // Check if it's the brand posts structure
