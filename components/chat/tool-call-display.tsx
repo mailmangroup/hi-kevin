@@ -17,6 +17,7 @@ const TOOL_ICONS: Record<string, string> = {
   get_audience_data: "👥",
   list_available_documents: "📂",
   retrieve_document: "📄",
+  extract_post_analysis: "✨",
   default: "⚡",
 }
 
@@ -31,6 +32,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_audience_data: "Getting Audience Data",
   list_available_documents: "Checking Documents",
   retrieve_document: "Reading Document",
+  extract_post_analysis: "Extracting Post Analysis",
 }
 
 export interface ToolCall {

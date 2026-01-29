@@ -14,11 +14,12 @@ interface BrandPost {
   videos: any[]
   status: string
   publishTime: number
+  videoAnalysis?: any
   [key: string]: any
 }
 
 interface BrandPostsArtifactProps {
-  data: BrandPost[] | { brand_posts?: BrandPost[]; data?: BrandPost[]; [key: string]: any }
+  data: BrandPost[] | { brand_posts?: BrandPost[]; competitor_posts?: any[]; data?: BrandPost[]; [key: string]: any }
 }
 
 export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
@@ -29,6 +30,9 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
     // Check if array elements are brand posts themselves (have brandId or publishId)
     if (data.length > 0 && (data[0]?.brandId || data[0]?.publishId)) {
       posts = data
+    } else if (data.length > 0 && data[0]?.competitor_posts) {
+       // Check if array elements have competitor_posts
+       posts = data.flatMap((item: any) => item.competitor_posts || []).map(mapCompetitorPost)
     } else {
       // Array might contain objects with brand_posts property
       // Look for brand_posts in any element
@@ -36,6 +40,9 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
         if (item && typeof item === 'object') {
           if (Array.isArray(item.brand_posts)) {
             posts = item.brand_posts
+            break
+          } else if (Array.isArray(item.competitor_posts)) {
+            posts = item.competitor_posts.map(mapCompetitorPost)
             break
           } else if (Array.isArray(item.data)) {
             posts = item.data
@@ -48,6 +55,8 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
     // Handle nested brand_posts
     if (Array.isArray(data.brand_posts)) {
       posts = data.brand_posts
+    } else if (Array.isArray(data.competitor_posts)) {
+      posts = data.competitor_posts.map(mapCompetitorPost)
     } else if (data.data && Array.isArray(data.data)) {
       // Handle nested data property
       posts = data.data
@@ -55,7 +64,13 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
       // Try to find any array property that might contain posts
       const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]))
       if (arrayKeys.length > 0) {
-        posts = data[arrayKeys[0]]
+        // Check if it looks like competitor posts
+        const firstItem = data[arrayKeys[0]][0]
+        if (firstItem && (firstItem.videoAnalysis || firstItem.competitor_posts)) {
+           posts = data[arrayKeys[0]].map(mapCompetitorPost)
+        } else {
+           posts = data[arrayKeys[0]]
+        }
       }
     }
   } else if (typeof data === 'string') {
@@ -66,17 +81,27 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
         // Check if parsed array elements are brand posts
         if (parsed.length > 0 && (parsed[0]?.brandId || parsed[0]?.publishId)) {
           posts = parsed
+        } else if (parsed.length > 0 && parsed[0]?.competitor_posts) {
+          posts = parsed.flatMap((item: any) => item.competitor_posts || []).map(mapCompetitorPost)
         } else {
           // Look for brand_posts in array elements
           for (const item of parsed) {
-            if (item && typeof item === 'object' && Array.isArray(item.brand_posts)) {
-              posts = item.brand_posts
-              break
+            if (item && typeof item === 'object') {
+               if (Array.isArray(item.brand_posts)) {
+                  posts = item.brand_posts
+                  break
+               }
+               if (Array.isArray(item.competitor_posts)) {
+                  posts = item.competitor_posts.map(mapCompetitorPost)
+                  break
+               }
             }
           }
         }
       } else if (parsed.brand_posts && Array.isArray(parsed.brand_posts)) {
         posts = parsed.brand_posts
+      } else if (parsed.competitor_posts && Array.isArray(parsed.competitor_posts)) {
+        posts = parsed.competitor_posts.map(mapCompetitorPost)
       }
     } catch (e) {
       console.error("Failed to parse brand posts data:", e)
@@ -101,6 +126,22 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
       ))}
     </div>
   )
+}
+
+function mapCompetitorPost(post: any): BrandPost {
+  return {
+    id: post.id,
+    brandId: post.account?.id || post.uid,
+    type: post.network,
+    text: post.desc,
+    description: post.desc,
+    images: post.coverUrl ? [post.coverUrl] : [],
+    videos: post.hostedUrl ? [{ image: { sizes: { m: post.coverUrl } }, urlOri: post.hostedUrl }] : [],
+    status: 'published',
+    publishTime: post.created,
+    videoAnalysis: post.videoAnalysis,
+    ...post
+  }
 }
 
 function BrandPostCard({ post }: { post: BrandPost }) {
@@ -239,6 +280,18 @@ function BrandPostCard({ post }: { post: BrandPost }) {
             </span>
           </div>
         )}
+
+        {/* Analysis Section */}
+        {post.videoAnalysis && Array.isArray(post.videoAnalysis) && post.videoAnalysis.length > 0 && post.videoAnalysis[0].analysis?.summary && (
+          <div className="mt-3 pt-3 border-t border-gray-100 bg-purple-50/50 -mx-4 -mb-4 px-4 py-3">
+             <div className="text-xs font-semibold text-purple-700 mb-1 flex items-center gap-1">
+               <span className="text-lg">✨</span> AI Analysis
+             </div>
+             <p className="text-xs text-gray-600 leading-relaxed">
+               {post.videoAnalysis[0].analysis.summary}
+             </p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -294,6 +347,7 @@ function PlatformIcon({ type }: { type: string }) {
         </div>
       )
     case 'douyin':
+    case 'dy':
       return (
         <span className="bg-black/80 text-white text-xs font-bold px-2 py-1 rounded-lg backdrop-blur-sm shadow-lg">
           DY

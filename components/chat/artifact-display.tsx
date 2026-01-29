@@ -113,18 +113,21 @@ function ArtifactContent({ artifact }: { artifact: Artifact }) {
   // Check for brand posts
   const isBrandPosts = (data: any, toolName?: string) => {
     // Explicitly check for specific tools
-    if (toolName === 'analyze_brand_content' || toolName === 'search_post' || toolName === 'get_brand_posts') return true
+    if (toolName === 'analyze_brand_content' || toolName === 'search_post' || toolName === 'get_brand_posts' || toolName === 'extract_post_analysis') return true
 
     if (!data) return false
     // Check if it's the brand posts structure
-    if (Array.isArray(data) && data.length > 0 && (data[0].brandId || data[0].publishId)) return true
+    if (Array.isArray(data) && data.length > 0 && (data[0].brandId || data[0].publishId || data[0].competitor_posts)) return true
     if (data.brand_posts && Array.isArray(data.brand_posts)) return true
+    if (data.competitor_posts && Array.isArray(data.competitor_posts)) return true
+    
     // Check if string and looks like brand posts
-    if (typeof data === 'string' && (data.includes('brandId') || data.includes('brand_posts'))) {
+    if (typeof data === 'string' && (data.includes('brandId') || data.includes('brand_posts') || data.includes('competitor_posts'))) {
         try {
             const parsed = JSON.parse(data);
-            if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0].brandId || parsed[0].publishId)) return true;
+            if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0].brandId || parsed[0].publishId || parsed[0].competitor_posts)) return true;
             if (parsed.brand_posts && Array.isArray(parsed.brand_posts)) return true;
+            if (parsed.competitor_posts && Array.isArray(parsed.competitor_posts)) return true;
         } catch (e) {
             return false;
         }
