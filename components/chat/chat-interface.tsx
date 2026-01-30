@@ -185,6 +185,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [conversationTitle, setConversationTitle] = React.useState<string>("New Conversation")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const initialized = React.useRef(false)
+  const justCreatedConversationId = React.useRef<string | null>(null)
   const searchParams = useSearchParams()
   const initialQuery = React.useMemo(() => {
     return initialMessage ?? searchParams?.get('q') ?? undefined
@@ -284,17 +285,19 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
     // Load credentials and history in parallel
     const isDev = process.env.NODE_ENV === 'development'
-    const hasLocalEnv = process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+    const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
+    const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
+    const hasLocalEnv = orgId && brandId
 
     // In dev mode with local env vars, ALWAYS use local env instead of Supabase profile
     if (isDev && hasLocalEnv) {
         console.log('[ChatInterface] Using local environment credentials:', {
-          orgId: process.env.KAWO_ORG_ID,
-          brandId: process.env.KAWO_BRAND_ID
+          orgId,
+          brandId
         })
         setCredentials({
-            orgId: process.env.KAWO_ORG_ID!,
-            brandId: process.env.KAWO_BRAND_ID!
+            orgId: orgId!,
+            brandId: brandId!
         })
         setCredentialsLoading(false)
     } else {
@@ -303,6 +306,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     }
     
     if (chatId) {
+      // If we just created this conversation locally and are already streaming,
+      // don't reload history as it would overwrite the current streaming state.
+      if (justCreatedConversationId.current === chatId) {
+        return
+      }
+
       setConversationId(chatId)
       // Load history and title in parallel
       loadHistory(chatId)
@@ -355,7 +364,39 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           })
           // Sort by timestamp ascending (oldest first)
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-          setMessages(formattedMessages)
+          
+          setMessages(prev => {
+              // Create a Set of IDs from the fetched history for O(1) lookup
+              const historyIds = new Set(formattedMessages.map(m => m.id))
+              
+              // Identify local/optimistic messages that are NOT in the fetched history
+              // Local messages typically have numeric timestamp-based IDs (e.g. "1741234567890")
+              // while DB messages have MongoDB ObjectIds or UUIDs.
+              const localMessages = prev.filter(m => !historyIds.has(m.id))
+              
+              // Special handling for race condition:
+              // If we have a local streaming message, we must preserve it.
+              // We also want to avoid duplicates if the DB history caught the new user message
+              // but we still have the local version of it.
+              
+              const hasStreamingMessage = localMessages.some(m => m.isStreaming)
+              
+              if (hasStreamingMessage) {
+                  // If we are streaming, we prioritize local state for the recent messages.
+                  // We merge history + local, but filter out history messages that look like duplicates of local ones
+                  // (based on content/role proximity) to avoid "double vision".
+                  
+                  // For now, simple merge is safer than complex dedup which might delete wrong things.
+                  // Local messages are appended.
+                  // If DB caught the user message, we might have a duplicate user message, 
+                  // but we keep the streaming assistant message which is critical.
+                  return [...formattedMessages, ...localMessages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+              }
+              
+              // If not streaming, we can trust history more, but still keep purely local messages
+              // (e.g. just typed user message that hasn't hit DB yet)
+              return [...formattedMessages, ...localMessages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+          })
 
           // Detect if this conversation contains a report
           const reportMessage = history.find((msg: ApiMessage) => msg.report_id || msg.report)
@@ -587,6 +628,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           // Handle different event types
           if (chunk.new_conversation) {
               newConversationId = chunk.conversation_id
+              justCreatedConversationId.current = newConversationId || null
               setConversationId(newConversationId)
               // Update URL without reloading
               window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
@@ -819,6 +861,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           setTimeout(() => {
               loadConversationTitle(newConversationId!)
           }, 1000)
+          
+          // Reset the justCreatedConversationId after streaming is done
+          // This allows future navigation back to this conversation to properly load history
+          setTimeout(() => {
+            if (justCreatedConversationId.current === newConversationId) {
+              justCreatedConversationId.current = null
+            }
+          }, 2000)
       }
     }
   }

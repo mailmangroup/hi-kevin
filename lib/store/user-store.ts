@@ -28,7 +28,13 @@ export const useUserStore = create<UserStore>((set, get) => ({
     try {
       // In development mode with local env vars, ALWAYS use local env instead of Supabase
       const isDev = process.env.NODE_ENV === 'development'
-      const hasLocalEnv = process.env.KAWO_TOKEN && process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+      // Check both standard and NEXT_PUBLIC_ variants
+      const token = process.env.KAWO_TOKEN || process.env.NEXT_PUBLIC_KAWO_TOKEN
+      const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
+      const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
+      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL
+      
+      const hasLocalEnv = token && orgId && brandId
 
       if (isDev && hasLocalEnv) {
         console.log('[UserStore] Using local environment credentials')
@@ -36,10 +42,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
           profile: {
             full_name: 'Local Dev User',
             email: 'dev@local.com',
-            kawo_token: process.env.KAWO_TOKEN,
-            kawo_org_id: process.env.KAWO_ORG_ID,
-            kawo_brand_id: process.env.KAWO_BRAND_ID,
-            kawo_api_url: process.env.KAWO_API_URL
+            kawo_token: token,
+            kawo_org_id: orgId,
+            kawo_brand_id: brandId,
+            kawo_api_url: apiUrl
           },
           isLoading: false
         })

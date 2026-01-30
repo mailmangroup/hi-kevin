@@ -15,6 +15,7 @@ interface BrandPost {
   status: string
   publishTime: number
   videoAnalysis?: any
+  visual?: Array<{ frame: number; time: number; caption: string }>
   [key: string]: any
 }
 
@@ -33,6 +34,9 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
     } else if (data.length > 0 && data[0]?.competitor_posts) {
        // Check if array elements have competitor_posts
        posts = data.flatMap((item: any) => item.competitor_posts || []).map(mapCompetitorPost)
+    } else if (data.length > 0 && data[0]?.brand_posts) {
+      // Check if array elements have brand_posts (new format support)
+      posts = data.flatMap((item: any) => item.brand_posts || [])
     } else {
       // Array might contain objects with brand_posts property
       // Look for brand_posts in any element
@@ -59,7 +63,11 @@ export function BrandPostsArtifact({ data }: BrandPostsArtifactProps) {
       posts = data.competitor_posts.map(mapCompetitorPost)
     } else if (data.data && Array.isArray(data.data)) {
       // Handle nested data property
-      posts = data.data
+      if (data.data.length > 0 && data.data[0].brand_posts && Array.isArray(data.data[0].brand_posts)) {
+         posts = data.data.flatMap((item: any) => item.brand_posts || [])
+      } else {
+         posts = data.data
+      }
     } else {
       // Try to find any array property that might contain posts
       const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]))
@@ -149,10 +157,12 @@ function BrandPostCard({ post }: { post: BrandPost }) {
   const title = (post.translation && post.translation.trim()) || 
                 (post.text && post.text.trim()) || 
                 (post.title && post.title.trim()) ||
+                (post.summary && post.summary.slice(0, 50) + (post.summary.length > 50 ? "..." : "")) ||
                 "Untitled Post"
   const content = (post.description && post.description.trim()) || 
                   (post.text && post.text.trim()) || 
                   (post.body && post.body.trim()) ||
+                  (post.summary && post.summary.trim()) ||
                   null
   const date = post.publishTime ? new Date(post.publishTime) : null
   
