@@ -40,8 +40,8 @@ export const useUserStore = create<UserStore>((set, get) => ({
         console.log('[UserStore] Using local environment credentials')
         set({
           profile: {
-            full_name: 'Local Dev User',
-            email: 'dev@local.com',
+            full_name: 'Jeremy',
+            email: 'jeremy@kawo.com',
             kawo_token: token,
             kawo_org_id: orgId,
             kawo_brand_id: brandId,

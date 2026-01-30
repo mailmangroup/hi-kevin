@@ -1,165 +1,49 @@
 "use client"
 
 import * as React from "react"
-import { User, Bot, FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { ChatInputArea, UploadedImage, UploadedDocument } from "./chat-input-area"
+import { useUserStore } from "@/lib/store/user-store"
+import { ArtifactProvider, useArtifact, ArtifactData } from "@/components/chat/artifact-context"
+import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
+import { ArtifactPanel } from "@/components/chat/artifact-panel"
+import { MessageContent } from "@/components/chat/message-content"
+import { ThinkingDisplay } from "@/components/chat/thinking-display"
+import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
+import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
-import { MessageContent } from "./message-content"
-import { ToolCallList, ToolCall, ToolCallDisplay } from "./tool-call-display"
-import { ArtifactProvider, useArtifact, ArtifactData } from "./artifact-context"
-import { ArtifactPanel } from "./artifact-panel"
-import { ArtifactSnippet } from "./artifact-snippet"
-import { ThinkingDisplay } from "./thinking-display"
 
-// A content part can be either text or a tool call, maintaining order
-type ContentPart =
-  | { type: "text"; content: string }
-  | { type: "tool"; tool: ToolCall }
-  | { type: "thinking"; content: string }
+// Types
+export interface ContentPart {
+  type: "text" | "thinking" | "tool"
+  content?: string
+  tool?: ToolCall
+}
 
-interface Message {
+export interface ToolCall {
+  id: string
+  name: string
+  input: any
+  output?: any
+  state: 'running' | 'completed' | 'failed'
+  artifact?: any
+}
+
+export interface Message {
   id: string
   role: "user" | "assistant" | "tool"
   content: string
   timestamp: Date
   toolCalls?: ToolCall[]
-  contentParts?: ContentPart[]  // Ordered list of content parts (text and tool calls)
-  isStreaming?: boolean
-  thinking?: string
-  followUpQuestions?: string[]
   images?: string[]
-  documents?: DocumentAttachment[]
+  documents?: any[]
+  contentParts?: ContentPart[]
+  thinking?: string
   report?: any
-}
-
-interface SubContentItem {
-  type: "tool_input" | "tool_output" | "assistant_message" | "user_message" | "user_image" | "user_document" | "thinking"
-  tool?: string
-  tool_input?: any
-  tool_output?: any
-  artifact?: any
-  content?: string
-  image_url?: string
-  document_id?: string
-  filename?: string
-  file_size?: number
-  processing_status?: string
-  chunk_strategy?: string
-}
-
-interface DocumentAttachment {
-  id: string
-  filename: string
-  file_size: number
-  processing_status: string
-  chunk_strategy?: string
-}
-
-/**
- * Parse sub_content_list from database message format to our internal Message format
- * Maintains sequence order and associates artifacts with their tool calls
- */
-function parseSubContentList(subContentList: SubContentItem[] | undefined): {
-  toolCalls: ToolCall[]
-  content: string
-  images: string[]
-  documents: DocumentAttachment[]
-  contentParts: ContentPart[]
-} {
-  if (!subContentList || subContentList.length === 0) {
-    return { toolCalls: [], content: "", images: [], documents: [], contentParts: [] }
-  }
-
-  const toolCalls: ToolCall[] = []
-  const contentParts: ContentPart[] = []
-  let content = ""
-  const images: string[] = []
-  const documents: DocumentAttachment[] = []
-
-  // Track tool inputs by name to match with outputs (using array to handle multiple calls to same tool)
-  const pendingToolsByName: Map<string, ToolCall[]> = new Map()
-
-  // Process items in order to maintain sequence
-  for (const item of subContentList) {
-    if (item.type === "user_message" && item.content) {
-      content = item.content
-    }
-
-    if (item.type === "user_image" && item.image_url) {
-        images.push(item.image_url)
-    }
-
-    if (item.type === "user_document" && item.document_id && item.filename) {
-        documents.push({
-            id: item.document_id,
-            filename: item.filename,
-            file_size: item.file_size || 0,
-            processing_status: item.processing_status || 'unknown',
-            chunk_strategy: item.chunk_strategy
-        })
-    }
-
-    if (item.type === "tool_input" && item.tool) {
-      const toolCall: ToolCall = {
-        id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
-        name: item.tool,
-        input: item.tool_input || {},
-        state: "completed" // Mark as completed since we're loading from history
-      }
-
-      // Track pending tools
-      const pending = pendingToolsByName.get(item.tool) || []
-      pending.push(toolCall)
-      pendingToolsByName.set(item.tool, pending)
-
-      toolCalls.push(toolCall)
-      // Add tool to content parts in order
-      contentParts.push({ type: "tool", tool: toolCall })
-    }
-
-    if (item.type === "tool_output" && item.tool) {
-      // Find the first pending tool with this name that doesn't have output yet
-      const pending = pendingToolsByName.get(item.tool)
-      const pendingTool = pending?.find(t => !t.output)
-
-      if (pendingTool) {
-        pendingTool.output = item.tool_output
-        pendingTool.state = "completed"
-        // Associate artifact with this specific tool call
-        if (item.artifact) {
-          pendingTool.artifact = item.artifact
-        }
-        // Tool is already in contentParts, it will be updated by reference
-      } else {
-        // Tool output without matching input, create complete tool call
-        const newTool: ToolCall = {
-          id: `${item.tool}-${toolCalls.length}-${Math.random().toString(36).slice(2)}`,
-          name: item.tool,
-          input: {},
-          output: item.tool_output,
-          artifact: item.artifact,
-          state: "completed"
-        }
-        toolCalls.push(newTool)
-        contentParts.push({ type: "tool", tool: newTool })
-      }
-    }
-
-    if (item.type === "thinking" && item.content) {
-      contentParts.push({ type: "thinking", content: item.content })
-    }
-
-    if (item.type === "assistant_message" && item.content) {
-      content = item.content
-      contentParts.push({ type: "text", content: item.content })
-    }
-  }
-
-  return { toolCalls, content, images, documents, contentParts }
+  isStreaming?: boolean
+  followUpQuestions?: string[]
 }
 
 interface ChatInterfaceProps {
@@ -182,7 +66,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
   const [conversationId, setConversationId] = React.useState<string | undefined>(chatId)
-  const [conversationTitle, setConversationTitle] = React.useState<string>("New Conversation")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const initialized = React.useRef(false)
   const justCreatedConversationId = React.useRef<string | null>(null)
@@ -190,9 +73,30 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const initialQuery = React.useMemo(() => {
     return initialMessage ?? searchParams?.get('q') ?? undefined
   }, [initialMessage, searchParams])
-  const [credentials, setCredentials] = React.useState<{orgId?: string, brandId?: string}>({})
-  const [credentialsLoading, setCredentialsLoading] = React.useState(true)
-  const [credentialsError, setCredentialsError] = React.useState<string | null>(null)
+
+  const { profile, fetchProfile, isLoading: isProfileLoading } = useUserStore()
+
+  React.useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
+
+  const credentials = React.useMemo(() => ({
+    orgId: profile?.kawo_org_id || undefined,
+    brandId: profile?.kawo_brand_id || undefined
+  }), [profile])
+
+  const credentialsLoading = isProfileLoading && !profile
+
+  const credentialsError = React.useMemo(() => {
+      // In dev mode, we might not have a profile but still have env vars
+      const isDev = process.env.NODE_ENV === 'development'
+      if (isDev && !profile && !isProfileLoading) return null // Let dev mode logic handle it or assume it's fine if user store handled it (user store handles dev env)
+      
+      if (isProfileLoading) return null
+      if (!profile) return "Please log in to continue."
+      if (!profile.kawo_org_id) return "KAWO credentials not found. Please connect your KAWO account in settings."
+      return null
+  }, [isProfileLoading, profile])
 
   // Listen for external requests to focus input (e.g. from artifact panel)
   React.useEffect(() => {
@@ -251,60 +155,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   // Report context (for chatting with reports)
   const [reportId, setReportId] = React.useState<string | undefined>()
 
-  // Load credentials and chat history in parallel
   React.useEffect(() => {
-    async function loadCredentials() {
-      try {
-        const supabase = createClient()
-        // Use getSession instead of getUser to avoid unnecessary network calls
-        const { data: { session } } = await supabase.auth.getSession()
-        const user = session?.user
-        
-        if (user) {
-          const { data, error } = await supabase.from('profiles').select('kawo_org_id, kawo_brand_id').eq('id', user.id).single()
-          if (error) throw error
-
-          if (data && data.kawo_org_id) {
-            setCredentials({
-              orgId: data.kawo_org_id,
-              brandId: data.kawo_brand_id
-            })
-          } else {
-            setCredentialsError("KAWO credentials not found. Please connect your KAWO account in settings.")
-          }
-        } else {
-          setCredentialsError("Please log in to continue.")
-        }
-      } catch (error) {
-        console.error("Failed to load credentials:", error)
-        setCredentialsError("Failed to load credentials. Please try refreshing the page.")
-      } finally {
-        setCredentialsLoading(false)
-      }
-    }
-
-    // Load credentials and history in parallel
-    const isDev = process.env.NODE_ENV === 'development'
-    const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
-    const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-    const hasLocalEnv = orgId && brandId
-
-    // In dev mode with local env vars, ALWAYS use local env instead of Supabase profile
-    if (isDev && hasLocalEnv) {
-        console.log('[ChatInterface] Using local environment credentials:', {
-          orgId,
-          brandId
-        })
-        setCredentials({
-            orgId: orgId!,
-            brandId: brandId!
-        })
-        setCredentialsLoading(false)
-    } else {
-        console.log('[ChatInterface] Loading credentials from Supabase profile')
-        loadCredentials()
-    }
-    
     if (chatId) {
       // If we just created this conversation locally and are already streaming,
       // don't reload history as it would overwrite the current streaming state.
@@ -331,7 +182,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       try {
           const conversation = await aiService.getConversation(id)
           if (conversation?.title) {
-              setConversationTitle(conversation.title)
               // Update document title
               document.title = `${conversation.title} - Kevin`
               // Notify sidebar to refresh chat history (title may have been generated)
@@ -738,8 +588,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   )
 
                   // Also update the tool in contentParts (they share the same reference)
-                  const updatedContentParts = (msg.contentParts || []).map(part => {
-                      if (part.type === "tool" && part.tool.name === toolName && part.tool.state === 'running') {
+                  const updatedContentParts = (msg.contentParts || []).map((part): ContentPart => {
+                      if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
                           return {
                               ...part,
                               tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
@@ -749,7 +599,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   })
 
                   // Update our local contentParts reference too
-                  contentParts = updatedContentParts as ContentPart[]
+                  contentParts = updatedContentParts
 
                   return { ...msg, toolCalls: updatedToolCalls, contentParts: updatedContentParts }
               }))
@@ -795,15 +645,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               openArtifact(reportArtifact)
           }
 
-          if (chunk.progress) {
-             // Optional: Show progress in thinking or content
-             // For now we just log it as we primarily rely on the dialog for progress
-             // But if generated from chat, we could show it.
-             const progressMsg = `Generating report: ${Math.round(chunk.progress * 100)}% - ${chunk.current_section || ''}`
-             
-             // If we want to show it in the UI, we could update a temporary status
-             // or append to thinking
-          }
+
 
           if (chunk.error) {
               fullContent += `\n[Error: ${chunk.error}]`
@@ -987,16 +829,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       <React.Fragment key={index}>
                         {part.type === "tool" ? (
                           <div className="mb-3">
-                            <ToolCallDisplay tool={part.tool} />
+                            <ToolCallDisplay tool={part.tool!} />
                           </div>
                         ) : part.type === "thinking" ? (
                           <ThinkingDisplay
-                            content={part.content}
+                            content={part.content || ""}
                             isStreaming={message.isStreaming}
                           />
                         ) : (
                           <MessageContent
-                            content={part.content}
+                            content={part.content || ""}
                             isUser={message.role === "user"}
                           />
                         )}
@@ -1178,4 +1020,48 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 
 function getToolDisplayName(toolName: string): string {
   return TOOL_DISPLAY_NAMES[toolName] || toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function parseSubContentList(subContentList: any[] = []): {
+  toolCalls: ToolCall[],
+  content: string,
+  images: string[],
+  documents: any[],
+  contentParts: ContentPart[]
+} {
+  const toolCalls: ToolCall[] = []
+  const images: string[] = []
+  const documents: any[] = []
+  const contentParts: ContentPart[] = []
+  let textContent = ""
+
+  if (!Array.isArray(subContentList)) {
+    return { toolCalls, content: textContent, images, documents, contentParts }
+  }
+
+  for (const item of subContentList) {
+    if (item.type === 'tool_call' || item.type === 'tool_use') {
+      const toolCall: ToolCall = {
+        id: item.id || Date.now().toString(),
+        name: item.name || item.tool,
+        input: item.input || item.args || {},
+        output: item.output,
+        state: item.output ? 'completed' : 'running', // Assume completed if output exists in history
+        artifact: item.artifact
+      }
+      toolCalls.push(toolCall)
+      contentParts.push({ type: 'tool', tool: toolCall })
+    } else if (item.type === 'image') {
+      if (item.url) images.push(item.url)
+    } else if (item.type === 'document') {
+      documents.push(item)
+    } else if (item.type === 'text') {
+      textContent += item.text || item.content || ""
+      contentParts.push({ type: 'text', content: item.text || item.content })
+    } else if (item.type === 'thinking') {
+      contentParts.push({ type: 'thinking', content: item.thinking || item.content })
+    }
+  }
+
+  return { toolCalls, content: textContent, images, documents, contentParts }
 }

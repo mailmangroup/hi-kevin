@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
 import { ArtifactProvider } from "@/components/chat/artifact-context"
 import { useUserStore } from "@/lib/store/user-store"
-import { aiService } from "@/lib/api/client"
 import { ReportParametersDialog } from "@/components/analytics/report-parameters-dialog"
-import { useCreateProjectConversation } from "@/lib/hooks/use-projects"
 
 interface ChatInputProps {
   projectId?: string
@@ -17,24 +15,23 @@ interface ChatInputProps {
   hideActions?: boolean
 }
 
-export function ChatInput({ projectId, projectName, projectDescription, hideActions = false }: ChatInputProps = {}) {
+export function ChatInput({ projectId, projectName, hideActions = false }: ChatInputProps = {}) {
   const [input, setInput] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
   const [model, setModel] = useState("qwen-max")
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
-  const [conversationId, setConversationId] = useState<string>()
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [fastPath, setFastPath] = useState<string | null>(null)
   const router = useRouter()
-  const createProjectConversation = useCreateProjectConversation()
 
   const { profile, fetchProfile } = useUserStore()
 
   useEffect(() => {
     fetchProfile()
-  }, [fetchProfile])
+    router.prefetch('/chat/new')
+  }, [fetchProfile, router])
 
   const fullName = profile?.full_name
 
@@ -97,32 +94,14 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
       params.set('fastPath', fastPath)
     }
 
-    // If this is for a project, create a project conversation first
+    // If this is for a project, pass the project ID
     if (projectId) {
-      createProjectConversation.mutate(projectId, {
-        onSuccess: (data) => {
-          router.push(`/chat/${data.conversation_id}?${params.toString()}`)
-        }
-      })
-      return
+      params.set('projectId', projectId)
     }
 
-    if (conversationId) {
-      router.push(`/chat/${conversationId}?${params.toString()}`)
-      return
-    }
-
-    try {
-      const resp = await aiService.createConversation(
-        profile?.kawo_org_id || undefined,
-        profile?.kawo_brand_id || undefined
-      )
-      window.dispatchEvent(new Event('chat-created'))
-      router.push(`/chat/${resp.conversation_id}?${params.toString()}`)
-    } catch (error) {
-      console.error("Failed to create conversation:", error)
-    }
+    router.push(`/chat/new?${params.toString()}`)
   }
+
 
   const greeting = projectName
     ? projectName
@@ -170,9 +149,7 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
                 setSelectedImages={setSelectedImages}
                 selectedDocuments={selectedDocuments}
                 setSelectedDocuments={setSelectedDocuments}
-                conversationId={conversationId}
                 placeholder="Reply..."
-                disabled={createProjectConversation.isPending}
               />
           </div>
         ) : (
@@ -225,7 +202,6 @@ export function ChatInput({ projectId, projectName, projectDescription, hideActi
                 setSelectedImages={setSelectedImages}
                 selectedDocuments={selectedDocuments}
                 setSelectedDocuments={setSelectedDocuments}
-                conversationId={conversationId}
                 placeholder=""
               />
             </div>
