@@ -903,7 +903,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border bg-white dark:bg-gray-900 p-4">
+      <div className="border-t border-border bg-white dark:bg-background p-4">
         <div className="mx-auto max-w-3xl">
           {credentialsError && (
             <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-300">
@@ -941,30 +941,27 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             </div>
           )}
 
-          <div className="relative rounded-2xl border border-border bg-white dark:bg-gray-900 shadow-sm focus-within:ring-1 focus-within:ring-primary">
-            <ChatInputArea
-              input={input}
-              setInput={setInput}
-              onSend={() => handleSend()}
-              onStop={handleStop}
-              thinkingEnabled={thinkingEnabled}
-              setThinkingEnabled={setThinkingEnabled}
-              includeWebSearch={includeWebSearch}
-              setIncludeWebSearch={setIncludeWebSearch}
-              model={model}
-              setModel={setModel}
-              selectedImages={selectedImages}
-              setSelectedImages={setSelectedImages}
-              selectedDocuments={selectedDocuments}
-              setSelectedDocuments={setSelectedDocuments}
-              conversationId={conversationId}
-              placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
-              disabled={credentialsLoading || !!credentialsError || isThinking}
-              isThinking={isThinking}
-              showBorder={false}
-              className="border-none shadow-none focus-within:ring-0 bg-transparent"
-            />
-          </div>
+          <ChatInputArea
+            input={input}
+            setInput={setInput}
+            onSend={() => handleSend()}
+            onStop={handleStop}
+            thinkingEnabled={thinkingEnabled}
+            setThinkingEnabled={setThinkingEnabled}
+            includeWebSearch={includeWebSearch}
+            setIncludeWebSearch={setIncludeWebSearch}
+            model={model}
+            setModel={setModel}
+            selectedImages={selectedImages}
+            setSelectedImages={setSelectedImages}
+            selectedDocuments={selectedDocuments}
+            setSelectedDocuments={setSelectedDocuments}
+            conversationId={conversationId}
+            placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
+            disabled={credentialsLoading || !!credentialsError || isThinking}
+            isThinking={isThinking}
+            showBorder={true}
+          />
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.
           </p>

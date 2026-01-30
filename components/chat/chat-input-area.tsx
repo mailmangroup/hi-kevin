@@ -92,7 +92,17 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const imageInputRef = React.useRef<HTMLInputElement>(null)
   const documentInputRef = React.useRef<HTMLInputElement>(null)
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const { reportNavigation, selectedArtifact } = useArtifact()
+
+  // Auto-resize textarea
+  React.useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }, [input])
 
   // Track global uploading state to disable send button if any file is uploading
   const isImageUploading = selectedImages.some(img => img.uploading)
@@ -372,7 +382,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative bg-white dark:bg-gray-900", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
+    <div className={cn("relative bg-white dark:bg-zinc-900", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-8 left-0 right-0 flex items-center justify-center pointer-events-none">
@@ -475,16 +485,17 @@ export function ChatInputArea({
       )}
 
       <textarea
+        ref={textareaRef}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyPress}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 min-h-[100px]"
+        className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 min-h-[100px] max-h-[40vh] overflow-y-auto"
         rows={1}
       />
 
-      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
           <Button
             variant={thinkingEnabled ? "secondary" : "ghost"}

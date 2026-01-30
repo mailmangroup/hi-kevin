@@ -32,18 +32,18 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
 
           // Paragraphs
           p: ({ children }) => (
-            <p className={cn("mb-2 last:mb-0 leading-relaxed", isUser && "text-white")}>{children}</p>
+            <p className={cn("mb-2 last:mb-0 leading-relaxed", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</p>
           ),
 
           // Lists
           ul: ({ children }) => (
-            <ul className={cn("list-disc list-inside mb-2 space-y-1", isUser && "text-white")}>{children}</ul>
+            <ul className={cn("list-disc list-inside mb-2 space-y-1", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className={cn("list-decimal list-inside mb-2 space-y-1", isUser && "text-white")}>{children}</ol>
+            <ol className={cn("list-decimal list-inside mb-2 space-y-1", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</ol>
           ),
           li: ({ children }) => (
-            <li className={cn("leading-relaxed", isUser && "text-white")}>{children}</li>
+            <li className={cn("leading-relaxed", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</li>
           ),
 
           // Code
@@ -101,7 +101,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
             <div className="overflow-x-auto my-2">
               <table className={cn(
                 "min-w-full text-xs border-collapse",
-                isUser ? "text-white" : "text-gray-700"
+                isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
               )}>
                 {children}
               </table>
@@ -109,7 +109,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           ),
           thead: ({ children }) => (
             <thead className={cn(
-              isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50"
+              isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50"
             )}>
               {children}
             </thead>
@@ -118,7 +118,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           tr: ({ children }) => (
             <tr className={cn(
               "border-b",
-              isUser ? "border-white/20" : "border-gray-100"
+              isUser ? "border-white/20" : "border-gray-100 dark:border-gray-800"
             )}>
               {children}
             </tr>
@@ -126,7 +126,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           th: ({ children }) => (
             <th className={cn(
               "px-3 py-2 text-left font-semibold",
-              isUser ? "text-white" : "text-gray-700"
+              isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
             )}>
               {children}
             </th>
@@ -134,7 +134,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           td: ({ children }) => (
             <td className={cn(
               "px-3 py-2",
-              isUser ? "text-white" : "text-gray-600"
+              isUser ? "text-white" : "text-gray-600 dark:text-gray-300"
             )}>
               {children}
             </td>
