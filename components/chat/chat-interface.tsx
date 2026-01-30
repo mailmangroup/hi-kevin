@@ -284,15 +284,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
     // Load credentials and history in parallel
     const isDev = process.env.NODE_ENV === 'development'
-    
-    // In dev mode, we can skip loading credentials if they are provided via env
-    if (isDev && process.env.KAWO_ORG_ID) {
+    const hasLocalEnv = process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+
+    // In dev mode with local env vars, ALWAYS use local env instead of Supabase profile
+    if (isDev && hasLocalEnv) {
+        console.log('[ChatInterface] Using local environment credentials:', {
+          orgId: process.env.KAWO_ORG_ID,
+          brandId: process.env.KAWO_BRAND_ID
+        })
         setCredentials({
-            orgId: process.env.KAWO_ORG_ID,
-            brandId: process.env.KAWO_BRAND_ID
+            orgId: process.env.KAWO_ORG_ID!,
+            brandId: process.env.KAWO_BRAND_ID!
         })
         setCredentialsLoading(false)
     } else {
+        console.log('[ChatInterface] Loading credentials from Supabase profile')
         loadCredentials()
     }
     
@@ -860,13 +866,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       const fileColor = getFileColor(doc.filename)
                       const getColorClass = (color: string) => {
                         const colorMap: Record<string, string> = {
-                          red: 'bg-red-50 text-red-700 border-red-200',
-                          blue: 'bg-blue-50 text-blue-700 border-blue-200',
-                          orange: 'bg-orange-50 text-orange-700 border-orange-200',
-                          green: 'bg-green-50 text-green-700 border-green-200',
-                          gray: 'bg-gray-50 text-gray-700 border-gray-200',
-                          purple: 'bg-purple-50 text-purple-700 border-purple-200',
-                          yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                          red: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+                          blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+                          orange: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+                          green: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+                          gray: 'bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+                          purple: 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+                          yellow: 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
                         }
                         return colorMap[color] || colorMap['gray']
                       }
@@ -984,7 +990,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                 <button
                                     key={idx}
                                     onClick={() => handleSend(question)}
-                                    className="text-left text-sm text-primary hover:bg-primary/5 px-3 py-2 rounded-lg border border-primary/20 transition-colors bg-white"
+                                    className="text-left text-sm text-primary hover:bg-primary/5 px-3 py-2 rounded-lg border border-primary/20 transition-colors bg-white dark:bg-gray-800"
                                 >
                                     {question}
                                 </button>
@@ -1005,10 +1011,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border bg-white p-4">
+      <div className="border-t border-border bg-white dark:bg-gray-900 p-4">
         <div className="mx-auto max-w-3xl">
           {credentialsError && (
-            <div className="mb-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+            <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-300">
               {credentialsError}
             </div>
           )}
@@ -1017,25 +1023,25 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           {(fastPath) && (
             <div className="mb-3 flex gap-2">
               {fastPath === 'analyze_video' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                   Analyze Video Mode
                 </div>
               )}
               {fastPath === 'helpcenter' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
                   Help Center Mode
                 </div>
               )}
               {fastPath === 'extract_video_script' && (
-                 <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700">
+                 <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
                   Extract Video Script Mode
                 </div>
               )}
               {fastPath === 'analyze_audio' && (
-                 <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-xs font-medium text-orange-700">
+                 <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
                   Analyze Audio Mode
                 </div>
@@ -1043,7 +1049,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             </div>
           )}
 
-          <div className="relative rounded-2xl border border-border bg-white shadow-sm focus-within:ring-1 focus-within:ring-primary">
+          <div className="relative rounded-2xl border border-border bg-white dark:bg-gray-900 shadow-sm focus-within:ring-1 focus-within:ring-primary">
             <ChatInputArea
               input={input}
               setInput={setInput}

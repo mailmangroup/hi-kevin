@@ -9,6 +9,7 @@ import { Save, Bell, Globe, User, Key, CheckCircle, Loader2 } from "lucide-react
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { useUserStore } from "@/lib/store/user-store"
+import { directApiCall } from "@/lib/api/client"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -177,21 +178,16 @@ export default function SettingsPage() {
     setConnectionStatus(null)
     
     try {
-      // We use the proxy to call a lightweight endpoint.
-      // /api/proxy/me (assuming this endpoint exists in KAWO API or we just check if proxy lets us through)
-      const response = await fetch('/api/proxy/users/current') // Using 'users/current' as a common pattern, or 'me'
+      // We use direct API call to check connection
+      // /users/current or /users/me
+      await directApiCall('users/current')
       
-      if (response.ok) {
-        setConnectionStatus('success')
-        toast({
-          title: "Connection successful",
-          description: "Successfully connected to KAWO API.",
-          type: "success"
-        })
-      } else {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'Connection failed')
-      }
+      setConnectionStatus('success')
+      toast({
+        title: "Connection successful",
+        description: "Successfully connected to KAWO API.",
+        type: "success"
+      })
     } catch (e: any) {
       console.error('Test connection error:', e)
       setConnectionStatus('error')

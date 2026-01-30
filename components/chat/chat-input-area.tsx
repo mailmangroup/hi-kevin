@@ -111,18 +111,10 @@ export function ChatInputArea({
           if (!img.file) return
 
           // 1. Get signed URL
-          const res = await fetch('/api/proxy/upload/sign', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: img.file.name, filetype: img.file.type })
-          })
+          const { upload_url, object_key } = await aiService.signDocumentUpload(img.file.name, img.file.type)
           
-          if (!res.ok) {
-            const err = await res.json()
-            throw new Error(err.error || 'Failed to get sign url')
-          }
-          
-          const { uploadUrl, objectKey } = await res.json()
+          const uploadUrl = upload_url
+          const objectKey = object_key
 
           // 2. Upload to OSS with Content-Type header
           // IMPORTANT: Content-Type must match what was used to generate the presigned URL
@@ -342,13 +334,13 @@ export function ChatInputArea({
   // Get file color class based on color name
   const getFileColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
-      red: 'bg-red-100 text-red-700 border-red-200',
-      blue: 'bg-blue-100 text-blue-700 border-blue-200',
-      orange: 'bg-orange-100 text-orange-700 border-orange-200',
-      green: 'bg-green-100 text-green-700 border-green-200',
-      gray: 'bg-gray-100 text-gray-700 border-gray-200',
-      purple: 'bg-purple-100 text-purple-700 border-purple-200',
-      yellow: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      red: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+      blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+      orange: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+      green: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
+      gray: 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+      purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+      yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
     }
     return colorMap[color] || colorMap['gray']
   }
@@ -380,7 +372,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative bg-white", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
+    <div className={cn("relative bg-white dark:bg-gray-900", showBorder && "rounded-2xl border border-border shadow-sm focus-within:ring-1 focus-within:ring-primary", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-8 left-0 right-0 flex items-center justify-center pointer-events-none">
@@ -488,7 +480,7 @@ export function ChatInputArea({
         onKeyDown={handleKeyPress}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm focus:outline-none disabled:opacity-50 min-h-[100px]"
+        className="w-full resize-none rounded-2xl bg-transparent p-4 pb-14 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 min-h-[100px]"
         rows={1}
       />
 

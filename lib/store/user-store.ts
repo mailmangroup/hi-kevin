@@ -26,6 +26,28 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
     set({ isLoading: true })
     try {
+      // In development mode with local env vars, ALWAYS use local env instead of Supabase
+      const isDev = process.env.NODE_ENV === 'development'
+      const hasLocalEnv = process.env.KAWO_TOKEN && process.env.KAWO_ORG_ID && process.env.KAWO_BRAND_ID
+
+      if (isDev && hasLocalEnv) {
+        console.log('[UserStore] Using local environment credentials')
+        set({
+          profile: {
+            full_name: 'Local Dev User',
+            email: 'dev@local.com',
+            kawo_token: process.env.KAWO_TOKEN,
+            kawo_org_id: process.env.KAWO_ORG_ID,
+            kawo_brand_id: process.env.KAWO_BRAND_ID,
+            kawo_api_url: process.env.KAWO_API_URL
+          },
+          isLoading: false
+        })
+        return
+      }
+
+      // Production mode: fetch from Supabase
+      console.log('[UserStore] Loading credentials from Supabase profile')
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user

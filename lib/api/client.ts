@@ -9,121 +9,89 @@ import { useUserStore } from '@/lib/store/user-store'
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false' // Default to mock
 
-// Check if we're in local development mode with env vars
-const isLocalDev = process.env.KAWO_TOKEN !== undefined
-
 /**
  * Helper function to get KAWO configuration
- * Uses environment variables in development, user profile in production
+ * Checks NEXT_PUBLIC_* env vars first (works in browser)
+ * Falls back to Supabase profile (production)
  */
 export function getKawoConfig() {
-  if (isLocalDev) {
+  // Check browser-accessible env vars first
+  const token = process.env.NEXT_PUBLIC_KAWO_TOKEN
+  const orgId = process.env.NEXT_PUBLIC_KAWO_ORG_ID
+  const brandId = process.env.NEXT_PUBLIC_KAWO_BRAND_ID
+  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL
+
+  if (token && orgId && brandId && apiUrl) {
     return {
-      token: process.env.KAWO_TOKEN!,
-      orgId: process.env.KAWO_ORG_ID!,
-      brandId: process.env.KAWO_BRAND_ID!,
-      apiUrl: process.env.KAWO_API_URL!,
+      token,
+      orgId,
+      brandId,
+      apiUrl,
     }
-  } else {
-    const { profile } = useUserStore.getState()
-    return {
-      token: profile?.kawo_token,
-      orgId: profile?.kawo_org_id,
-      brandId: profile?.kawo_brand_id,
-      apiUrl: profile?.kawo_api_url,
-    }
+  }
+
+  // Fallback to user profile from Supabase
+  const { profile } = useUserStore.getState()
+  return {
+    token: profile?.kawo_token,
+    orgId: profile?.kawo_org_id,
+    brandId: profile?.kawo_brand_id,
+    apiUrl: profile?.kawo_api_url,
   }
 }
 
 /**
  * Direct API call to KAWO backend.
- * In development mode, routes through Next.js API proxy to avoid CORS issues.
- * In production, calls the backend directly for performance.
+ * Always calls the backend directly with auth headers.
  */
 export async function directApiCall<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  // In development, route through Next.js proxy to avoid CORS and keep credentials server-side
-  if (typeof window !== 'undefined') {
-    const proxyUrl = `/api/proxy/${endpoint.replace(/^\//, '')}`
-    console.log('[API] Routing through proxy:', proxyUrl)
-
-    const response = await fetch(proxyUrl, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    })
-
-    if (!response.ok) {
-      let errorData: any = {}
-      try {
-        errorData = await response.json()
-      } catch {
-        errorData = { error: response.statusText }
-      }
-
-      console.error('[API] Proxy error:', {
-        status: response.status,
-        endpoint,
-        errorData
-      })
-
-      const error: any = new Error(errorData.error || errorData.message || response.statusText)
-      error.status = response.status
-      error.code = errorData.code
-      error.details = errorData
-      throw error
-    }
-
-    return response.json()
-  }
-
-  // Production: direct backend call
-  if (!isLocalDev) {
-    const { profile, fetchProfile } = useUserStore.getState()
-    if (!profile) {
-      await fetchProfile()
-    }
-  }
-
-  // Get KAWO configuration
   const config = getKawoConfig()
 
   if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
     throw new Error('KAWO credentials not configured. Please complete setup.')
   }
 
-  // Build full backend URL
   const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`
+  console.log('[API] Direct call:', targetUrl, 'Config:', {
+    apiUrl: config.apiUrl,
+    token: config.token ? '***' : 'missing',
+    orgId: config.orgId,
+    brandId: config.brandId
+  })
 
-  console.log('[API] Direct backend call:', targetUrl)
+  // Ensure headers are properly set
+  const headers = new Headers(options?.headers)
+  headers.set('Content-Type', 'application/json')
+  headers.set('Authorization', `Bearer ${config.token}`)
+  headers.set('X-KAWO-Org-Id', config.orgId)
+  headers.set('X-KAWO-Brand-Id', config.brandId)
 
   const response = await fetch(targetUrl, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.token}`,
-      'X-KAWO-Org-Id': config.orgId,
-      'X-KAWO-Brand-Id': config.brandId,
-      ...options?.headers,
-    },
+    headers,
   })
 
   if (!response.ok) {
     let errorData: any = {}
     try {
       errorData = await response.json()
-    } catch {
-      errorData = { error: response.statusText }
+    } catch (e) {
+      // If parsing JSON fails, try text
+      try {
+        const text = await response.text()
+        errorData = { error: response.statusText, text }
+      } catch (e2) {
+        errorData = { error: response.statusText }
+      }
     }
 
-    console.error('[API] Backend error:', {
+    console.error('[API] Error:', {
       status: response.status,
       endpoint,
-      errorData
+      errorData: JSON.stringify(errorData, null, 2)
     })
 
     const error: any = new Error(errorData.error || errorData.message || response.statusText)
@@ -366,6 +334,16 @@ export const aiService = {
         return
     }
 
+    // Dynamic model selection based on images
+    let model = options.model || "qwen-max"
+    if (options.images && options.images.length > 0) {
+        if (model === 'qwen-max') {
+            model = 'qwen-vl-max'
+        } else if (model === 'qwen-plus') {
+            model = 'qwen3-vl-plus'
+        }
+    }
+
     const payload: any = {
         query: message,
         conversation_id: options.conversationId,
@@ -373,7 +351,7 @@ export const aiService = {
         org_id: options.orgId,
         brand_id: options.brandId,
         stream: true,
-        model: options.model || "qwen-max",
+        model: model,
         include_web_search: options.includeWebSearch ?? true,
         thinking_enabled: options.thinkingEnabled ?? false,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
@@ -390,41 +368,22 @@ export const aiService = {
     console.log('[API] Sending chat query payload:', payload)
     console.log(`[API] Payload size: ${payloadSizeKB} KB`)
 
+    // Direct backend call for better streaming performance
+    const config = getKawoConfig()
+
+    if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+      throw new Error('KAWO credentials not configured. Please complete setup.')
+    }
+
+    // Inject org_id and brand_id if not provided in options
+    if (!payload.org_id) payload.org_id = config.orgId
+    if (!payload.brand_id) payload.brand_id = config.brandId
+
+    const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
+    console.log('[API] Direct backend call:', targetUrl)
+
     let response
     try {
-      if (typeof window !== 'undefined') {
-        // In development, route through Next.js proxy to avoid CORS issues
-        // The proxy injects credentials and org_id/brand_id automatically
-        const proxyUrl = '/api/proxy/agent/query'
-        console.log('[API] Routing chat stream through proxy:', proxyUrl)
-
-        response = await fetch(proxyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payloadString,
-        })
-      } else {
-        // Production: direct backend call
-        if (!isLocalDev) {
-          const { profile, fetchProfile } = useUserStore.getState()
-          if (!profile) {
-            await fetchProfile()
-          }
-        }
-
-        const config = getKawoConfig()
-
-        if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
-          throw new Error('KAWO credentials not configured. Please complete setup.')
-        }
-
-        // Inject org_id and brand_id if not provided in options
-        if (!payload.org_id) payload.org_id = config.orgId
-        if (!payload.brand_id) payload.brand_id = config.brandId
-
-        const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
-        console.log('[API] Initiating direct fetch to backend:', targetUrl)
-
         response = await fetch(targetUrl, {
           method: 'POST',
           headers: {
@@ -433,10 +392,9 @@ export const aiService = {
             'X-KAWO-Org-Id': config.orgId,
             'X-KAWO-Brand-Id': config.brandId,
           },
-          body: JSON.stringify(payload),
+          body: payloadString,
         })
-      }
-      console.log('[API] Fetch completed, status:', response.status)
+        console.log('[API] Fetch completed, status:', response.status)
     } catch (fetchError) {
         console.error('[API] Fetch failed:', fetchError)
         throw new Error(`Network error: ${fetchError}`)
