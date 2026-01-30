@@ -136,13 +136,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     return searchParams?.get('model') || "qwen-max"
   })
   const [fastPath, setFastPath] = React.useState<string | undefined>(() => {
-    // Check for legacy params first for backward compatibility
-    const analyzePost = searchParams?.get('analyzePost') === 'true'
-    const helpcenterQuery = searchParams?.get('helpcenterQuery') === 'true'
-    
-    if (analyzePost) return 'analyze_video'
-    if (helpcenterQuery) return 'helpcenter'
-    
     return searchParams?.get('fastPath') || undefined
   })
 

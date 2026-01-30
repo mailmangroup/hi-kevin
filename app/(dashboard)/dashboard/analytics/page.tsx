@@ -127,7 +127,6 @@ export default function AnalyticsPage() {
         {/* Sidebar Tools */}
         <div className="space-y-6">
           <ReportGenerator />
-          {/* KOL Database removed per user request */}
         </div>
       </div>
     </div>

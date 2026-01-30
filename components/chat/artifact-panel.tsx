@@ -510,10 +510,6 @@ function ReportContent({ data }: { data: any }) {
 
   // Support for new Report structure with pages
   if (data?.pages && Array.isArray(data.pages)) {
-    // Note: We removed IntersectionObserver for auto-tracking sections 
-    // to support "manual attach" mode as requested.
-    // Navigation is now updated via Tabs (for page) and "Chat" button (for section).
-
     const handleTabChange = (index: number) => {
         setActivePage(index)
         setReportNavigation(prev => ({
