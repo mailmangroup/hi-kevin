@@ -185,6 +185,7 @@ export function Sidebar({ className }: { className?: string }) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 "group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
                 isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
@@ -215,7 +216,7 @@ export function Sidebar({ className }: { className?: string }) {
             )}
 
             {/* New Chat Button */}
-            <Link href="/dashboard">
+            <Link href="/dashboard" prefetch={false}>
                 <div className="mb-3 px-3">
                     <Button className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-white">
                         <MessageSquare className="h-4 w-4" />
@@ -231,6 +232,7 @@ export function Sidebar({ className }: { className?: string }) {
                     <Link
                         key={chat.id}
                         href={`/chat/${chat.id}`}
+                        prefetch={false}
                         className={cn(
                             "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
                             isActive ? "bg-primary/5 text-primary" : "text-muted-foreground"
@@ -249,6 +251,7 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex items-center justify-between">
             <Link
               href="/dashboard/settings"
+              prefetch={false}
               className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               <Settings className="h-4 w-4" />

@@ -1045,7 +1045,7 @@ function parseSubContentList(subContentList: any[] = []): {
       if (item.url) images.push(item.url)
     } else if (item.type === 'document') {
       documents.push(item)
-    } else if (item.type === 'text') {
+    } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
       textContent += item.text || item.content || ""
       contentParts.push({ type: 'text', content: item.text || item.content })
     } else if (item.type === 'thinking') {

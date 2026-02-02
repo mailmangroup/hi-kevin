@@ -31,8 +31,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
   useEffect(() => {
     fetchProfile()
-    router.prefetch('/chat/new')
-  }, [fetchProfile, router])
+  }, [fetchProfile])
 
   const fullName = profile?.full_name
 
