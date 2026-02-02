@@ -88,7 +88,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "underline underline-offset-2 hover:opacity-80",
+                "underline underline-offset-2 hover:opacity-80 break-all",
                 isUser ? "text-white" : "text-primary"
               )}
             >
