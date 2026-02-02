@@ -24,6 +24,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [fastPath, setFastPath] = useState<string | null>(null)
+  const [isNavigating, setIsNavigating] = useState(false)
   const router = useRouter()
 
   const { profile, fetchProfile } = useUserStore()
@@ -36,6 +37,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const fullName = profile?.full_name
 
   const handleSend = async () => {
+    if (isNavigating) return
     if (!input.trim() && selectedImages.length === 0 && selectedDocuments.length === 0) return
 
     // Check if any images are still uploading
@@ -99,6 +101,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
       params.set('projectId', projectId)
     }
 
+    setIsNavigating(true)
     router.push(`/chat/new?${params.toString()}`)
   }
 
@@ -150,6 +153,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 selectedDocuments={selectedDocuments}
                 setSelectedDocuments={setSelectedDocuments}
                 placeholder="Reply..."
+                disabled={isNavigating}
               />
           </div>
         ) : (
@@ -203,6 +207,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 selectedDocuments={selectedDocuments}
                 setSelectedDocuments={setSelectedDocuments}
                 placeholder=""
+                disabled={isNavigating}
               />
             </div>
 
