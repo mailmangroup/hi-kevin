@@ -32,18 +32,18 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
 
           // Paragraphs
           p: ({ children }) => (
-            <p className={cn("mb-2 last:mb-0 leading-relaxed", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</p>
+            <p className={cn("mb-2 last:mb-0 leading-relaxed", isUser ? "text-white" : "")}>{children}</p>
           ),
 
           // Lists
           ul: ({ children }) => (
-            <ul className={cn("list-disc list-inside mb-2 space-y-1", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</ul>
+            <ul className={cn("list-disc list-inside mb-2 space-y-1", isUser ? "text-white" : "")}>{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className={cn("list-decimal list-inside mb-2 space-y-1", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</ol>
+            <ol className={cn("list-decimal list-inside mb-2 space-y-1", isUser ? "text-white" : "")}>{children}</ol>
           ),
           li: ({ children }) => (
-            <li className={cn("leading-relaxed", isUser ? "text-white" : "dark:font-medium dark:text-gray-200")}>{children}</li>
+            <li className={cn("leading-relaxed", isUser ? "text-white" : "")}>{children}</li>
           ),
 
           // Code

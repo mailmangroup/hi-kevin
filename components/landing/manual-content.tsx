@@ -20,7 +20,7 @@ export function ManualContent() {
         </Button>
       </div>
 
-      <article className="prose prose-slate max-w-none lg:prose-lg dark:prose-invert bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
+      <article className="prose prose-slate max-w-none lg:prose-lg bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
         <div className="border-b border-slate-200 pb-8 mb-8">
            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-sm font-medium mb-4">
               <FileText className="w-4 h-4" />

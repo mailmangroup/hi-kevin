@@ -20,7 +20,6 @@ import { BetaBadge } from "@/components/ui/beta-badge"
 import { Button } from "@/components/ui/button"
 import { frostService } from "@/lib/api/frost"
 import { aiService, Conversation } from "@/lib/api/client"
-import { ModeToggle } from "@/components/mode-toggle"
 
 // Simple cache to avoid refetching on every navigation
 const sidebarCache = {
@@ -298,9 +297,6 @@ export function Sidebar({ className }: { className?: string }) {
                     <p className="truncate text-sm font-medium text-slate-700">Settings</p>
                 </div>
             </Link>
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white shadow-sm">
-                <ModeToggle />
-            </div>
         </div>
       </div>
     </div>

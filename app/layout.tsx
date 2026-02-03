@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { AuraBackground } from "@/components/layout/aura-background"
 import { ToastProvider } from "@/components/ui/toast"
 import { ConfirmProvider } from "@/components/providers/confirm-provider"
@@ -29,18 +28,11 @@ export default function RootLayout({
         <AuraBackground />
         <QueryProvider>
           <UserStoreProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <ToastProvider>
-                <ConfirmProvider>
-                  {children}
-                </ConfirmProvider>
-              </ToastProvider>
-            </ThemeProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                {children}
+              </ConfirmProvider>
+            </ToastProvider>
           </UserStoreProvider>
         </QueryProvider>
       </body>

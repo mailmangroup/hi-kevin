@@ -513,7 +513,7 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 includeWebSearch
-                    ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                    ? "bg-blue-50 text-blue-600 border-blue-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
