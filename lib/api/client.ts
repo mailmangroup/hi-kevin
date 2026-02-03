@@ -671,18 +671,7 @@ export const aiService = {
     return directApiCall(`conversations/${conversationId}/documents/${documentId}/url?expiration=${expiration}`)
   },
 
-  /**
-   * Delete document
-   */
-  async deleteDocument(conversationId: string, documentId: string): Promise<{
-    success: boolean
-    document_id: string
-    message: string
-  }> {
-    return directApiCall(`conversations/${conversationId}/documents/${documentId}`, {
-      method: 'DELETE',
-    })
-  },
+
 
   // =========================================================================
   // Project Management

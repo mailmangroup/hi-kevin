@@ -67,6 +67,7 @@ export interface ChatInputAreaProps {
 }
 
 import { useArtifact } from "./artifact-context"
+import { useToast } from "@/components/ui/toast"
 
 export function ChatInputArea({
   input,
@@ -94,6 +95,7 @@ export function ChatInputArea({
   const documentInputRef = React.useRef<HTMLInputElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const { reportNavigation, selectedArtifact } = useArtifact()
+  const { toast } = useToast()
 
   // Auto-resize textarea
   React.useEffect(() => {
@@ -291,7 +293,7 @@ export function ChatInputArea({
           // Validate file
           const validationError = validateFile(file)
           if (validationError) {
-              alert(validationError)
+              toast({ title: "Invalid File", description: validationError, type: "error" })
               continue
           }
 

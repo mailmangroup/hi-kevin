@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/ui/toast"
+import { ConfirmProvider } from "@/components/providers/confirm-provider"
 import QueryProvider from "@/components/providers/query-provider"
 import { UserStoreProvider } from "@/components/providers/user-store-provider"
 
@@ -32,7 +33,11 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
-              <ToastProvider>{children}</ToastProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  {children}
+                </ConfirmProvider>
+              </ToastProvider>
             </ThemeProvider>
           </UserStoreProvider>
         </QueryProvider>

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Project } from "@/lib/api/client"
 import { useDeleteProject } from "@/lib/hooks/use-projects"
+import { useConfirm } from "@/components/providers/confirm-provider"
 
 interface ProjectHeaderProps {
   project: Project
@@ -19,9 +20,15 @@ interface ProjectHeaderProps {
 export function ProjectHeader({ project }: ProjectHeaderProps) {
   const router = useRouter()
   const deleteProject = useDeleteProject()
+  const { confirm } = useConfirm()
 
-  const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+  const handleDelete = async () => {
+    if (await confirm({
+      title: "Delete Project",
+      description: "Are you sure you want to delete this project? This action cannot be undone.",
+      confirmText: "Delete",
+      variant: "destructive",
+    })) {
       deleteProject.mutate(project.id, {
         onSuccess: () => {
           router.push("/projects")

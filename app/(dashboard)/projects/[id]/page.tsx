@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, MoreHorizontal, Star } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, Pencil, Trash } from "lucide-react"
 import { useProject } from "@/lib/hooks/use-projects"
 import { ProjectSidebar } from "@/components/projects/project-sidebar"
 import { ProjectContextPanel } from "@/components/projects/project-context-panel"
+import { ProjectEditDialog } from "@/components/projects/project-edit-dialog"
 import { ChatInput } from "@/components/dashboard/chat-input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -16,8 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Settings, Trash } from "lucide-react"
 import { useDeleteProject } from "@/lib/hooks/use-projects"
+import { useConfirm } from "@/components/providers/confirm-provider"
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -25,9 +27,16 @@ export default function ProjectDetailPage() {
   const projectId = params.id as string
   const { data: project, isLoading } = useProject(projectId)
   const deleteProject = useDeleteProject()
+  const { confirm } = useConfirm()
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+  const handleDelete = async () => {
+    if (await confirm({
+      title: "Delete Project",
+      description: "Are you sure you want to delete this project? This action cannot be undone.",
+      confirmText: "Delete",
+      variant: "destructive",
+    })) {
       deleteProject.mutate(projectId, {
         onSuccess: () => {
           router.push("/projects")
@@ -96,9 +105,9 @@ export default function ProjectDetailPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
+                  <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Project
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
@@ -107,11 +116,14 @@ export default function ProjectDetailPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Star className="h-4 w-4" />
-              </Button>
             </div>
           </div>
+
+          <ProjectEditDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            project={project}
+          />
 
           {/* Project Description */}
           {project.description && (

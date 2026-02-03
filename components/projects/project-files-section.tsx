@@ -8,6 +8,8 @@ import { FileCard } from "./file-card"
 import { FilePreviewDialog } from "./file-preview-dialog"
 import { aiService } from "@/lib/api/client"
 import { useQueryClient } from "@tanstack/react-query"
+import { useToast } from "@/components/ui/toast"
+import { useConfirm } from "@/components/providers/confirm-provider"
 
 interface ProjectFilesSectionProps {
   projectId: string
@@ -17,6 +19,8 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
   const { data: project } = useProject(projectId)
   const { data: documents, isLoading } = useProjectDocuments(projectId)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const { toast } = useToast()
+  const { confirm } = useConfirm()
   
   // Selection & Preview State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -50,7 +54,12 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} files?`)) return
+    if (!(await confirm({
+      title: "Delete Files",
+      description: `Are you sure you want to delete ${selectedIds.size} files?`,
+      confirmText: "Delete",
+      variant: "destructive",
+    }))) return
 
     setIsDeleting(true)
     try {
@@ -63,24 +72,31 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
       setSelectedIds(new Set())
       queryClient.invalidateQueries({ queryKey: ['project-documents', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      toast({ title: "Success", description: "Files deleted successfully.", type: "success" })
     } catch (error) {
       console.error("Failed to delete files:", error)
-      alert("Failed to delete some files. Please try again.")
+      toast({ title: "Error", description: "Failed to delete some files. Please try again.", type: "error" })
     } finally {
       setIsDeleting(false)
     }
   }
 
   const handleDeleteSingle = async (documentId: string) => {
-    if (!confirm("Are you sure you want to delete this file?")) return
+    if (!(await confirm({
+      title: "Delete File",
+      description: "Are you sure you want to delete this file?",
+      confirmText: "Delete",
+      variant: "destructive",
+    }))) return
     setIsDeleting(true)
     try {
       await aiService.deleteProjectDocument(projectId, documentId)
       queryClient.invalidateQueries({ queryKey: ['project-documents', projectId] })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      toast({ title: "Success", description: "File deleted successfully.", type: "success" })
     } catch (error) {
       console.error("Failed to delete file:", error)
-      alert("Failed to delete file.")
+      toast({ title: "Error", description: "Failed to delete file.", type: "error" })
     } finally {
       setIsDeleting(false)
     }
