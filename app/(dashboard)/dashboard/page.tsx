@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   const dashboardData = await getDashboardData()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Chat Input Section */}
       <ChatInput />
 

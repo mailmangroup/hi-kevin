@@ -107,32 +107,35 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
     <button
       onClick={handleClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all duration-200 cursor-pointer text-left group",
-        colors.bg,
-        colors.border,
+        "w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 cursor-pointer text-left group glass-premium shadow-[0_4px_16px_rgba(30,58,138,0.06)] hover:shadow-[0_8px_24px_rgba(30,58,138,0.12)] relative overflow-hidden",
         isSelected && "ring-2 ring-primary ring-offset-1",
         className
       )}
     >
+      {/* Light Leak */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden rounded-[inherit] pointer-events-none z-0">
+         <div className="absolute -top-10 -left-10 w-24 h-24 bg-purple-500/10 blur-[30px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      </div>
+
       {/* Icon */}
-      <div className={cn("flex-shrink-0 p-2 rounded-md bg-white/60", colors.icon)}>
-        <Icon className="h-4 w-4" />
+      <div className={cn("flex-shrink-0 p-2 rounded-lg bg-white/80 shadow-sm relative z-10", colors.icon)}>
+        <Icon className="h-5 w-5" />
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className={cn("text-sm font-medium truncate", colors.text)}>
+      <div className="flex-1 min-w-0 relative z-10">
+        <div className="text-sm font-semibold text-foreground truncate">
           {title}
         </div>
         {description && (
-          <div className={cn("text-xs truncate mt-0.5", colors.subtext)}>
+          <div className="text-xs text-muted-foreground truncate mt-0.5">
             {description}
           </div>
         )}
       </div>
 
       {/* Arrow indicator */}
-      <div className={cn("flex-shrink-0 transition-transform group-hover:translate-x-0.5", colors.icon)}>
+      <div className="flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 relative z-10">
         <ChevronRight className="h-4 w-4" />
       </div>
     </button>

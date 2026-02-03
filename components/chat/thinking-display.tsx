@@ -33,7 +33,7 @@ export function ThinkingDisplay({ content, isStreaming = false }: ThinkingDispla
       </button>
 
       {isExpanded && (
-        <div className="px-3 pb-3 pt-1 border-t border-purple-200">
+        <div className="px-4 pb-4 pt-1 border-t border-purple-100 relative z-10">
           <div className="text-xs text-purple-900/80 whitespace-pre-wrap leading-relaxed">
             {content}
             {isStreaming && (

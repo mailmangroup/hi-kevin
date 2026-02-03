@@ -169,7 +169,7 @@ function CompetitorsTab() {
 function KOLsTab() {
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="glass-premium">
         <CardHeader>
           <CardTitle>KOL Database</CardTitle>
           <CardDescription>Discover and analyze influencers across platforms</CardDescription>
@@ -196,7 +196,7 @@ function KOLsTab() {
 function TrendsTab() {
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="glass-premium">
         <CardHeader>
           <CardTitle>Trending Topics</CardTitle>
           <CardDescription>Discover what&apos;s trending across platforms</CardDescription>

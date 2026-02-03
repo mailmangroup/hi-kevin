@@ -42,7 +42,7 @@ export function ProjectMemorySection({ projectId }: ProjectMemorySectionProps) {
         <div className="text-xs text-muted-foreground">Loading memory...</div>
       ) : sortedFacts.length === 0 ? (
         <div className="text-xs text-muted-foreground text-center py-2">
-          No memory facts yet
+          No memory yet
         </div>
       ) : (
         <div className="space-y-2">

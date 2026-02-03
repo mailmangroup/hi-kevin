@@ -9,6 +9,7 @@ import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
 import { WebSearchArtifact } from "./web-search-artifact"
 import { HelpCenterArtifact } from "./help-center-artifact"
+import { ReportOutlineSidebar } from "./report-outline-sidebar"
 import { formatDateRangeDisplay } from "@/lib/utils/date-range"
 import { 
   BarChart, 
@@ -72,81 +73,88 @@ export function ArtifactPanel() {
     (selectedArtifact.toolName ? TOOL_DISPLAY_NAMES[selectedArtifact.toolName] : null) ||
     getDefaultTitle(selectedArtifact.type)
 
+  const isReportType = selectedArtifact?.type === 'report' && selectedArtifact?.data?.pages
+
   return (
     <div
       className={cn(
-        "flex flex-col border-l border-border bg-white transition-all duration-300 h-full w-[600px] max-w-full"
+        "flex flex-col border-l border-border bg-white transition-all duration-300 h-full max-w-full",
+        isReportType ? "flex-1" : "w-[600px]"
       )}
     >
-      {/* Content Panel */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Icon className="h-4 w-4 text-gray-600 flex-shrink-0" />
-            <span className="font-medium text-sm text-gray-900 flex-shrink-0">{title}</span>
-            {(selectedArtifact.toolName || selectedArtifact.session) && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {selectedArtifact.toolName && (
-                  <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
-                    {selectedArtifact.toolName}
-                  </span>
-                )}
-                {selectedArtifact.session?.date_start && selectedArtifact.session?.date_end && (
-                  <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
-                    {selectedArtifact.session.date_start} - {selectedArtifact.session.date_end}
-                  </span>
-                )}
-                {selectedArtifact.session?.networks && selectedArtifact.session.networks.length > 0 && (
-                  selectedArtifact.session.networks.map((network, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200"
-                    >
-                      {network}
-                    </span>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={handleCopy}
-              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-              title="Copy content"
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
-              ) : (
-                <Copy className="h-4 w-4 text-gray-600" />
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white flex-shrink-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Icon className="h-4 w-4 text-gray-600 flex-shrink-0" />
+          <span className="font-medium text-sm text-gray-900 flex-shrink-0">{title}</span>
+          {(selectedArtifact.toolName || selectedArtifact.session) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectedArtifact.toolName && (
+                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
+                  {selectedArtifact.toolName}
+                </span>
               )}
-            </button>
-            <button
-              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-              title="More options"
-            >
-              <ChevronDown className="h-4 w-4 text-gray-600" />
-            </button>
-            <button
-              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4 text-gray-600" />
-            </button>
-            <button
-              onClick={closePanel}
-              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-              title="Close"
-            >
-              <X className="h-4 w-4 text-gray-600" />
-            </button>
-          </div>
+              {selectedArtifact.session?.date_start && selectedArtifact.session?.date_end && (
+                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
+                  {selectedArtifact.session.date_start} - {selectedArtifact.session.date_end}
+                </span>
+              )}
+              {selectedArtifact.session?.networks && selectedArtifact.session.networks.length > 0 && (
+                selectedArtifact.session.networks.map((network, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200"
+                  >
+                    {network}
+                  </span>
+                ))
+              )}
+            </div>
+          )}
         </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={handleCopy}
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            title="Copy content"
+          >
+            {copied ? (
+              <Check className="h-4 w-4 text-green-600" />
+            ) : (
+              <Copy className="h-4 w-4 text-gray-600" />
+            )}
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            title="More options"
+          >
+            <ChevronDown className="h-4 w-4 text-gray-600" />
+          </button>
+          <button
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="h-4 w-4 text-gray-600" />
+          </button>
+          <button
+            onClick={closePanel}
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            title="Close"
+          >
+            <X className="h-4 w-4 text-gray-600" />
+          </button>
+        </div>
+      </div>
 
+      {/* Content Panel */}
+      <div className="flex-1 flex overflow-hidden">
+        {isReportType && <ReportOutlineSidebar report={selectedArtifact.data} />}
+        
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white">
-          <ArtifactPanelContent artifact={selectedArtifact} />
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className={cn("min-h-full", isReportType ? "p-8 max-w-5xl mx-auto" : "p-6")}>
+            <ArtifactPanelContent artifact={selectedArtifact} />
+          </div>
         </div>
       </div>
     </div>
@@ -430,7 +438,7 @@ function TableContent({ data }: { data: any }) {
           <thead className="bg-gray-50">
             <tr>
               {headers.map((header) => (
-                <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   {formatHeader(header)}
                 </th>
               ))}
@@ -461,7 +469,7 @@ function TableContent({ data }: { data: any }) {
           <thead className="bg-gray-50">
             <tr>
               {headers.map((header: any, idx: number) => (
-                <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   {formatCellValue(header)}
                 </th>
               ))}

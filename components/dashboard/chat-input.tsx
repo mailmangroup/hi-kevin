@@ -133,7 +133,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
   return (
     <ArtifactProvider>
-      <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-8 py-10"}>
+      <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-6 py-8"}>
         {projectId ? (
           // Project page layout
           <div className="w-full">
@@ -160,7 +160,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
           <>
             <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
 
-            <div className="w-full max-w-2xl relative">
+            <div className="w-full max-w-3xl relative">
               {/* Mode Indicators */}
               {(fastPath) && (
                 <div className="mb-3 flex gap-2">
@@ -214,35 +214,35 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
               <div className="flex flex-wrap justify-center gap-3">
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/50 hover:bg-white"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleAnalyzeVideo}
                 >
                   Analyze Video
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/50 hover:bg-white"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleExtractScript}
                 >
                   Extract Script
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/50 hover:bg-white"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleAnalyzeAudio}
                 >
                   Analyze Audio
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/50 hover:bg-white"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleGetHelp}
                 >
                   Get Help
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/50 hover:bg-white"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleCreateReport}
                 >
                   Create Report

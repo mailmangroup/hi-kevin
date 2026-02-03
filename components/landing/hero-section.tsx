@@ -194,7 +194,7 @@ export function HeroSection() {
                           transition={{ delay: 1.1 }}
                           className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-800 hover:border-primary/30 transition-all group cursor-pointer hover:shadow-lg hover:shadow-primary/5"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/15 transition-colors">
                             <MessageSquare className="w-4 h-4" />
                           </div>
                           <div className="flex-1">

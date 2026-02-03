@@ -35,6 +35,9 @@ interface ArtifactContextValue {
   // Report navigation state
   reportNavigation: ReportNavigation
   setReportNavigation: React.Dispatch<React.SetStateAction<ReportNavigation>>
+  // Sidebar state
+  isOutlineCollapsed: boolean
+  setIsOutlineCollapsed: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 const ArtifactContext = React.createContext<ArtifactContextValue | undefined>(undefined)
@@ -43,6 +46,7 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
   const [selectedArtifact, setSelectedArtifact] = React.useState<ArtifactData | null>(null)
   const [isPanelOpen, setIsPanelOpen] = React.useState(false)
   const [reportNavigation, setReportNavigation] = React.useState<ReportNavigation>({ pageNumber: 1, sectionIndexes: [] })
+  const [isOutlineCollapsed, setIsOutlineCollapsed] = React.useState(false)
 
   const openArtifact = React.useCallback((artifact: ArtifactData) => {
     setSelectedArtifact(artifact)
@@ -64,8 +68,10 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     closePanel,
     togglePanel,
     reportNavigation,
-    setReportNavigation
-  }), [selectedArtifact, isPanelOpen, openArtifact, closePanel, togglePanel, reportNavigation])
+    setReportNavigation,
+    isOutlineCollapsed,
+    setIsOutlineCollapsed
+  }), [selectedArtifact, isPanelOpen, openArtifact, closePanel, togglePanel, reportNavigation, isOutlineCollapsed])
 
   return (
     <ArtifactContext.Provider value={value}>

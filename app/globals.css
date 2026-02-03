@@ -5,18 +5,18 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
+  --background: 228 33% 98%; /* #F8F9FC */
+  --foreground: 222 47% 11%; /* #111827 */
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+  --popover-foreground: 222 47% 11%;
   --primary: 239 84% 67%; /* #6366F1 */
   --primary-foreground: 0 0% 98%;
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
   --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
+  --muted-foreground: 215 16% 47%; /* Cool grey */
   --accent: 240 4.8% 95.9%;
   --accent-foreground: 240 5.9% 10%;
   --destructive: 0 84.2% 60.2%;
@@ -27,7 +27,7 @@
   --radius: 0.5rem;
   
   /* Sidebar */
-  --sidebar-background: 0 0% 98%;
+  --sidebar-background: 0 0% 98%; /* Will be overridden by glass effect */
   --sidebar-foreground: 240 5.3% 26.1%;
   --sidebar-primary: 240 5.9% 10%;
   --sidebar-primary-foreground: 0 0% 98%;
@@ -151,7 +151,7 @@
 
   --color-border-light: #F3F4F6;
   
-  /* Legacy Color Aliases (for backward compatibility if needed) */
+  --color-primary-dark: #4338ca; /* Indigo-700 */
   --color-primary-light: #EEF2FF;
   --color-primary-hover: #5558E3;
 }
@@ -161,9 +161,38 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[#F9FAFB] text-foreground;
     font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-[20px] border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.05)];
+  }
+
+  .glass-card {
+     @apply bg-white/70 backdrop-blur-[20px] border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300;
+  }
+
+  .glass-premium {
+    /* Translucent White Body - "Frosted Glass" not "Clear Plastic" */
+    background: rgba(255, 255, 255, 0.85);
+    
+    /* The Blur */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    
+    /* The "Rim Light" - A gradient border that is white on top, fading to transparent */
+    border: 1px solid transparent;
+    background-clip: padding-box; /* Necessary for gradient border */
+    
+    /* Blue-tinted shadow for "cool shade" instead of "muddy grey" */
+    box-shadow: 
+      0 4px 30px rgba(30, 58, 138, 0.05), /* Deep soft blue-tinted shadow */
+      inset 0 1px 0 rgba(255, 255, 255, 0.9); /* Highlight on top edge */
   }
 }
 
@@ -178,122 +207,9 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-muted rounded-full;
+  @apply bg-muted-foreground/20 rounded-full;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground;
-}
-
-/* ============ AI-Generated Content Styling ============ */
-.ai-content {
-  background: linear-gradient(to bottom right,
-    rgba(99, 102, 241, 0.05),
-    rgba(99, 102, 241, 0.1));
-  border: 2px dashed var(--color-primary-light);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  position: relative;
-}
-
-.ai-content::before {
-  content: "✨";
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  font-size: 1.25rem;
-}
-
-/* AI loading animation */
-@keyframes pulse-dots {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.ai-thinking-dots span {
-  animation: pulse-dots 1.4s infinite;
-}
-
-.ai-thinking-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.ai-thinking-dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-/* ============ Platform Badges ============ */
-.platform-badge-xiaohongshu {
-  background-color: var(--color-xiaohongshu);
-  color: white;
-}
-
-.platform-badge-douyin {
-  background-color: var(--color-douyin);
-  color: white;
-}
-
-.platform-badge-weibo {
-  background-color: var(--color-weibo);
-  color: white;
-}
-
-.platform-badge-wechat {
-  background-color: var(--color-wechat);
-  color: white;
-}
-
-/* ============ Priority Indicators ============ */
-.priority-high {
-  color: var(--color-priority-high);
-}
-
-.priority-medium {
-  color: var(--color-priority-medium);
-}
-
-.priority-low {
-  color: var(--color-priority-low);
-}
-
-.priority-badge-high {
-  background-color: var(--color-priority-high);
-  color: white;
-}
-
-.priority-badge-medium {
-  background-color: var(--color-priority-medium);
-  color: white;
-}
-
-.priority-badge-low {
-  background-color: var(--color-priority-low);
-  color: white;
-}
-
-/* ============ Keyframe Animations ============ */
-/* Note: accordion animations are usually handled by tailwindcss-animate automatically if configured */
-
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 0%,
-    hsl(var(--muted) / 0.5) 50%,
-    hsl(var(--muted)) 100%
-  );
-  background-size: 2000px 100%;
-  animation: shimmer 2s infinite linear;
-}
-
-/* Grid pattern for landing page */
-.bg-grid-pattern {
-  background-image: 
-    linear-gradient(to right, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
-  background-size: 40px 40px;
+  @apply bg-muted-foreground/40;
 }

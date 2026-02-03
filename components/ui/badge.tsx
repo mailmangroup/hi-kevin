@@ -20,9 +20,9 @@ const badgeVariants = cva(
         weibo: "bg-[#E6162D] text-white",
         wechat: "bg-[#07C160] text-white",
         // Priority badges
-        high: "bg-priority-high text-white",
-        medium: "bg-priority-medium text-white",
-        low: "bg-priority-low text-white",
+        high: "bg-red-500/10 text-red-600 border border-red-500/20 backdrop-blur-sm",
+        medium: "bg-amber-500/10 text-amber-600 border border-amber-500/20 backdrop-blur-sm",
+        low: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 backdrop-blur-sm",
         // Status badges (per DESIGN.md)
         draft: "bg-border-light text-muted-foreground",
         scheduled: "bg-success-light text-success-dark",

@@ -28,7 +28,7 @@ const priorityColors = {
 export function SuggestionsList({ suggestions }: SuggestionsListProps) {
   if (suggestions.length === 0) {
     return (
-      <Card>
+      <Card className="glass-premium border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
@@ -48,7 +48,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
   }
 
   return (
-    <Card>
+    <Card className="glass-premium border-0">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -72,7 +72,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
           {suggestions.map((suggestion, index) => (
             <div
               key={suggestion.id}
-              className="flex items-start gap-4 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background transition-all"
+              className="flex items-start gap-4 p-4 rounded-lg border border-white/20 bg-white/30 hover:bg-white/50 transition-all"
             >
               {/* Priority indicator */}
               <div className="flex-shrink-0 pt-1">

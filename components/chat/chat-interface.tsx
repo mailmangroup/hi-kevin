@@ -62,7 +62,7 @@ export function ChatInterface({ initialMessage, chatId, projectId }: ChatInterfa
 }
 
 function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
-  const { openArtifact, isPanelOpen, reportNavigation } = useArtifact()
+  const { openArtifact, isPanelOpen, reportNavigation, selectedArtifact } = useArtifact()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
@@ -730,15 +730,18 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     }
   }
 
+  const isReportOpen = isPanelOpen && selectedArtifact?.type === 'report' && selectedArtifact?.data?.pages
+
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full min-h-0 bg-transparent">
       {/* Chat Area */}
       <div className={cn(
-        "flex flex-1 flex-col transition-all duration-300",
-        isPanelOpen ? "mr-0" : ""
+        "flex flex-col h-full min-h-0 transition-all duration-300",
+        isReportOpen ? "w-[450px] flex-shrink-0 border-r border-border" : "flex-1",
+        isPanelOpen && !isReportOpen ? "mr-0" : ""
       )}>
         {/* Project Breadcrumb */}
-        <div className="flex items-center gap-2 border-b border-border/50 bg-background/95 px-6 py-3 text-sm backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+        <div className="flex items-center gap-2 border-b border-border/50 bg-transparent px-6 py-3 text-sm sticky top-0 z-10">
           {project && (
             <>
               <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
@@ -755,7 +758,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.map((message) => (
             <div
@@ -765,15 +768,32 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 message.role === "user" ? "flex-row-reverse" : "flex-row"
               )}
             >
+              {/* Avatar for AI */}
+              {/* {message.role !== "user" && (
+                <div className="flex-shrink-0 mt-1">
+                   <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center border border-indigo-200 shadow-sm">
+                     <span className="text-lg">🤖</span>
+                   </div>
+                </div>
+              )} */}
+
               {/* Content */}
               <div
                 className={cn(
-                  "relative max-w-[80%] text-sm leading-relaxed",
+                  "relative max-w-[80%] text-sm leading-relaxed overflow-hidden",
                   message.role === "user"
-                    ? "bg-primary text-white rounded-2xl rounded-tr-none px-5 py-3 shadow-sm"
-                    : "bg-transparent text-foreground px-0 py-0"
+                    ? "bg-gradient-to-br from-indigo-600 to-indigo-700 shadow-[0_8px_24px_rgba(99,102,241,0.25)] rounded-2xl rounded-tr-sm text-white px-5 py-3"
+                    : "glass-premium border border-white/20 rounded-[2rem] rounded-tl-sm p-6 shadow-[0_8px_30px_rgba(30,58,138,0.1)] text-foreground"
                 )}
               >
+                {/* Light Leak for Assistant Message */}
+                {message.role !== "user" && (
+                  <div className="absolute top-0 left-0 w-full h-full overflow-hidden rounded-[inherit] pointer-events-none z-0">
+                    <div className="absolute -top-20 -left-20 w-64 h-64 bg-purple-500/5 blur-[60px] rounded-full" />
+                  </div>
+                )}
+                
+                <div className="relative z-10">
                 {/* Uploaded Images */}
                 {message.images && message.images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
@@ -926,6 +946,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 <span className="mt-1 block text-[10px] opacity-70">
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                </div>
               </div>
             </div>
           ))}
@@ -935,8 +956,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border bg-white dark:bg-background p-4">
-        <div className="mx-auto max-w-3xl">
+      <div className="flex-shrink-0 p-4 z-20 pointer-events-none">
+        <div className="mx-auto max-w-3xl pointer-events-auto">
+          {messages.length === 0 && (
+            <div className="mb-8 text-center">
+               <h2 className="text-2xl font-semibold text-foreground">How can I help you?</h2>
+            </div>
+          )}
+
           {credentialsError && (
             <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-300">
               {credentialsError}
@@ -1062,6 +1089,8 @@ function parseSubContentList(subContentList: any[] = []): {
   const images: string[] = []
   const documents: any[] = []
   const contentParts: ContentPart[] = []
+  const incompleteToolCalls = new Map<string, ToolCall>()
+  let lastToolCall: ToolCall | null = null
   let textContent = ""
 
   if (!Array.isArray(subContentList)) {
@@ -1080,6 +1109,47 @@ function parseSubContentList(subContentList: any[] = []): {
       }
       toolCalls.push(toolCall)
       contentParts.push({ type: 'tool', tool: toolCall })
+      
+      if (toolCall.state === 'running') {
+         if (toolCall.id) incompleteToolCalls.set(toolCall.id, toolCall)
+         lastToolCall = toolCall
+      }
+    } else if (item.type === 'tool_input') {
+      const id = item.tool_call_id || Date.now().toString()
+      const toolCall: ToolCall = {
+        id: id,
+        name: item.tool,
+        input: item.tool_input || {},
+        state: 'running'
+      }
+      toolCalls.push(toolCall)
+      contentParts.push({ type: 'tool', tool: toolCall })
+      
+      incompleteToolCalls.set(id, toolCall)
+      lastToolCall = toolCall
+    } else if (item.type === 'tool_output') {
+       // Try to find matching tool call
+       let toolCall: ToolCall | undefined
+       
+       if (item.tool_call_id) {
+           toolCall = incompleteToolCalls.get(item.tool_call_id)
+       }
+       
+       // Fallback to last tool call if no ID match or ID not provided, 
+       // but only if name matches
+       if (!toolCall && lastToolCall && lastToolCall.name === item.tool) {
+           toolCall = lastToolCall
+       }
+       
+       if (toolCall) {
+           toolCall.output = item.tool_output
+           toolCall.state = 'completed'
+           if (item.artifact) {
+               toolCall.artifact = item.artifact
+           }
+           // Remove from incomplete map since it's done
+           if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
+       }
     } else if (item.type === 'image') {
       if (item.url) images.push(item.url)
     } else if (item.type === 'document') {

@@ -26,6 +26,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 const sidebarCache = {
   leadsCount: null as number | null,
   chatHistory: null as Conversation[] | null,
+  totalChats: 0,
   lastFetch: 0,
   CACHE_DURATION: 30000, // 30 seconds
 }
@@ -96,6 +97,41 @@ export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const [navItems, setNavItems] = useState<NavItem[]>(INITIAL_NAV_ITEMS)
   const [chatHistory, setChatHistory] = useState<Conversation[]>([])
+  const [totalChats, setTotalChats] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  const fetchHistory = async (options?: { refresh?: boolean; loadMore?: boolean }) => {
+    const isLoadMore = options?.loadMore
+
+    // If loading more and already loading, skip
+    if (isLoadMore && isLoadingMore) return
+
+    if (isLoadMore) setIsLoadingMore(true)
+
+    try {
+        const limit = 20
+        const skip = isLoadMore ? chatHistory.length : 0
+        
+        const { conversations, total } = await aiService.getConversations(limit, skip)
+        
+        if (isLoadMore) {
+            const newHistory = [...chatHistory, ...conversations]
+            setChatHistory(newHistory)
+            sidebarCache.chatHistory = newHistory
+        } else {
+            setChatHistory(conversations)
+            sidebarCache.chatHistory = conversations
+        }
+        setTotalChats(total)
+        sidebarCache.totalChats = total
+    } catch (error: any) {
+        // Ignore missing credentials error as it's expected during onboarding
+        if (error?.code === 'CREDENTIALS_MISSING') return
+        console.error("Failed to fetch chat history:", error)
+    } finally {
+        if (isLoadMore) setIsLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     const now = Date.now()
@@ -120,18 +156,6 @@ export function Sidebar({ className }: { className?: string }) {
       }
     }
 
-    const fetchHistory = async (forceRefresh = false) => {
-        try {
-            const { conversations } = await aiService.getConversations(10)
-            sidebarCache.chatHistory = conversations
-            setChatHistory(conversations)
-        } catch (error: any) {
-            // Ignore missing credentials error as it's expected during onboarding
-            if (error?.code === 'CREDENTIALS_MISSING') return
-            console.error("Failed to fetch chat history:", error)
-        }
-    }
-
     // Use cached data if available and valid
     if (isCacheValid && sidebarCache.leadsCount !== null) {
       setNavItems(prev => prev.map(item => {
@@ -146,6 +170,7 @@ export function Sidebar({ className }: { className?: string }) {
 
     if (isCacheValid && sidebarCache.chatHistory !== null) {
       setChatHistory(sidebarCache.chatHistory)
+      setTotalChats(sidebarCache.totalChats)
     } else {
       fetchHistory()
     }
@@ -153,7 +178,7 @@ export function Sidebar({ className }: { className?: string }) {
     sidebarCache.lastFetch = now
 
     // Listen for new chat creation and title updates - always refresh on these events
-    const handleChatEvent = () => fetchHistory(true)
+    const handleChatEvent = () => fetchHistory({ refresh: true })
     window.addEventListener('chat-created', handleChatEvent)
     window.addEventListener('chat-title-updated', handleChatEvent)
     return () => {
@@ -163,9 +188,14 @@ export function Sidebar({ className }: { className?: string }) {
   }, [])
 
   return (
-    <div className={cn("flex h-full w-60 flex-col border-r border-sidebar-border bg-sidebar", className)}>
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
+    <div className={cn("relative flex h-full w-60 flex-col glass-premium border-r border-white/20 bg-white/90 backdrop-blur-[24px] overflow-hidden z-20 shadow-[4px_0_24px_rgba(30,58,138,0.08)]", className)}>
+      {/* Light Leak - Pseudo-element Overlay */}
+      <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[40%] bg-purple-500/10 blur-[80px] rounded-full pointer-events-none z-0" />
+      
+      {/* Content Container (z-10 to sit above light leak) */}
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-2 px-6">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
           K
         </div>
@@ -188,7 +218,7 @@ export function Sidebar({ className }: { className?: string }) {
               prefetch={false}
               className={cn(
                 "group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
-                isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                isActive ? "bg-primary/10 text-primary-dark border-l-2 border-primary" : "text-muted-foreground"
               )}
             >
               <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
@@ -242,6 +272,17 @@ export function Sidebar({ className }: { className?: string }) {
                     </Link>
                 )
             })}
+            {chatHistory.length < totalChats && (
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-xs text-muted-foreground hover:text-primary mt-2"
+                    onClick={() => fetchHistory({ loadMore: true })}
+                    disabled={isLoadingMore}
+                >
+                    {isLoadingMore ? "Loading..." : "Load More"}
+                </Button>
+            )}
           </div>
         </div>
       </nav>
@@ -259,6 +300,7 @@ export function Sidebar({ className }: { className?: string }) {
             </Link>
             <ModeToggle />
         </div>
+      </div>
       </div>
     </div>
   )

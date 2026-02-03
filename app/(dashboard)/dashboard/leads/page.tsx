@@ -385,7 +385,7 @@ export default function LeadsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="rounded-xl bg-card p-6 shadow-sm border border-border">
+        <div className="rounded-xl glass-premium p-6">
           <p className="text-sm font-medium text-muted-foreground">Total Leads</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-bold text-foreground">
@@ -397,7 +397,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-card p-6 shadow-sm border border-border">
+        <div className="rounded-xl glass-premium p-6">
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-muted-foreground" />
             <p className="text-sm font-medium text-muted-foreground">New Leads</p>
@@ -412,7 +412,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-card p-6 shadow-sm border border-border md:col-span-2">
+        <div className="rounded-xl glass-premium p-6 md:col-span-2">
            <div className="flex items-center justify-between h-full">
               <div className="space-y-1">
                  <p className="text-sm font-medium text-muted-foreground">Date Range</p>
@@ -427,7 +427,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Aggregated View (Nested Table) */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl glass-premium overflow-hidden">
         <div className="p-6 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold">Source Breakdown</h2>
           <DropdownMenu>
