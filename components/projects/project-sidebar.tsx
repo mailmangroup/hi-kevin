@@ -2,6 +2,7 @@ import { useProjectConversations } from "@/lib/hooks/use-projects"
 import { cn } from "@/lib/utils/cn"
 import { formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface ProjectSidebarProps {
   projectId: string
@@ -23,23 +24,29 @@ export function ProjectSidebar({ projectId, currentConversationId }: ProjectSide
           </div>
         ) : (
           <div className="divide-y">
-            {conversations?.conversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => router.push(`/chat/${conv.id}`)}
-                className={cn(
-                  "flex w-full flex-col gap-1 px-6 py-4 text-left transition-colors hover:bg-accent/50",
-                  currentConversationId === conv.id && "bg-accent"
-                )}
-              >
-                <span className="font-medium">
-                  {conv.title || "New Conversation"}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  Last message {formatDistanceToNow(new Date(conv.updated_at), { addSuffix: false })} ago
-                </span>
-              </button>
-            ))}
+            <AnimatePresence>
+              {conversations?.conversations.map((conv, index) => (
+                <motion.button
+                  key={conv.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.2 }}
+                  onClick={() => router.push(`/chat/${conv.id}`)}
+                  className={cn(
+                    "flex w-full flex-col gap-1 px-6 py-4 text-left transition-colors hover:bg-accent/50 cursor-pointer",
+                    currentConversationId === conv.id && "bg-accent"
+                  )}
+                >
+                  <span className="font-medium">
+                    {conv.title || "New Conversation"}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    Last message {formatDistanceToNow(new Date(conv.updated_at), { addSuffix: false })} ago
+                  </span>
+                </motion.button>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

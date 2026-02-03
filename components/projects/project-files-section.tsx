@@ -1,10 +1,13 @@
 import { useState } from "react"
-import { FileText, Plus, X } from "lucide-react"
+import { Plus, X, Trash, Trash2, MinusSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useProjectDocuments, useProject } from "@/lib/hooks/use-projects"
-import { formatFileSize } from "@/lib/utils/file-helpers"
 import { DocumentUploader } from "./document-uploader"
+import { FileCard } from "./file-card"
+import { FilePreviewDialog } from "./file-preview-dialog"
+import { aiService } from "@/lib/api/client"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface ProjectFilesSectionProps {
   projectId: string
@@ -14,26 +17,73 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
   const { data: project } = useProject(projectId)
   const { data: documents, isLoading } = useProjectDocuments(projectId)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  
+  // Selection & Preview State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const queryClient = useQueryClient()
 
   // Calculate capacity percentage (assuming 1M tokens as max capacity)
   const MAX_CAPACITY_TOKENS = 1_000_000
   const capacityPercentage = project ? Math.min((project.total_tokens / MAX_CAPACITY_TOKENS) * 100, 100) : 0
 
-  const getFileTypeBadge = (filename: string) => {
-    const ext = filename.split('.').pop()?.toLowerCase() || ''
-    const typeMap: Record<string, string> = {
-      'txt': 'TEXT',
-      'md': 'TEXT',
-      'pdf': 'PDF',
-      'docx': 'DOCX',
-      'doc': 'DOC'
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
     }
-    return typeMap[ext] || 'FILE'
+    setSelectedIds(newSelected)
   }
 
-  // Estimate lines from tokens (rough approximation: 1 line ≈ 10-15 tokens)
-  const estimateLines = (tokenCount: number) => {
-    return Math.round(tokenCount / 12)
+  const selectAll = () => {
+    if (documents) {
+      setSelectedIds(new Set(documents.map(d => d.id)))
+    }
+  }
+
+  const deselectAll = () => {
+    setSelectedIds(new Set())
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} files?`)) return
+
+    setIsDeleting(true)
+    try {
+      // Execute deletions in parallel
+      await Promise.all(
+        Array.from(selectedIds).map(id => aiService.deleteProjectDocument(projectId, id))
+      )
+      
+      // Clear selection and refresh
+      setSelectedIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ['project-documents', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    } catch (error) {
+      console.error("Failed to delete files:", error)
+      alert("Failed to delete some files. Please try again.")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteSingle = async (documentId: string) => {
+    if (!confirm("Are you sure you want to delete this file?")) return
+    setIsDeleting(true)
+    try {
+      await aiService.deleteProjectDocument(projectId, documentId)
+      queryClient.invalidateQueries({ queryKey: ['project-documents', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    } catch (error) {
+      console.error("Failed to delete file:", error)
+      alert("Failed to delete file.")
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
@@ -78,10 +128,41 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
             style={{ width: `${capacityPercentage}%` }}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {capacityPercentage.toFixed(0)}% of project capacity used
-        </p>
+        <div className="flex justify-between items-center text-xs text-muted-foreground">
+          <span>{capacityPercentage < 1 && capacityPercentage > 0 ? '<1' : capacityPercentage.toFixed(0)}% of project capacity used</span>
+          <span>{project?.total_tokens?.toLocaleString() ?? 0} tokens</span>
+        </div>
       </div>
+
+      {/* Bulk Selection Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between py-2 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={deselectAll}
+              title="Clear selection"
+            >
+              <MinusSquare className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium text-muted-foreground">
+              {selectedIds.size} selected
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={handleDeleteSelected}
+            disabled={isDeleting}
+            title="Delete selected"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-xs text-muted-foreground">Loading files...</div>
@@ -91,27 +172,25 @@ export function ProjectFilesSection({ projectId }: ProjectFilesSectionProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {documents.map((doc) => {
-            const estimatedLines = estimateLines(doc.token_count)
-            return (
-              <div
-                key={doc.id}
-                className="p-3 border rounded-lg hover:bg-muted/50 transition-colors flex flex-col"
-              >
-                <p className="text-sm font-medium mb-1 line-clamp-2">{doc.filename}</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  {estimatedLines > 0 ? `${estimatedLines} lines` : formatFileSize(doc.file_size)}
-                </p>
-                <div className="mt-auto">
-                  <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
-                    {getFileTypeBadge(doc.filename)}
-                  </Badge>
-                </div>
-              </div>
-            )
-          })}
+          {documents.map((doc) => (
+            <FileCard
+              key={doc.id}
+              file={doc}
+              isSelected={selectedIds.has(doc.id)}
+              onToggleSelect={() => toggleSelect(doc.id)}
+              onPreview={() => setPreviewFileId(doc.id)}
+              onDelete={() => handleDeleteSingle(doc.id)}
+            />
+          ))}
         </div>
       )}
+
+      <FilePreviewDialog 
+        open={!!previewFileId} 
+        onOpenChange={(open) => !open && setPreviewFileId(null)}
+        documentId={previewFileId}
+        filename={documents?.find(d => d.id === previewFileId)?.filename}
+      />
     </div>
   )
 }

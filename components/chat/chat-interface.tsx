@@ -5,6 +5,7 @@ import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "luci
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { useUserStore } from "@/lib/store/user-store"
 import { ArtifactProvider, useArtifact, ArtifactData } from "@/components/chat/artifact-context"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
@@ -66,6 +67,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
   const [conversationId, setConversationId] = React.useState<string | undefined>(chatId)
+  const [project, setProject] = React.useState<{ id: string, name: string } | null>(null)
+  const [conversationTitle, setConversationTitle] = React.useState<string>("")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const initialized = React.useRef(false)
   const justCreatedConversationId = React.useRef<string | null>(null)
@@ -175,15 +178,34 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       try {
           const conversation = await aiService.getConversation(id)
           if (conversation?.title) {
-              // Update document title
+              setConversationTitle(conversation.title)
               document.title = `${conversation.title} - Kevin`
               // Notify sidebar to refresh chat history (title may have been generated)
               window.dispatchEvent(new Event('chat-title-updated'))
+          }
+
+          // Handle project context
+          if (conversation?.project_id) {
+             try {
+                 const projectData = await aiService.getProject(conversation.project_id)
+                 setProject({ id: projectData.id, name: projectData.name })
+             } catch (e) {
+                 console.error("Failed to load project details", e)
+             }
           }
       } catch (error) {
           console.error("Failed to load conversation title:", error)
       }
   }
+
+  // Load project details if projectId prop is provided (e.g. new chat from project)
+  React.useEffect(() => {
+    if (projectId) {
+       aiService.getProject(projectId)
+         .then(p => setProject({ id: p.id, name: p.name }))
+         .catch(err => console.error("Failed to load project", err))
+    }
+  }, [projectId])
 
   const loadHistory = async (id: string) => {
       try {
@@ -715,6 +737,23 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         "flex flex-1 flex-col transition-all duration-300",
         isPanelOpen ? "mr-0" : ""
       )}>
+        {/* Project Breadcrumb */}
+        <div className="flex items-center gap-2 border-b border-border/50 bg-background/95 px-6 py-3 text-sm backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+          {project && (
+            <>
+              <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
+                  {project.name}
+                </Link>
+              </div>
+              <span className="text-muted-foreground/40">/</span>
+            </>
+          )}
+          <span className="font-medium text-foreground truncate max-w-[300px]">
+              {conversationTitle || "Chat"}
+          </span>
+        </div>
+
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mx-auto max-w-3xl space-y-6">

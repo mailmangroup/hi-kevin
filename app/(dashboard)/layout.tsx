@@ -2,7 +2,6 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { KawoCredentialsModal } from '@/components/onboarding/kawo-credentials-modal'
 import { Sidebar } from "@/components/layout/sidebar"
-import { Header } from "@/components/layout/header"
 
 // Cache the onboarding check for the duration of a request
 const getOnboardingStatus = cache(async () => {
@@ -33,7 +32,6 @@ export default async function DashboardLayout({
         <Sidebar />
       </div>
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
         <main className="flex-1 overflow-y-auto bg-background p-6">
           {children}
         </main>

@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, Settings } from "lucide-react"
+import { Bell, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BetaBadge } from "@/components/ui/beta-badge"
 import { MobileSidebar } from "@/components/layout/mobile-sidebar"
@@ -12,14 +12,6 @@ export function Header() {
       {/* Mobile Menu & Search */}
       <div className="flex flex-1 items-center gap-4">
         <MobileSidebar />
-        <div className="relative w-full max-w-md hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
       </div>
 
       {/* Right section */}

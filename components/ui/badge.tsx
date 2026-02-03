@@ -8,7 +8,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-white",
-        secondary: "bg-border-light text-muted",
+        secondary: "bg-border-light text-muted-foreground",
         destructive: "bg-error text-white",
         outline: "text-foreground border border-border bg-transparent",
         success: "bg-success text-white",
@@ -24,7 +24,7 @@ const badgeVariants = cva(
         medium: "bg-priority-medium text-white",
         low: "bg-priority-low text-white",
         // Status badges (per DESIGN.md)
-        draft: "bg-border-light text-muted",
+        draft: "bg-border-light text-muted-foreground",
         scheduled: "bg-success-light text-success-dark",
       },
     },

@@ -1,101 +1,74 @@
-import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { useState, useEffect, useRef } from "react"
 import { useUpdateProject, useProject } from "@/lib/hooks/use-projects"
-import { Pencil, X } from "lucide-react"
+import { Pencil, Check, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils/cn"
 
 interface ProjectInstructionsSectionProps {
   projectId: string
 }
 
-const formSchema = z.object({
-  instructions: z.string().optional(),
-})
-
 export function ProjectInstructionsSection({ projectId }: ProjectInstructionsSectionProps) {
   const { data: project } = useProject(projectId)
   const updateProject = useUpdateProject()
-  const [isEditing, setIsEditing] = useState(false)
-
-  const { register, handleSubmit, reset } = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      instructions: project?.instructions || "",
-    },
-  })
+  const [content, setContent] = useState("")
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (project) {
-      reset({ instructions: project.instructions || "" })
-    }
-  }, [project, reset])
-
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    updateProject.mutate({ id: projectId, data: { instructions: values.instructions } }, {
-      onSuccess: () => {
-        setIsEditing(false)
+    if (project?.instructions !== undefined) {
+      setContent(project.instructions)
+      if (contentRef.current && contentRef.current.innerText !== project.instructions) {
+        contentRef.current.innerText = project.instructions
       }
-    })
+    }
+  }, [project])
+
+  const handleBlur = () => {
+    if (!contentRef.current) return
+    const newContent = contentRef.current.innerText
+    if (newContent !== project?.instructions) {
+      updateProject.mutate({ id: projectId, data: { instructions: newContent } })
+    }
   }
 
-  const handleCancel = () => {
-    reset({ instructions: project?.instructions || "" })
-    setIsEditing(false)
+  const handleFocus = () => {
+    if (contentRef.current) {
+      contentRef.current.focus()
+    }
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Instructions</h3>
-        {!isEditing && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setIsEditing(true)}
-          >
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={handleFocus}
+        >
+          {updateProject.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
             <Pencil className="h-4 w-4" />
-          </Button>
-        )}
+          )}
+        </Button>
       </div>
 
-      {isEditing ? (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
-          <Textarea
-            placeholder="Enter custom instructions for how the AI should behave in this project..."
-            className="min-h-[200px] resize-y text-sm"
-            {...register("instructions")}
-            autoFocus
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleCancel}
-            >
-              <X className="h-4 w-4 mr-1" />
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={updateProject.isPending}
-            >
-              Save
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
-            {project?.instructions || "No custom instructions provided yet."}
-          </p>
-        </div>
-      )}
+      <div className="space-y-2 relative">
+        <div
+          ref={contentRef}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={handleBlur}
+          className={cn(
+            "text-sm text-foreground leading-relaxed whitespace-pre-wrap min-h-[100px] p-2 -ml-2 rounded-md transition-colors",
+            "focus:bg-accent/30 focus:outline-none focus:ring-1 focus:ring-ring",
+            "empty:before:content-['Enter_custom_instructions...'] empty:before:text-muted-foreground"
+          )}
+          spellCheck={false}
+        />
+      </div>
     </div>
   )
 }

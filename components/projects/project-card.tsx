@@ -30,11 +30,16 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex w-full justify-between">
             <div className="flex items-center gap-1">
               <FileText className="w-3 h-3" />
-              <span>{project.document_count} docs</span>
+              <span>{project.document_count} {project.document_count === 1 ? 'doc' : 'docs'}</span>
             </div>
             <div className="flex items-center gap-1">
               <Database className="w-3 h-3" />
-              <span>{Math.round(project.total_tokens / 1000)}k tokens</span>
+              <span>
+                {project.total_tokens > 0 && project.total_tokens < 1000 
+                  ? '<1k tokens' 
+                  : `${Math.round(project.total_tokens / 1000)}k tokens`
+                }
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-1 w-full">

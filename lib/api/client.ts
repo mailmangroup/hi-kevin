@@ -147,6 +147,7 @@ export interface Conversation {
   last_message?: string
   is_favorite: boolean
   has_report?: boolean
+  project_id?: string
 }
 
 export interface Message {
@@ -651,6 +652,26 @@ export const aiService = {
   },
 
   /**
+   * Get fresh signed URL for a conversation document
+   *
+   * Useful when a document URL has expired and you need a new one,
+   * or when you want a custom expiration time.
+   *
+   * @param conversationId Conversation ID
+   * @param documentId Document ID
+   * @param expiration URL expiration time in seconds (60-3600, default 300)
+   * @returns Fresh presigned URL with specified expiration
+   */
+  async getConversationDocumentUrl(conversationId: string, documentId: string, expiration: number = 300): Promise<{
+    document_id: string
+    document_url: string
+    expires_in: number
+    oss_key: string
+  }> {
+    return directApiCall(`conversations/${conversationId}/documents/${documentId}/url?expiration=${expiration}`)
+  },
+
+  /**
    * Delete document
    */
   async deleteDocument(conversationId: string, documentId: string): Promise<{
@@ -752,6 +773,26 @@ export const aiService = {
    */
   async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
     return directApiCall(`projects/${projectId}/documents`)
+  },
+
+  /**
+   * Get fresh signed URL for a project document
+   *
+   * Useful when a document URL has expired and you need a new one,
+   * or when you want a custom expiration time.
+   *
+   * @param projectId Project ID
+   * @param documentId Document ID
+   * @param expiration URL expiration time in seconds (60-3600, default 300)
+   * @returns Fresh presigned URL with specified expiration
+   */
+  async getProjectDocumentUrl(projectId: string, documentId: string, expiration: number = 300): Promise<{
+    document_id: string
+    document_url: string
+    expires_in: number
+    oss_key: string
+  }> {
+    return directApiCall(`projects/${projectId}/documents/${documentId}/url?expiration=${expiration}`)
   },
 
   /**
