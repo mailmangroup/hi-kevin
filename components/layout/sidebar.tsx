@@ -188,90 +188,87 @@ export function Sidebar({ className }: { className?: string }) {
   }, [])
 
   return (
-    <div className={cn("relative flex h-full w-60 flex-col glass-premium border-r border-white/20 bg-white/90 backdrop-blur-[24px] overflow-hidden z-20 shadow-[4px_0_24px_rgba(30,58,138,0.08)]", className)}>
-      {/* Light Leak - Pseudo-element Overlay */}
-      <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[40%] bg-purple-500/10 blur-[80px] rounded-full pointer-events-none z-0" />
-      
-      {/* Content Container (z-10 to sit above light leak) */}
-      <div className="relative z-10 flex flex-col h-full">
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-2 px-6">
+    <div className={cn("relative flex h-full w-64 flex-col bg-transparent", className)}>
+      {/* Header */}
+      <div className="flex h-16 items-center gap-2 px-6 mb-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
           K
         </div>
-        <span className="text-xl font-bold text-sidebar-foreground">Kevin</span>
+        <span className="text-xl font-bold text-slate-900">Kevin</span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          // Dashboard should only be active on exact match, not sub-routes
-          const isActive = item.href === "/dashboard"
-            ? pathname === "/dashboard" || pathname === "/dashboard/"
-            : pathname === item.href || pathname.startsWith(item.href + "/")
+      <div className="flex-1 overflow-y-auto no-scrollbar px-4">
+        <nav className="space-y-1">
+            {navItems.map((item) => {
+            const Icon = item.icon
+            // Dashboard should only be active on exact match, not sub-routes
+            const isActive = item.href === "/dashboard"
+                ? pathname === "/dashboard" || pathname === "/dashboard/"
+                : pathname === item.href || pathname.startsWith(item.href + "/")
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              className={cn(
-                "group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
-                isActive ? "bg-primary/10 text-primary-dark border-l-2 border-primary" : "text-muted-foreground"
-              )}
-            >
-              <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0", isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-              <span className="flex-1 truncate">{item.title}</span>
-              <div className="ml-auto flex items-center gap-2">
-                {item.isBeta && <BetaBadge />}
-                {item.badge && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-error text-[10px] font-bold text-white">
-                    {item.badge}
-                  </span>
+            return (
+                <Link
+                key={item.href}
+                href={item.href}
+                prefetch={false}
+                className={cn(
+                    "group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all",
+                    isActive 
+                        ? "bg-white text-primary shadow-sm" 
+                        : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
                 )}
-              </div>
-            </Link>
-          )
-        })}
+                >
+                <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0 transition-colors", 
+                    isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
+                )} />
+                <span className="flex-1 truncate">{item.title}</span>
+                <div className="ml-auto flex items-center gap-2">
+                    {item.isBeta && <div className="h-1.5 w-1.5 rounded-full bg-orange-400" />}
+                    {item.badge && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        {item.badge}
+                    </span>
+                    )}
+                </div>
+                </Link>
+            )
+            })}
+        </nav>
 
         {/* Chat History Section */}
         <div className="mt-8">
-            {chatHistory.length > 0 && (
-                <div className="flex items-center justify-between px-3 mb-2">
-                    <h3 className="text-xs font-semibold uppercase text-muted-foreground/70">
-                        Chat History
-                    </h3>
-                </div>
-            )}
-
-            {/* New Chat Button */}
-            <Link href="/dashboard" prefetch={false}>
-                <div className="mb-3 px-3">
-                    <Button className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-white">
-                        <MessageSquare className="h-4 w-4" />
+            <div className="mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                History
+            </div>
+            <div className="space-y-1">
+                <Link href="/dashboard" prefetch={false}>
+                    <button className="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200">
+                            <MessageSquare className="h-3 w-3 text-slate-500" />
+                        </div>
                         New Chat
-                    </Button>
-                </div>
-            </Link>
-          
-          <div className="space-y-1">
-            {chatHistory.map((chat) => {
-                const isActive = pathname === `/chat/${chat.id}`
-                return (
-                    <Link
-                        key={chat.id}
-                        href={`/chat/${chat.id}`}
-                        prefetch={false}
-                        className={cn(
-                            "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all hover:bg-primary/5 hover:text-primary",
-                            isActive ? "bg-primary/5 text-primary" : "text-muted-foreground"
-                        )}
-                    >
-                        <span className="truncate" title={chat.title}>{chat.title || "New Chat"}</span>
-                    </Link>
-                )
-            })}
+                    </button>
+                </Link>
+                {chatHistory.map((chat) => {
+                    const isActive = pathname === `/chat/${chat.id}`
+                    return (
+                        <Link
+                            key={chat.id}
+                            href={`/chat/${chat.id}`}
+                            prefetch={false}
+                            className={cn(
+                                "group flex items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+                                isActive 
+                                    ? "bg-white text-primary shadow-sm" 
+                                    : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
+                            )}
+                        >
+                            <span className="truncate" title={chat.title}>{chat.title || "New Chat"}</span>
+                        </Link>
+                    )
+                })}
+            </div>
             {chatHistory.length < totalChats && (
                 <Button 
                     variant="ghost" 
@@ -283,24 +280,28 @@ export function Sidebar({ className }: { className?: string }) {
                     {isLoadingMore ? "Loading..." : "Load More"}
                 </Button>
             )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Footer Section */}
-      <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center justify-between">
-            <Link
-              href="/dashboard/settings"
-              prefetch={false}
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-            <ModeToggle />
         </div>
       </div>
+
+      {/* Footer Section */}
+      <div className="mt-auto p-4 pt-2">
+        <div className="flex items-center gap-2">
+            <Link
+                href="/dashboard/settings"
+                prefetch={false}
+                className="flex-1 flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm transition-all hover:shadow-md"
+            >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                    <Settings className="h-4 w-4" />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <p className="truncate text-sm font-medium text-slate-700">Settings</p>
+                </div>
+            </Link>
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white shadow-sm">
+                <ModeToggle />
+            </div>
+        </div>
       </div>
     </div>
   )
