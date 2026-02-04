@@ -934,7 +934,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                 <button
                                     key={idx}
                                     onClick={() => handleSend(question)}
-                                    className="text-left text-sm text-primary hover:bg-primary/5 px-3 py-2 rounded-lg border border-primary/20 transition-colors bg-white dark:bg-gray-800"
+                                    className="text-left text-xs text-primary hover:bg-primary/5 px-3 py-2 rounded-lg border border-primary/20 transition-colors bg-white dark:bg-gray-800"
                                 >
                                     {question}
                                 </button>
