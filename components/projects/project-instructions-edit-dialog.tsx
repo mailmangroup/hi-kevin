@@ -70,7 +70,7 @@ export function ProjectInstructionsEditDialog({ open, onOpenChange, project }: P
         <DialogHeader>
           <DialogTitle>Edit Instructions</DialogTitle>
           <DialogDescription>
-            Update the custom instructions for this project. These guide the AI assistant's behavior.
+            Update the custom instructions for this project. These guide the AI assistant&apos;s behavior.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
