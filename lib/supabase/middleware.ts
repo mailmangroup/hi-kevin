@@ -33,15 +33,18 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
+  // Use getSession() instead of getUser() for faster auth check
+  // getSession() reads from cookies (local), getUser() calls Supabase API (network)
+  // For middleware route protection, session check is sufficient
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
 
   if (
-    !user &&
+    !session &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/_next') && 
+    !request.nextUrl.pathname.startsWith('/_next') &&
     request.nextUrl.pathname !== '/' // Allow landing page
   ) {
     // no user, potentially respond by redirecting the user to the login page

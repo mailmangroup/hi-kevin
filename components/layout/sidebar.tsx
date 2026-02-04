@@ -133,61 +133,64 @@ export function Sidebar({ className }: { className?: string }) {
   }
 
   useEffect(() => {
-    const now = Date.now()
-    const isCacheValid = now - sidebarCache.lastFetch < sidebarCache.CACHE_DURATION
+    // Defer non-critical fetches to after initial paint
+    // This ensures navigation feels instant even if sidebar data is stale briefly
+    const timeoutId = setTimeout(() => {
+      const now = Date.now()
+      const isCacheValid = now - sidebarCache.lastFetch < sidebarCache.CACHE_DURATION
 
-    const fetchLeadsCount = async () => {
-      try {
-        const response = await frostService.getNewLeadsCount()
-        const count = response.count
-        sidebarCache.leadsCount = count
+      const fetchLeadsCount = async () => {
+        try {
+          const response = await frostService.getNewLeadsCount()
+          const count = response.count
+          sidebarCache.leadsCount = count
 
+          setNavItems(prev => prev.map(item => {
+            if (item.title === "Leads") {
+              return { ...item, badge: count > 0 ? count : undefined }
+            }
+            return item
+          }))
+        } catch (error: any) {
+          // Ignore missing credentials error as it's expected during onboarding
+          if (error?.code === 'CREDENTIALS_MISSING') return
+          console.error("Failed to fetch new leads count:", error)
+        }
+      }
+
+      // Use cached data immediately if available
+      if (isCacheValid && sidebarCache.leadsCount !== null) {
         setNavItems(prev => prev.map(item => {
           if (item.title === "Leads") {
-            return { ...item, badge: count > 0 ? count : undefined }
+            return { ...item, badge: sidebarCache.leadsCount! > 0 ? sidebarCache.leadsCount! : undefined }
           }
           return item
         }))
-      } catch (error: any) {
-        // Ignore missing credentials error as it's expected during onboarding
-        if (error?.code === 'CREDENTIALS_MISSING') return
-        console.error("Failed to fetch new leads count:", error)
       }
-    }
 
-    // Use cached data if available and valid
-    if (isCacheValid && sidebarCache.leadsCount !== null) {
-      setNavItems(prev => prev.map(item => {
-        if (item.title === "Leads") {
-          return { ...item, badge: sidebarCache.leadsCount! > 0 ? sidebarCache.leadsCount! : undefined }
-        }
-        return item
-      }))
-    } else {
-      fetchLeadsCount()
-    }
+      if (isCacheValid && sidebarCache.chatHistory !== null) {
+        setChatHistory(sidebarCache.chatHistory)
+        setTotalChats(sidebarCache.totalChats)
+      }
 
-    if (isCacheValid && sidebarCache.chatHistory !== null) {
-      setChatHistory(sidebarCache.chatHistory)
-      setTotalChats(sidebarCache.totalChats)
-    } else {
-      fetchHistory()
-    }
+      // Fetch fresh data in background (won't block navigation)
+      if (!isCacheValid) {
+        fetchLeadsCount()
+        fetchHistory()
+        sidebarCache.lastFetch = now
+      }
+    }, 100) // Small delay to let navigation complete first
 
-    sidebarCache.lastFetch = now
-
-    // Listen for new chat creation and title updates - always refresh on these events
+    // Event listeners remain immediate
     const handleChatEvent = () => fetchHistory({ refresh: true })
-    const handleDashboardLoad = () => fetchHistory({ refresh: true })
 
     window.addEventListener('chat-created', handleChatEvent)
     window.addEventListener('chat-title-updated', handleChatEvent)
-    window.addEventListener('dashboard-loaded', handleDashboardLoad)
 
     return () => {
+      clearTimeout(timeoutId)
       window.removeEventListener('chat-created', handleChatEvent)
       window.removeEventListener('chat-title-updated', handleChatEvent)
-      window.removeEventListener('dashboard-loaded', handleDashboardLoad)
     }
   }, [])
 
@@ -215,11 +218,10 @@ export function Sidebar({ className }: { className?: string }) {
                 <Link
                 key={item.href}
                 href={item.href}
-                prefetch={false}
                 className={cn(
                     "group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all",
-                    isActive 
-                        ? "bg-white text-primary shadow-sm" 
+                    isActive
+                        ? "bg-white text-primary shadow-sm"
                         : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
                 )}
                 >
