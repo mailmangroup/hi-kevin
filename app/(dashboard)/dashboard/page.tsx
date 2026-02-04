@@ -1,9 +1,14 @@
+"use client"
+
+import { useEffect } from "react"
 import { SuggestionsList } from "@/components/dashboard/suggestions-list"
-import { getDashboardData } from "@/lib/mock"
 import { ChatInput } from "@/components/dashboard/chat-input"
 
-export default async function DashboardPage() {
-  const dashboardData = await getDashboardData()
+export default function DashboardPage() {
+  useEffect(() => {
+    // Notify sidebar to refresh chat history when dashboard loads
+    window.dispatchEvent(new Event('dashboard-loaded'))
+  }, [])
 
   return (
     <div className="space-y-10">
@@ -11,7 +16,7 @@ export default async function DashboardPage() {
       <ChatInput />
 
       {/* Kevin's Suggestions */}
-      <SuggestionsList suggestions={dashboardData.suggestions} />
+      <SuggestionsList suggestions={[]} />
     </div>
   )
 }

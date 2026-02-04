@@ -178,11 +178,16 @@ export function Sidebar({ className }: { className?: string }) {
 
     // Listen for new chat creation and title updates - always refresh on these events
     const handleChatEvent = () => fetchHistory({ refresh: true })
+    const handleDashboardLoad = () => fetchHistory({ refresh: true })
+
     window.addEventListener('chat-created', handleChatEvent)
     window.addEventListener('chat-title-updated', handleChatEvent)
+    window.addEventListener('dashboard-loaded', handleDashboardLoad)
+
     return () => {
       window.removeEventListener('chat-created', handleChatEvent)
       window.removeEventListener('chat-title-updated', handleChatEvent)
+      window.removeEventListener('dashboard-loaded', handleDashboardLoad)
     }
   }, [])
 
@@ -236,13 +241,13 @@ export function Sidebar({ className }: { className?: string }) {
         </nav>
 
         {/* Chat History Section */}
-        <div className="mt-8">
-            <div className="mb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="mt-6">
+            <div className="mb-1.5 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
                 History
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
                 <Link href="/dashboard" prefetch={false}>
-                    <button className="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
+                    <button className="flex w-full items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
                         <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200">
                             <MessageSquare className="h-3 w-3 text-slate-500" />
                         </div>
@@ -257,9 +262,9 @@ export function Sidebar({ className }: { className?: string }) {
                             href={`/chat/${chat.id}`}
                             prefetch={false}
                             className={cn(
-                                "group flex items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
-                                isActive 
-                                    ? "bg-white text-primary shadow-sm" 
+                                "group flex items-center rounded-xl px-4 py-1.5 text-sm font-medium transition-all",
+                                isActive
+                                    ? "bg-white text-primary shadow-sm"
                                     : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
                             )}
                         >
