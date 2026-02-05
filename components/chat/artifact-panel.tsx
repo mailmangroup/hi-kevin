@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { X, Download, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, ExternalLink, Maximize2, Minimize2, ArrowUp, ArrowDown, Minus, MessageSquare } from "lucide-react"
+import { X, Download, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, Maximize2, Minimize2, ArrowUp, ArrowDown, Minus, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import { useArtifact, ArtifactData, ReportNavigation } from "./artifact-context"
@@ -516,6 +516,39 @@ function ReportContent({ data }: { data: any }) {
       }
   }, [reportNavigation.pageNumber, data])
 
+  const tabsRef = React.useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false)
+  const [canScrollRight, setCanScrollRight] = React.useState(false)
+
+  const checkScrollability = React.useCallback(() => {
+    if (tabsRef.current) {
+      setCanScrollLeft(tabsRef.current.scrollLeft > 0)
+      setCanScrollRight(tabsRef.current.scrollLeft < tabsRef.current.scrollWidth - tabsRef.current.clientWidth - 1)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    checkScrollability()
+    const tabsEl = tabsRef.current
+    if (tabsEl) {
+      tabsEl.addEventListener('scroll', checkScrollability)
+    }
+    window.addEventListener('resize', checkScrollability)
+    return () => {
+      tabsEl?.removeEventListener('scroll', checkScrollability)
+      window.removeEventListener('resize', checkScrollability)
+    }
+  }, [checkScrollability, activePage])
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsRef.current) {
+      tabsRef.current.scrollBy({
+        left: direction === 'right' ? 150 : -150,
+        behavior: 'smooth'
+      })
+    }
+  }
+
   // Support for new Report structure with pages
   if (data?.pages && Array.isArray(data.pages)) {
     const handleTabChange = (index: number) => {
@@ -564,21 +597,33 @@ function ReportContent({ data }: { data: any }) {
           </div>
 
           {/* Page Tabs */}
-          <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar">
-              {data.pages.map((page: any, idx: number) => (
-                  <Button
-                      key={idx}
-                      variant={activePage === idx ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleTabChange(idx)}
-                      className={cn(
-                          "whitespace-nowrap flex-shrink-0 h-8 text-xs",
-                          activePage === idx ? "bg-primary text-white" : "text-gray-600 bg-gray-50 border-gray-200"
-                      )}
-                  >
-                      {page.title || `Page ${idx + 1}`}
-                  </Button>
-              ))}
+          <div className="flex items-center gap-1">
+              {canScrollLeft && (
+                  <button onClick={() => scrollTabs('left')} className="p-1 rounded hover:bg-gray-100 text-gray-500 flex-shrink-0">
+                      <ChevronLeft size={16} />
+                  </button>
+              )}
+              <div ref={tabsRef} className="flex overflow-x-auto gap-2 pb-1 no-scrollbar flex-1">
+                  {data.pages.map((page: any, idx: number) => (
+                      <Button
+                          key={idx}
+                          variant={activePage === idx ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleTabChange(idx)}
+                          className={cn(
+                              "whitespace-nowrap flex-shrink-0 h-8 text-xs",
+                              activePage === idx ? "bg-primary text-white" : "text-gray-600 bg-gray-50 border-gray-200"
+                          )}
+                      >
+                          {page.title || `Page ${idx + 1}`}
+                      </Button>
+                  ))}
+              </div>
+              {canScrollRight && (
+                  <button onClick={() => scrollTabs('right')} className="p-1 rounded hover:bg-gray-100 text-gray-500 flex-shrink-0">
+                      <ChevronRight size={16} />
+                  </button>
+              )}
           </div>
         </div>
 
