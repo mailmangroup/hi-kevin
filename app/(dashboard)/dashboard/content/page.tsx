@@ -17,12 +17,6 @@ export default function ContentPage() {
             Manage your content calendar, create new posts, and track performance.
           </p>
         </div>
-        <Link href="/dashboard/content/localize">
-          <Button variant="outline" className="gap-2">
-            <Globe className="h-4 w-4" />
-            Localization Tool
-          </Button>
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -58,6 +52,13 @@ export default function ContentPage() {
               You&apos;re on track! 3 more posts needed to hit your weekly target across all platforms.
             </p>
           </div>
+
+          <Link href="/dashboard/content/localize" className="block">
+            <Button variant="outline" className="w-full gap-2 h-12 text-base">
+              <Globe className="h-4 w-4" />
+              Localization Tool
+            </Button>
+          </Link>
 
           <ComplianceChecker />
         </div>

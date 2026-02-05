@@ -99,14 +99,11 @@ export function ComplianceChecker({
           <ShieldCheck className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">Compliance Checker</h3>
         </div>
-        <Badge variant={issues.length > 0 ? "destructive" : "outline"}>
-          {hasChecked ? `${issues.length} Issues Found` : "Ready to Check"}
-        </Badge>
       </div>
 
       <div className="space-y-4">
         <textarea
-          className="w-full min-h-[150px] p-3 rounded-md border border-border bg-white resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          className="w-full min-h-[150px] p-3 rounded-md border border-border bg-white resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all break-words"
           placeholder="Paste content to check for compliance risks..."
           value={text}
           onChange={(e) => {
@@ -158,9 +155,9 @@ export function ComplianceChecker({
                           {issue.severity.toUpperCase()}
                         </Badge>
                       </div>
-                      <p className="text-sm mt-1">{issue.reason}</p>
+                      <p className="text-sm mt-1 break-words">{issue.reason}</p>
                       {issue.suggestion && (
-                        <p className="text-xs mt-1.5 font-medium opacity-80">
+                        <p className="text-xs mt-1.5 font-medium opacity-80 break-words">
                           Suggestion: {issue.suggestion}
                         </p>
                       )}

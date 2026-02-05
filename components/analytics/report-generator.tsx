@@ -34,11 +34,6 @@ export function ReportGenerator() {
         >
           Generate Brand Report
         </Button>
-        
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          <span>Creates detailed PDF reports with analysis</span>
-        </div>
       </div>
 
       <ReportParametersDialog 

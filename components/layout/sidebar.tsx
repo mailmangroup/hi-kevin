@@ -16,7 +16,6 @@ import {
   MessageSquare,
   FolderKanban
 } from "lucide-react"
-import { BetaBadge } from "@/components/ui/beta-badge"
 import { Button } from "@/components/ui/button"
 import { frostService } from "@/lib/api/frost"
 import { aiService, Conversation } from "@/lib/api/client"

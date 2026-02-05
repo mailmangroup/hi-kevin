@@ -16,7 +16,6 @@ export function Header() {
 
       {/* Right section */}
       <div className="flex items-center gap-2">
-        <BetaBadge label="Kevin Pilot" />
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-error" />
