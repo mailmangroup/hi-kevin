@@ -133,7 +133,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
   return (
     <ArtifactProvider>
-      <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-6 py-8"}>
+      <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-6 py-8 h-full min-h-[calc(100vh-16rem)]"}>
         {projectId ? (
           // Project page layout
           <div className="w-full">

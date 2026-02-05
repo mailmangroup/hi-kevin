@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, Copy, Check, ThumbsUp, ThumbsDown } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
@@ -70,6 +70,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [project, setProject] = React.useState<{ id: string, name: string } | null>(null)
   const [conversationTitle, setConversationTitle] = React.useState<string>("")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const [userScrolled, setUserScrolled] = React.useState(false)
   const initialized = React.useRef(false)
   const justCreatedConversationId = React.useRef<string | null>(null)
   const searchParams = useSearchParams()
@@ -166,8 +168,19 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     }
   }, [chatId])
 
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+      // If user is near bottom (within 100px), we consider them "not scrolled up"
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100
+      setUserScrolled(!isAtBottom)
+    }
+  }
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (!userScrolled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
   }
 
   React.useEffect(() => {
@@ -354,6 +367,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
     if ((!text.trim() && images.length === 0 && documents.length === 0) || isThinking) return
+
+    setUserScrolled(false) // Force scroll to bottom for new message
 
     // Don't send if credentials are still loading or missing
     // Bypass check in development mode to allow local testing with env vars
@@ -758,7 +773,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-6">
+        <div 
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-6"
+        >
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.map((message) => (
             <div
@@ -778,9 +797,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               )} */}
 
               {/* Content */}
+              <div className={cn("flex flex-col max-w-[80%]", message.role === "user" ? "items-end" : "items-start")}>
               <div
                 className={cn(
-                  "relative max-w-[80%] text-sm leading-relaxed overflow-hidden",
+                  "relative w-full text-sm leading-relaxed overflow-hidden",
                   message.role === "user"
                     ? "bg-gradient-to-br from-indigo-600 to-indigo-700 shadow-[0_8px_24px_rgba(99,102,241,0.25)] rounded-2xl rounded-tr-sm text-white px-5 py-3"
                     : "glass-premium border border-white/20 rounded-[2rem] rounded-tl-sm p-6 shadow-[0_8px_30px_rgba(30,58,138,0.1)] text-foreground"
@@ -948,6 +968,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 </span>
                 </div>
               </div>
+              {message.role === "assistant" && !message.isStreaming && (
+                  <MessageActions message={message} />
+              )}
+              </div>
             </div>
           ))}
 
@@ -1047,6 +1071,35 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 
 function getToolDisplayName(toolName: string): string {
   return TOOL_DISPLAY_NAMES[toolName] || toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function MessageActions({ message, onRegenerate }: { message: Message, onRegenerate?: () => void }) {
+  const [copied, setCopied] = React.useState(false)
+
+  const handleCopy = () => {
+    const textToCopy = message.content || ""
+    navigator.clipboard.writeText(textToCopy)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-2 -ml-2">
+      <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" title="Like">
+        <ThumbsUp className="h-3.5 w-3.5" />
+      </button>
+      <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" title="Dislike">
+        <ThumbsDown className="h-3.5 w-3.5" />
+      </button>
+      <button 
+        onClick={handleCopy}
+        className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" 
+        title="Copy"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  )
 }
 
 function parseSubContentList(subContentList: any[] = []): {

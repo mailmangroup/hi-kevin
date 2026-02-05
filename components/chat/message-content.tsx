@@ -4,6 +4,7 @@ import * as React from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { cn } from "@/lib/utils/cn"
+import { Copy, Check, Download } from "lucide-react"
 
 interface MessageContentProps {
   content: string
@@ -70,16 +71,40 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
               </code>
             )
           },
-          pre: ({ children }) => (
-            <pre className={cn(
-              "p-3 rounded-lg overflow-x-auto text-xs my-2",
-              isUser
-                ? "bg-white/10 text-white"
-                : "bg-gray-50 border border-gray-100"
-            )}>
-              {children}
-            </pre>
-          ),
+          pre: ({ children }) => {
+            const [copied, setCopied] = React.useState(false)
+            const ref = React.useRef<HTMLPreElement>(null)
+
+            const onCopy = () => {
+              if (ref.current) {
+                navigator.clipboard.writeText(ref.current.innerText)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }
+            }
+
+            return (
+              <div className="relative group">
+                <pre ref={ref} className={cn(
+                  "p-3 rounded-lg overflow-x-auto text-xs my-2",
+                  isUser
+                    ? "bg-white/10 text-white"
+                    : "bg-gray-50 border border-gray-100"
+                )}>
+                  {children}
+                </pre>
+                {!isUser && (
+                  <button
+                    onClick={onCopy}
+                    className="absolute top-2 right-2 p-1.5 bg-white/80 dark:bg-gray-800/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                    title="Copy code"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
+                  </button>
+                )}
+              </div>
+            )
+          },
 
           // Links
           a: ({ href, children }) => (
@@ -97,16 +122,74 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           ),
 
           // Tables
-          table: ({ children }) => (
-            <div className="overflow-x-auto my-2">
-              <table className={cn(
-                "min-w-full text-xs border-collapse",
-                isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
-              )}>
-                {children}
-              </table>
-            </div>
-          ),
+          table: ({ children }) => {
+            const [copied, setCopied] = React.useState(false)
+            const ref = React.useRef<HTMLTableElement>(null)
+
+            const onCopy = () => {
+              if (ref.current) {
+                navigator.clipboard.writeText(ref.current.innerText)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }
+            }
+
+            const onDownloadCSV = () => {
+              if (ref.current) {
+                const rows = Array.from(ref.current.querySelectorAll('tr'))
+                const csvContent = rows.map(row => {
+                  const cells = Array.from(row.querySelectorAll('th, td'))
+                  return cells.map(cell => {
+                    // Get text content and escape quotes
+                    const text = (cell as HTMLElement).innerText.replace(/"/g, '""')
+                    return `"${text}"`
+                  }).join(',')
+                }).join('\n')
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.setAttribute('download', 'table_data.csv')
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+              }
+            }
+
+            return (
+              <div className="relative group my-2 border rounded-lg border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table ref={ref} className={cn(
+                    "min-w-full text-xs border-collapse",
+                    isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
+                  )}>
+                    {children}
+                  </table>
+                </div>
+                {!isUser && (
+                  <div className="flex justify-end items-center gap-2 p-1 bg-gray-50 border-t border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+                    <button
+                      onClick={onDownloadCSV}
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
+                      title="Download as CSV"
+                    >
+                      <Download className="h-3 w-3" />
+                      CSV
+                    </button>
+                    <div className="h-3 w-px bg-gray-300 dark:bg-gray-700" />
+                    <button
+                      onClick={onCopy}
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
+                    >
+                      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          },
           thead: ({ children }) => (
             <thead className={cn(
               isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50"
