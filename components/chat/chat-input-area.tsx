@@ -505,7 +505,7 @@ export function ChatInputArea({
                 disabled={disabled}
             >
                 <Brain className="h-3.5 w-3.5 mr-1.5" />
-                DeepThink
+                Thinking
             </Button>
             <Button
                 variant={includeWebSearch ? "secondary" : "ghost"}
