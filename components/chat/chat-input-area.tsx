@@ -407,7 +407,7 @@ export function ChatInputArea({
 
       {/* Mode Indicators */}
       {(fastPath) && (
-          <div className="flex justify-center pt-2">
+          <div className="flex justify-start px-4 pt-2">
             {fastPath === 'analyze_video' && (
               <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
