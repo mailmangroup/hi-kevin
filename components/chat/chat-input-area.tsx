@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Send, Brain, Globe, X, ArrowUp, Loader2, Square, File, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,11 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { compressImage } from "@/lib/utils/image-compression"
 import {
   validateFile,
-  formatFileSize,
-  getFileTypeDisplay,
   getFileColor,
   truncateFilename
 } from "@/lib/utils/file-helpers"
@@ -70,6 +67,7 @@ export interface ChatInputAreaProps {
   disabled?: boolean
   isThinking?: boolean
   showBorder?: boolean
+  fastPath?: string | null
 }
 
 import { useArtifact } from "./artifact-context"
@@ -95,11 +93,13 @@ export function ChatInputArea({
   placeholder = "Message Kevin...",
   disabled = false,
   isThinking = false,
-  showBorder = true
+  showBorder = true,
+  fastPath
 }: ChatInputAreaProps) {
   const imageInputRef = React.useRef<HTMLInputElement>(null)
   const documentInputRef = React.useRef<HTMLInputElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const isComposing = React.useRef(false)
   const { reportNavigation, selectedArtifact } = useArtifact()
   const { toast } = useToast()
 
@@ -341,6 +341,9 @@ export function ChatInputArea({
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.nativeEvent.isComposing || isComposing.current) {
+      return
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       if (!isUploading) {
@@ -402,9 +405,39 @@ export function ChatInputArea({
           </div>
       )}
 
+      {/* Mode Indicators */}
+      {(fastPath) && (
+          <div className="flex justify-center pt-2">
+            {fastPath === 'analyze_video' && (
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                Analyze Video Mode
+              </div>
+            )}
+            {fastPath === 'helpcenter' && (
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                Help Center Mode
+              </div>
+            )}
+            {fastPath === 'extract_video_script' && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
+                Extract Video Script Mode
+              </div>
+            )}
+            {fastPath === 'analyze_audio' && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
+                Analyze Audio Mode
+              </div>
+            )}
+          </div>
+      )}
+
       {/* Image & Document Preview */}
       {(selectedImages.length > 0 || selectedDocuments.length > 0) && (
-          <div className="absolute -top-24 left-0 right-0 flex gap-2 p-2 overflow-x-auto justify-center z-10">
+          <div className="flex gap-2 px-4 pt-4 pb-2 overflow-x-auto">
               {/* Images */}
               {selectedImages.map((img, idx) => (
                   <div key={`img-${idx}`} className="relative group flex-shrink-0">
@@ -413,7 +446,7 @@ export function ChatInputArea({
                           src={img.url}
                           alt="Selected"
                           className={cn(
-                            "h-16 w-16 object-cover rounded-lg border border-border transition-opacity bg-white shadow-sm",
+                            "h-12 w-12 object-cover rounded-lg border border-border transition-opacity bg-white shadow-sm",
                             img.uploading ? "opacity-50" : "opacity-100",
                             img.error ? "border-red-500" : ""
                           )}
@@ -446,7 +479,7 @@ export function ChatInputArea({
                   return (
                       <div key={`doc-${idx}`} className="relative group flex-shrink-0">
                           <div className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-opacity min-w-[120px] bg-white shadow-sm h-16",
+                              "flex items-center gap-2 px-3 py-2 rounded-lg border transition-opacity min-w-[120px] bg-white shadow-sm h-12",
                               colorClass,
                               (doc.uploading || doc.processing) && "opacity-60"
                           )}>
@@ -481,6 +514,8 @@ export function ChatInputArea({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
+            onCompositionStart={() => { isComposing.current = true }}
+            onCompositionEnd={() => { isComposing.current = false }}
             placeholder={placeholder}
             disabled={disabled}
             className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 resize-none min-h-[40px] max-h-[300px] overflow-y-auto break-words overflow-wrap-anywhere"

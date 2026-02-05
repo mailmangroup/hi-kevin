@@ -137,7 +137,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
         {projectId ? (
           // Project page layout
           <div className="w-full">
-            <ChatInputArea
+              <ChatInputArea
                 input={input}
                 setInput={setInput}
                 onSend={handleSend}
@@ -153,6 +153,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setSelectedDocuments={setSelectedDocuments}
                 placeholder="Reply..."
                 disabled={isNavigating}
+                fastPath={fastPath}
               />
           </div>
         ) : (
@@ -161,36 +162,6 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
             <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
 
             <div className="w-full max-w-3xl relative">
-              {/* Mode Indicators */}
-              {(fastPath) && (
-                <div className="mb-3 flex gap-2">
-                  {fastPath === 'analyze_video' && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                      Analyze Video Mode
-                    </div>
-                  )}
-                  {fastPath === 'helpcenter' && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                      Help Center Mode
-                    </div>
-                  )}
-                  {fastPath === 'extract_video_script' && (
-                     <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
-                      Extract Video Script Mode
-                    </div>
-                  )}
-                  {fastPath === 'analyze_audio' && (
-                     <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-xs font-medium text-orange-700">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                      Analyze Audio Mode
-                    </div>
-                  )}
-                </div>
-              )}
-
               <ChatInputArea
                 input={input}
                 setInput={setInput}
@@ -207,6 +178,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setSelectedDocuments={setSelectedDocuments}
                 placeholder=""
                 disabled={isNavigating}
+                fastPath={fastPath}
               />
             </div>
 

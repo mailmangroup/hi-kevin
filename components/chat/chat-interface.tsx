@@ -970,36 +970,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             </div>
           )}
 
-          {/* Mode Indicators */}
-          {(fastPath) && (
-            <div className="mb-3 flex gap-2">
-              {fastPath === 'analyze_video' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                  Analyze Video Mode
-                </div>
-              )}
-              {fastPath === 'helpcenter' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                  Help Center Mode
-                </div>
-              )}
-              {fastPath === 'extract_video_script' && (
-                 <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
-                  Extract Video Script Mode
-                </div>
-              )}
-              {fastPath === 'analyze_audio' && (
-                 <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                  Analyze Audio Mode
-                </div>
-              )}
-            </div>
-          )}
-
           <ChatInputArea
             input={input}
             setInput={setInput}
@@ -1020,6 +990,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             disabled={credentialsLoading || !!credentialsError || isThinking}
             isThinking={isThinking}
             showBorder={true}
+            fastPath={fastPath}
           />
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.
