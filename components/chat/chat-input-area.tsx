@@ -68,6 +68,7 @@ export interface ChatInputAreaProps {
   isThinking?: boolean
   showBorder?: boolean
   fastPath?: string | null
+  setFastPath?: (value: string | undefined) => void
 }
 
 import { useArtifact } from "./artifact-context"
@@ -94,7 +95,8 @@ export function ChatInputArea({
   disabled = false,
   isThinking = false,
   showBorder = true,
-  fastPath
+  fastPath,
+  setFastPath
 }: ChatInputAreaProps) {
   const imageInputRef = React.useRef<HTMLInputElement>(null)
   const documentInputRef = React.useRef<HTMLInputElement>(null)
@@ -409,27 +411,43 @@ export function ChatInputArea({
       {(fastPath) && (
           <div className="flex justify-start px-4 pt-2">
             {fastPath === 'analyze_video' && (
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+              <div 
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                onClick={() => setFastPath?.(undefined)}
+              >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                 Analyze Video Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
             {fastPath === 'helpcenter' && (
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300">
+              <div 
+                className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                onClick={() => setFastPath?.(undefined)}
+              >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
                 Help Center Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
             {fastPath === 'extract_video_script' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300">
+                <div 
+                  className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                  onClick={() => setFastPath?.(undefined)}
+                >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
                 Extract Video Script Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
             {fastPath === 'analyze_audio' && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
+                <div 
+                  className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
+                  onClick={() => setFastPath?.(undefined)}
+                >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
                 Analyze Audio Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
           </div>

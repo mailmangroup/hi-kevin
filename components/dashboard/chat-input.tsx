@@ -154,6 +154,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 placeholder="Reply..."
                 disabled={isNavigating}
                 fastPath={fastPath}
+                setFastPath={(val) => setFastPath(val ?? null)}
               />
           </div>
         ) : (
@@ -179,6 +180,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 placeholder=""
                 disabled={isNavigating}
                 fastPath={fastPath}
+                setFastPath={(val) => setFastPath(val ?? null)}
               />
             </div>
 

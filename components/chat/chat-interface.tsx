@@ -1015,6 +1015,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             isThinking={isThinking}
             showBorder={true}
             fastPath={fastPath}
+            setFastPath={setFastPath}
           />
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.
