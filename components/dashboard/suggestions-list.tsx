@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Circle } from "lucide-react"
+import { ArrowRight, Circle, Sparkles } from "lucide-react"
 import Link from "next/link"
 import type { Suggestion } from "@/types"
 import { formatRelativeTime } from "@/lib/utils/date"
@@ -31,7 +31,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
       <Card className="glass-premium border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-xl">🤖</span>
+            <Sparkles className="w-5 h-5 text-primary" />
             Kevin&apos;s Suggestions
             <BetaBadge />
           </CardTitle>
@@ -53,7 +53,7 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-xl">🤖</span>
+              <Sparkles className="w-5 h-5 text-primary" />
               Kevin&apos;s Suggestions
               <BetaBadge />
             </CardTitle>
