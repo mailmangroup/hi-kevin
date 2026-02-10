@@ -127,6 +127,10 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     setFastPath("analyze_audio")
   }
 
+  const handleQueryDatabase = () => {
+    setFastPath("query_database")
+  }
+
   const handleCreateReport = () => {
     setIsReportDialogOpen(true)
   }
@@ -213,6 +217,13 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                   onClick={handleGetHelp}
                 >
                   Get Help
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                  onClick={handleQueryDatabase}
+                >
+                  Query Database
                 </Button>
                 <Button
                   variant="outline"

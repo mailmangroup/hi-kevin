@@ -441,12 +441,22 @@ export function ChatInputArea({
               </div>
             )}
             {fastPath === 'analyze_audio' && (
-                <div 
+                <div
                   className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
                   onClick={() => setFastPath?.(undefined)}
                 >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
                 Analyze Audio Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
+              </div>
+            )}
+            {fastPath === 'query_database' && (
+                <div
+                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                  onClick={() => setFastPath?.(undefined)}
+                >
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                Query Database Mode
                 <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
