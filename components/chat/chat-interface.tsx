@@ -131,7 +131,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   // Chat options
   const [thinkingEnabled, setThinkingEnabled] = React.useState(() => {
     const param = searchParams?.get('thinking')
-    return param === 'true'
+    return param === 'false' ? false : true
   })
   const [includeWebSearch, setIncludeWebSearch] = React.useState(() => {
     const param = searchParams?.get('search')

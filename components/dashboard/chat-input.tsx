@@ -17,7 +17,7 @@ interface ChatInputProps {
 
 export function ChatInput({ projectId, projectName, hideActions = false }: ChatInputProps = {}) {
   const [input, setInput] = useState("")
-  const [thinkingEnabled, setThinkingEnabled] = useState(false)
+  const [thinkingEnabled, setThinkingEnabled] = useState(true)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
   const [model, setModel] = useState("qwen-max")
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
