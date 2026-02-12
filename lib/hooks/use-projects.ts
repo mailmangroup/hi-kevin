@@ -94,3 +94,10 @@ export function useProjectMemory(projectId: string) {
     enabled: !!projectId,
   })
 }
+
+export function useGlobalMemory() {
+  return useQuery({
+    queryKey: ['global-memory'],
+    queryFn: () => aiService.getGlobalMemory(),
+  })
+}

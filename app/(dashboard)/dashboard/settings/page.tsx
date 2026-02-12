@@ -1,18 +1,29 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ComponentType } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Save, Bell, Globe, User, Key, CheckCircle, Loader2 } from "lucide-react"
+import { Save, Bell, Globe, User, Key, CheckCircle, Loader2, Brain } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { useUserStore } from "@/lib/store/user-store"
 import { directApiCall } from "@/lib/api/client"
+import { cn } from "@/lib/utils/cn"
+import { UserMemorySection } from "@/components/settings/user-memory-section"
+
+type SettingsPageKey = 'general' | 'connection' | 'memory'
+
+const SETTINGS_PAGES: { key: SettingsPageKey; label: string; icon: ComponentType<{ className?: string }> }[] = [
+  { key: 'general', label: 'General', icon: User },
+  { key: 'connection', label: 'Connection', icon: Key },
+  { key: 'memory', label: 'Memory', icon: Brain },
+]
 
 export default function SettingsPage() {
   const { toast } = useToast()
+  const [activePage, setActivePage] = useState<SettingsPageKey>('general')
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null)
@@ -25,16 +36,15 @@ export default function SettingsPage() {
     kawo_api_url: ''
   })
   const [error, setError] = useState<string | null>(null)
-  
-  const { profile: storeProfile, fetchProfile, setProfile: setStoreProfile } = useUserStore()
+
+  const { profile: storeProfile, setProfile: setStoreProfile } = useUserStore()
 
   useEffect(() => {
-    // If we have profile in store, use it immediately
     if (storeProfile) {
       setProfile(prev => ({
         ...prev,
         full_name: storeProfile.full_name || '',
-        email: storeProfile.email || prev.email, // Preserve email if we have it locally, otherwise use store
+        email: storeProfile.email || prev.email,
       }))
     }
   }, [storeProfile])
@@ -43,15 +53,11 @@ export default function SettingsPage() {
     async function loadProfile() {
       try {
         const supabase = createClient()
-        // Use getSession instead of getUser to avoid unnecessary network calls
         const { data: { session } } = await supabase.auth.getSession()
         const user = session?.user
-        
+
         if (!user) return
 
-        // If we have store profile, we might still want to fetch full details (tokens etc) that are not in store
-        // But for full_name we can rely on store.
-        
         const { data, error } = await supabase
           .from('profiles')
           .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
@@ -73,14 +79,12 @@ export default function SettingsPage() {
             kawo_brand_id: data.kawo_brand_id || '',
             kawo_api_url: data.kawo_api_url || ''
           })
-          
-          // Update store with latest data
+
           setStoreProfile({
             full_name: data.full_name,
             email: data.email || user.email || null
           })
-        } else if (user) {
-          // If no profile exists yet, initialize with user email
+        } else {
           setProfile({
             full_name: '',
             email: user.email || '',
@@ -95,15 +99,16 @@ export default function SettingsPage() {
         setError('An unexpected error occurred.')
       }
     }
+
     loadProfile()
-  }, [])
+  }, [setStoreProfile])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile(prev => ({
       ...prev,
       [e.target.id]: e.target.value
     }))
-    // Reset connection status on change since credentials might be invalid now
+
     if (connectionStatus) setConnectionStatus(null)
   }
 
@@ -115,7 +120,7 @@ export default function SettingsPage() {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         setError('You must be logged in to save settings.')
         setLoading(false)
@@ -145,12 +150,10 @@ export default function SettingsPage() {
         type: "success"
       })
 
-      // Update global store
       setStoreProfile({
         full_name: profile.full_name,
         email: profile.email || null
       })
-
     } catch (e: any) {
       console.error('Save error:', e)
       setError(e.message || 'Failed to save settings')
@@ -165,23 +168,12 @@ export default function SettingsPage() {
   }
 
   const handleTestConnection = async () => {
-    // Save first if needed? For now, we assume user saved.
-    // Actually, users might expect "Test" to test current inputs. 
-    // But our proxy reads from DB. So we MUST save first or warn user.
-    // Let's autosave before testing or warn. 
-    // For simplicity, we'll just check if current inputs match DB (complex).
-    // Let's just run the test. If it fails, maybe it's because they didn't save.
-    // Better: Prompt to save if dirty? Too complex for now.
-    // We will just run the test against the proxy, which uses DB credentials.
-    
     setTesting(true)
     setConnectionStatus(null)
-    
+
     try {
-      // We use direct API call to check connection
-      // /users/current or /users/me
       await directApiCall('users/current')
-      
+
       setConnectionStatus('success')
       toast({
         title: "Connection successful",
@@ -211,71 +203,180 @@ export default function SettingsPage() {
       </div>
 
       {error && (
-        <ErrorBanner 
-          message={error} 
+        <ErrorBanner
+          message={error}
           onClose={() => setError(null)}
           className="mb-6"
         />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Settings */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Profile & KAWO Integration */}
-          <Card className="p-6 border-primary/20 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-primary/10 rounded-full">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">Profile & KAWO Integration</h2>
-                <p className="text-sm text-muted-foreground">Manage your profile and configure your connection to KAWO platform</p>
-              </div>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Profile Section */}
-              <div className="space-y-4 pb-6 border-b border-border">
-                <div className="flex items-center gap-2 mb-4">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium">Profile Information</h3>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
+        <Card className="p-3 h-fit lg:sticky lg:top-6">
+          <nav className="space-y-1">
+            {SETTINGS_PAGES.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActivePage(item.key)}
+                  className={cn(
+                    "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors flex items-center gap-2",
+                    activePage === item.key
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              )
+            })}
+          </nav>
+        </Card>
+
+        <div className="space-y-6">
+          {activePage === 'general' && (
+            <>
+              <Card className="p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">Profile</h2>
+                    <p className="text-sm text-muted-foreground">Basic account information</p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="full_name" className="text-sm font-medium text-foreground">
-                    Full Name
-                  </label>
-                  <Input
-                    id="full_name"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={profile.full_name}
-                    onChange={handleChange}
-                  />
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="full_name" className="text-sm font-medium text-foreground">
+                      Full Name
+                    </label>
+                    <Input
+                      id="full_name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={profile.full_name}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="text-sm font-medium text-foreground">
+                      Email
+                    </label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={profile.email}
+                      onChange={handleChange}
+                    />
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium text-foreground">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={profile.email}
-                    onChange={handleChange}
-                  />
+
+                <div>
+                  <Button onClick={handleSave} disabled={loading} className="gap-2">
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Profile
+                  </Button>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Globe className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Preferences</h2>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="language" className="text-sm font-medium text-foreground">
+                      Language
+                    </label>
+                    <select
+                      id="language"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      defaultValue="en"
+                    >
+                      <option value="en">English</option>
+                      <option value="zh">中文</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="timezone" className="text-sm font-medium text-foreground">
+                      Timezone
+                    </label>
+                    <select
+                      id="timezone"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      defaultValue="utc"
+                    >
+                      <option value="utc">UTC</option>
+                      <option value="pst">PST (UTC-8)</option>
+                      <option value="est">EST (UTC-5)</option>
+                      <option value="cst">CST (UTC+8)</option>
+                    </select>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Bell className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Notifications</h2>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-2">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium text-foreground">
+                        Email Notifications
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        Receive email updates about your account activity
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="border-t border-border" />
+                  <div className="flex items-center justify-between py-2">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium text-foreground">
+                        Campaign Alerts
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        Get notified when campaigns are launched or completed
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {activePage === 'connection' && (
+            <Card className="p-6 border-primary/20 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <Key className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">KAWO Connection</h2>
+                  <p className="text-sm text-muted-foreground">Configure your API credentials for KAWO integration</p>
                 </div>
               </div>
 
-              {/* KAWO Integration Section */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Key className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium">KAWO Credentials</h3>
-                </div>
-                
                 <div className="space-y-2">
                   <label htmlFor="kawo_token" className="text-sm font-medium text-foreground">
                     KAWO User Token
@@ -291,7 +392,7 @@ export default function SettingsPage() {
                     Found in your KAWO user settings under API Access
                   </p>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="kawo_org_id" className="text-sm font-medium text-foreground">
@@ -305,7 +406,7 @@ export default function SettingsPage() {
                       onChange={handleChange}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <label htmlFor="kawo_brand_id" className="text-sm font-medium text-foreground">
                       Brand ID
@@ -337,15 +438,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-6">
                 <Button onClick={handleSave} disabled={loading} className="gap-2">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save Changes
+                  Save Connection
                 </Button>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={handleTestConnection} 
+
+                <Button
+                  variant="outline"
+                  onClick={handleTestConnection}
                   disabled={testing || loading}
                   className={connectionStatus === 'success' ? "border-green-500 text-green-600 hover:text-green-700 hover:bg-green-50" : ""}
                 >
@@ -359,97 +460,16 @@ export default function SettingsPage() {
                   {testing ? 'Testing...' : connectionStatus === 'success' ? 'Connected' : 'Test Connection'}
                 </Button>
               </div>
-              
+
               {connectionStatus === 'error' && (
-                <p className="text-sm text-destructive mt-2">
+                <p className="text-sm text-destructive mt-3">
                   Connection failed. Please check your credentials and try again. Ensure you save changes before testing.
                 </p>
               )}
-            </div>
-          </Card>
+            </Card>
+          )}
 
-          {/* Notifications */}
-          <Card className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Bell className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Notifications</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-2">
-                <div className="space-y-0.5">
-                  <label className="text-sm font-medium text-foreground">
-                    Email Notifications
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive email updates about your account activity
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              {/* Other notifications... simplified for brevity if needed, but keeping user's structure */}
-              <div className="border-t border-border" />
-              <div className="flex items-center justify-between py-2">
-                <div className="space-y-0.5">
-                  <label className="text-sm font-medium text-foreground">
-                    Campaign Alerts
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when campaigns are launched or completed
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-primary"
-                />
-              </div>
-            </div>
-          </Card>
-
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Globe className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Preferences</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="language" className="text-sm font-medium text-foreground">
-                  Language
-                </label>
-                <select
-                  id="language"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  defaultValue="en"
-                >
-                  <option value="en">English</option>
-                  <option value="zh">中文</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="timezone" className="text-sm font-medium text-foreground">
-                  Timezone
-                </label>
-                <select
-                  id="timezone"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  defaultValue="utc"
-                >
-                  <option value="utc">UTC</option>
-                  <option value="pst">PST (UTC-8)</option>
-                  <option value="est">EST (UTC-5)</option>
-                  <option value="cst">CST (UTC+8)</option>
-                </select>
-              </div>
-            </div>
-          </Card>
+          {activePage === 'memory' && <UserMemorySection />}
         </div>
       </div>
     </div>
