@@ -7,6 +7,7 @@ import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/cha
 import { ArtifactProvider } from "@/components/chat/artifact-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { ReportParametersDialog } from "@/components/analytics/report-parameters-dialog"
+import { CommandCenterDialog } from "@/components/dashboard/command-center-dialog"
 
 interface ChatInputProps {
   projectId?: string
@@ -23,6 +24,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [isCommandCenterDialogOpen, setIsCommandCenterDialogOpen] = useState(false)
   const [fastPath, setFastPath] = useState<string | null>(null)
   const [isNavigating, setIsNavigating] = useState(false)
   const router = useRouter()
@@ -135,6 +137,10 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     setIsReportDialogOpen(true)
   }
 
+  const handleCommandCenter = () => {
+    setIsCommandCenterDialogOpen(true)
+  }
+
   return (
     <ArtifactProvider>
       <div className={projectId ? "" : "flex flex-col items-center justify-center space-y-6 py-8 h-full min-h-[calc(100vh-16rem)]"}>
@@ -232,6 +238,13 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 >
                   Create Report
                 </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:border-indigo-200 transition-all"
+                  onClick={handleCommandCenter}
+                >
+                  Command Center
+                </Button>
               </div>
             )}
           </>
@@ -239,10 +252,16 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
       </div>
 
       {!projectId && (
-        <ReportParametersDialog
-          open={isReportDialogOpen}
-          onOpenChange={setIsReportDialogOpen}
-        />
+        <>
+          <ReportParametersDialog
+            open={isReportDialogOpen}
+            onOpenChange={setIsReportDialogOpen}
+          />
+          <CommandCenterDialog
+            open={isCommandCenterDialogOpen}
+            onOpenChange={setIsCommandCenterDialogOpen}
+          />
+        </>
       )}
     </ArtifactProvider>
   )

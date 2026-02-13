@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -69,6 +69,7 @@ export interface ChatInputAreaProps {
   showBorder?: boolean
   fastPath?: string | null
   setFastPath?: (value: string | undefined) => void
+  onGenerateArtifact?: () => Promise<void>
 }
 
 import { useArtifact } from "./artifact-context"
@@ -96,13 +97,15 @@ export function ChatInputArea({
   isThinking = false,
   showBorder = true,
   fastPath,
-  setFastPath
+  setFastPath,
+  onGenerateArtifact
 }: ChatInputAreaProps) {
+  const [isGeneratingArtifact, setIsGeneratingArtifact] = React.useState(false)
   const imageInputRef = React.useRef<HTMLInputElement>(null)
   const documentInputRef = React.useRef<HTMLInputElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const isComposing = React.useRef(false)
-  const { reportNavigation, selectedArtifact } = useArtifact()
+  const { reportNavigation, selectedArtifact, openArtifact } = useArtifact()
   const { toast } = useToast()
 
   // Auto-resize textarea
@@ -339,6 +342,18 @@ export function ChatInputArea({
   const removeDocument = (index: number) => {
     if (setSelectedDocuments) {
       setSelectedDocuments(prev => prev.filter((_, i) => i !== index))
+    }
+  }
+
+  const handleGenerateArtifact = async () => {
+    if (onGenerateArtifact) {
+      // Use the callback from parent (ChatInterface)
+      setIsGeneratingArtifact(true)
+      try {
+        await onGenerateArtifact()
+      } finally {
+        setIsGeneratingArtifact(false)
+      }
     }
   }
 
@@ -584,6 +599,32 @@ export function ChatInputArea({
                 <Globe className="h-3.5 w-3.5 mr-1.5" />
                 Search
             </Button>
+
+            {/* Generate Artifact Button - Only visible in command_center mode */}
+            {fastPath === "command_center" && (
+                <Button
+                    variant="secondary"
+                    onClick={handleGenerateArtifact}
+                    className={cn(
+                        "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                        "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 border-indigo-200 hover:from-indigo-100 hover:to-purple-100"
+                    )}
+                    disabled={disabled || isGeneratingArtifact || !onGenerateArtifact}
+                    title="Generate a visualization or dashboard based on the last assistant response"
+                >
+                    {isGeneratingArtifact ? (
+                        <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Generating...
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Generate Artifact
+                        </>
+                    )}
+                </Button>
+            )}
 
             {/* Model Selection */}
             <Select value={model} onValueChange={setModel} disabled={disabled}>

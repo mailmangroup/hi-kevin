@@ -836,4 +836,93 @@ export const aiService = {
       method: 'DELETE'
     })
   },
+
+  // =========================================================================
+  // Canvas / Simple Agent
+  // =========================================================================
+
+  /**
+   * Generate Canvas content (HTML, code, visualizations)
+   * Uses the simple agent with Canvas flag for on-demand generation
+   */
+  async generateCanvas(
+    query: string,
+    options: {
+      orgId?: string
+      brandId?: string
+    }
+  ): Promise<{
+    response: string
+    artifacts?: Array<{
+      type: 'html' | 'markdown' | 'code' | 'mermaid'
+      content: string
+      language?: string
+    }>
+  }> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+      return {
+        response: 'Here is your visualization:',
+        artifacts: [{
+          type: 'html',
+          content: '<div class="p-8"><h1>Mock Dashboard</h1><p>This is a mock canvas artifact.</p></div>'
+        }]
+      }
+    }
+
+    const config = getKawoConfig()
+    if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+      throw new Error('KAWO credentials not configured. Please complete setup.')
+    }
+
+    const payload = {
+      query,
+      flag: { CANVAS: true },
+      org_id: options.orgId || config.orgId,
+      brand_id: options.brandId || config.brandId
+    }
+
+    return directApiCall('agent/simple/query', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  },
+
+  /**
+   * Generate Command Center analysis
+   * Uses command_center fast path for specialized workflows
+   */
+  async generateCommandCenterAnalysis(
+    query: string,
+    options: {
+      orgId?: string
+      brandId?: string
+    }
+  ): Promise<{
+    response: string
+    artifacts?: any[]
+  }> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+      return {
+        response: 'Here is your Command Center analysis:',
+        artifacts: []
+      }
+    }
+
+    const config = getKawoConfig()
+    if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+      throw new Error('KAWO credentials not configured. Please complete setup.')
+    }
+
+    const payload = {
+      query,
+      fast_path: 'command_center',
+      org_id: options.orgId || config.orgId,
+      brand_id: options.brandId || config.brandId
+    }
+
+    return directApiCall('agent/query', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  },
 }

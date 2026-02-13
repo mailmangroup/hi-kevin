@@ -365,6 +365,78 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     setIsThinking(false)
   }
 
+  const handleGenerateArtifact = async () => {
+    // Get the last assistant message (treated as generated insights)
+    const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop()
+
+    if (!lastAssistantMessage?.content) {
+      console.error("No assistant message found to generate artifact from")
+      return
+    }
+
+    const insightsPrompt = `Based on the following insights, generate a canvas to visualize them in HTML.
+
+<insights>
+${lastAssistantMessage.content}
+</insights>
+
+Create a clear, self-contained HTML visualization (with inline CSS) that best represents these insights. Include data where appropriate.`
+
+    try {
+      const result = await aiService.generateCanvas(insightsPrompt, {
+        orgId: credentials.orgId,
+        brandId: credentials.brandId
+      })
+
+      // Create a new assistant message with the artifact
+      if (result.artifacts && result.artifacts.length > 0) {
+        const artifact = result.artifacts[0]
+
+        // Add as a new message in the chat
+        const artifactMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: result.response || 'Here is your visualization:',
+          timestamp: new Date(),
+          toolCalls: [{
+            id: `artifact-${Date.now()}`,
+            name: 'generate_artifact',
+            input: { query: lastAssistantMessage.content.substring(0, 100) },
+            output: artifact.content,
+            state: 'completed',
+            artifact: {
+              type: artifact.type,
+              data: artifact.content,
+              title: 'Generated Artifact'
+            }
+          }]
+        }
+
+        setMessages(prev => [...prev, artifactMessage])
+
+        // Also open in artifact panel
+        openArtifact({
+          id: `artifact-${Date.now()}`,
+          type: artifact.type as any,
+          data: artifact.content,
+          title: 'Generated Artifact',
+          timestamp: new Date()
+        })
+      }
+    } catch (error: any) {
+      console.error("Failed to generate artifact:", error)
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Failed to generate artifact: ${error.message || 'Unknown error'}`,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    }
+  }
+
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
     if ((!text.trim() && images.length === 0 && documents.length === 0) || isThinking) return
 
@@ -1004,6 +1076,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             showBorder={true}
             fastPath={fastPath}
             setFastPath={setFastPath}
+            onGenerateArtifact={handleGenerateArtifact}
           />
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.
