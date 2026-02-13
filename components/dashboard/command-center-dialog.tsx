@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils/cn"
 interface CommandCenterDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  model?: string
+  thinkingEnabled?: boolean
 }
 
 const WORKFLOWS = [
@@ -54,7 +56,9 @@ const WORKFLOWS = [
 
 export function CommandCenterDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  model = "qwen-max",
+  thinkingEnabled = true
 }: CommandCenterDialogProps) {
   const router = useRouter()
   const [isStarting, setIsStarting] = React.useState(false)
@@ -66,7 +70,9 @@ export function CommandCenterDialog({
     // Backend will replace "start" with actual workflow instructions
     const searchParams = new URLSearchParams({
       q: "start",
-      fastPath: "command_center"
+      fastPath: "command_center",
+      model,
+      thinking: thinkingEnabled.toString()
     })
 
     router.push(`/chat/new?${searchParams.toString()}`)

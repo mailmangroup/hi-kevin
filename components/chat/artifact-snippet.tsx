@@ -11,6 +11,9 @@ const ARTIFACT_ICONS = {
   table: Table2,
   report: FileText,
   data: FileText,
+  html: FileText,
+  markdown: FileText,
+  mermaid: Code,
 }
 
 const ARTIFACT_COLORS = {
@@ -49,6 +52,27 @@ const ARTIFACT_COLORS = {
     text: "text-gray-900",
     subtext: "text-gray-600",
   },
+  html: {
+    bg: "bg-amber-50 hover:bg-amber-100",
+    border: "border-amber-200 hover:border-amber-300",
+    icon: "text-amber-600",
+    text: "text-amber-900",
+    subtext: "text-amber-600",
+  },
+  markdown: {
+    bg: "bg-slate-50 hover:bg-slate-100",
+    border: "border-slate-200 hover:border-slate-300",
+    icon: "text-slate-600",
+    text: "text-slate-900",
+    subtext: "text-slate-600",
+  },
+  mermaid: {
+    bg: "bg-cyan-50 hover:bg-cyan-100",
+    border: "border-cyan-200 hover:border-cyan-300",
+    icon: "text-cyan-600",
+    text: "text-cyan-900",
+    subtext: "text-cyan-600",
+  },
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -58,6 +82,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   web_search: "Web Search Results",
   analyze_competitors: "Competitor Analysis",
   generate_content: "Generated Content",
+  generate_artifact: "Generated Artifact",
   schedule_post: "Scheduled Post",
   get_audience_data: "Audience Data",
 }
@@ -81,6 +106,9 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
     return `${toolName || "artifact"}-${JSON.stringify(artifact).slice(0, 50)}`
   }, [artifact, toolName])
 
+  // Normalize data: backend sends content, frontend often uses data
+  const artifactData = artifact?.data ?? artifact?.content ?? artifact
+
   // Extract title and description
   const title = artifact?.title ||
     (toolName ? TOOL_DISPLAY_NAMES[toolName] : null) ||
@@ -92,15 +120,14 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
   const isSelected = isPanelOpen && selectedArtifact?.id === artifactId
 
   const handleClick = () => {
-    const artifactData: ArtifactData = {
+    openArtifact({
       id: artifactId,
       type: artifactType,
       title,
-      data: artifact.data || artifact,
+      data: artifactData,
       toolName,
       session: artifact.session,
-    }
-    openArtifact(artifactData)
+    })
   }
 
   return (
@@ -143,9 +170,12 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
 }
 
 // Helper to determine artifact type from data or tool name
-function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" {
-  // Check if artifact has explicit type
-  if (artifact?.type) {
+function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
+  // Backend create_artifact sends { type: "artifact", artifact_type: "html"|"markdown"|"code"|"mermaid" }
+  if (artifact?.type === "artifact" && artifact?.artifact_type) {
+    return artifact.artifact_type
+  }
+  if (artifact?.type && artifact.type !== "artifact") {
     return artifact.type
   }
 
@@ -185,6 +215,9 @@ function getDefaultTitle(type: string): string {
     table: "Table",
     report: "Report",
     data: "Data",
+    html: "HTML",
+    markdown: "Markdown",
+    mermaid: "Diagram",
   }
   return titles[type] || "Artifact"
 }

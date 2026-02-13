@@ -4,7 +4,7 @@ import * as React from "react"
 
 export interface ArtifactData {
   id: string
-  type: "chart" | "code" | "table" | "report" | "data"
+  type: "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid"
   title?: string
   data: any
   toolName?: string

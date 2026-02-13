@@ -391,6 +391,8 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
       // Create a new assistant message with the artifact
       if (result.artifacts && result.artifacts.length > 0) {
         const artifact = result.artifacts[0]
+        const artifactDisplayType = artifact.artifact_type || artifact.type
+        const artifactContent = artifact.content ?? artifact.data
 
         // Add as a new message in the chat
         const artifactMessage: Message = {
@@ -402,12 +404,13 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
             id: `artifact-${Date.now()}`,
             name: 'generate_artifact',
             input: { query: lastAssistantMessage.content.substring(0, 100) },
-            output: artifact.content,
+            output: artifactContent,
             state: 'completed',
             artifact: {
-              type: artifact.type,
-              data: artifact.content,
-              title: 'Generated Artifact'
+              type: artifactDisplayType,
+              artifact_type: artifact.artifact_type,
+              data: artifactContent,
+              title: artifact.title || 'Generated Artifact'
             }
           }]
         }
@@ -417,10 +420,9 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
         // Also open in artifact panel
         openArtifact({
           id: `artifact-${Date.now()}`,
-          type: artifact.type as any,
-          data: artifact.content,
-          title: 'Generated Artifact',
-          timestamp: new Date()
+          type: artifactDisplayType as any,
+          data: artifactContent,
+          title: artifact.title || 'Generated Artifact'
         })
       }
     } catch (error: any) {
@@ -712,7 +714,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
                   id: `${toolName}-${Date.now()}`,
                   type: determineArtifactType(toolArtifact, toolName),
                   title: toolArtifact.title || getToolDisplayName(toolName),
-                  data: toolArtifact.data || toolArtifact,
+                  data: toolArtifact.content ?? toolArtifact.data ?? toolArtifact,
                   toolName,
                   session: toolArtifact.session,
                 }
@@ -1092,8 +1094,11 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
 }
 
 // Helper functions for artifact type detection
-function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" {
-  if (artifact?.type) {
+function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
+  if (artifact?.type === "artifact" && artifact?.artifact_type) {
+    return artifact.artifact_type
+  }
+  if (artifact?.type && artifact.type !== "artifact") {
     return artifact.type
   }
   if (toolName) {

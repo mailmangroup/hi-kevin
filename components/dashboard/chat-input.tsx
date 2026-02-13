@@ -260,6 +260,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
           <CommandCenterDialog
             open={isCommandCenterDialogOpen}
             onOpenChange={setIsCommandCenterDialogOpen}
+            model={model}
+            thinkingEnabled={thinkingEnabled}
           />
         </>
       )}

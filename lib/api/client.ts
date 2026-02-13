@@ -854,8 +854,11 @@ export const aiService = {
   ): Promise<{
     response: string
     artifacts?: Array<{
-      type: 'html' | 'markdown' | 'code' | 'mermaid'
+      type?: string
+      artifact_type?: 'html' | 'markdown' | 'code' | 'mermaid'
+      title?: string
       content: string
+      data?: string
       language?: string
     }>
   }> {

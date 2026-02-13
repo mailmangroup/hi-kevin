@@ -35,6 +35,9 @@ const ARTIFACT_ICONS = {
   table: Table2,
   report: FileText,
   data: FileText,
+  html: FileText,
+  markdown: FileText,
+  mermaid: Code,
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -307,6 +310,12 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
     return <HelpCenterArtifact data={data} />
   }
 
+  // Rule-based fallback: if data is a string that looks like HTML, render as HTML
+  const rawData = artifact.data
+  if (typeof rawData === "string" && looksLikeHtml(rawData) && artifact.type !== "code" && artifact.type !== "markdown") {
+    return <HtmlContent data={rawData} />
+  }
+
   switch (artifact.type) {
     case "chart":
       return <ChartContent data={artifact.data} />
@@ -316,6 +325,12 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
       return <TableContent data={artifact.data} />
     case "report":
       return <ReportContent data={artifact.data} />
+    case "html":
+      return <HtmlContent data={artifact.data} />
+    case "markdown":
+      return <MarkdownContent data={artifact.data} />
+    case "mermaid":
+      return <MermaidContent data={artifact.data} />
     default:
       return <DataContent data={artifact.data} />
   }
@@ -348,6 +363,50 @@ function CodeContent({ data }: { data: any }) {
       </pre>
     </div>
   )
+}
+
+/** Rule-based detection: string looks like HTML (for fallback when artifact_type is missing). */
+function looksLikeHtml(s: string): boolean {
+  if (typeof s !== "string" || !s.trim()) return false
+  const trimmed = s.trim()
+  if (/^\s*<!DOCTYPE\s+/i.test(trimmed)) return true
+  if (/^\s*<html[\s>]/i.test(trimmed)) return true
+  if (/^\s*<head[\s>]/i.test(trimmed)) return true
+  if (/^\s*<body[\s>]/i.test(trimmed)) return true
+  if (/^\s*<div[\s>]/i.test(trimmed) && trimmed.includes("</")) return true
+  if (/^\s*<[a-z][a-z0-9]*[\s>]/i.test(trimmed) && trimmed.includes("</")) return true
+  return false
+}
+
+function HtmlContent({ data }: { data: any }) {
+  const html = typeof data === "string" ? data : data?.content ?? data?.html ?? ""
+  if (!html) return <p className="text-sm text-gray-500">No HTML content</p>
+  return (
+    <div className="w-full min-h-[200px] rounded-lg border border-gray-200 overflow-hidden bg-white">
+      <iframe
+        title="HTML artifact"
+        srcDoc={html}
+        className="w-full min-h-[400px] border-0"
+        sandbox="allow-same-origin"
+      />
+    </div>
+  )
+}
+
+function MarkdownContent({ data }: { data: any }) {
+  const md = typeof data === "string" ? data : data?.content ?? data?.markdown ?? ""
+  if (!md) return <p className="text-sm text-gray-500">No markdown content</p>
+  return (
+    <div className="prose prose-sm max-w-none">
+      <MessageContent content={md} />
+    </div>
+  )
+}
+
+function MermaidContent({ data }: { data: any }) {
+  const code = typeof data === "string" ? data : data?.content ?? data?.code ?? ""
+  if (!code) return <p className="text-sm text-gray-500">No diagram content</p>
+  return <CodeContent data={code} />
 }
 
 function TableContent({ data }: { data: any }) {
@@ -980,6 +1039,9 @@ function ReportChart({ data }: { data: any }) {
 
 function DataContent({ data }: { data: any }) {
   if (typeof data === "string") {
+    if (looksLikeHtml(data)) {
+      return <HtmlContent data={data} />
+    }
     if (data.includes("**") || data.includes("##") || data.includes("- ") || data.includes("|") || data.includes("```")) {
       return (
         <div className="prose prose-sm max-w-none">
@@ -1026,6 +1088,9 @@ function getDefaultTitle(type: string): string {
     table: "Table",
     report: "Report",
     data: "Data",
+    html: "HTML",
+    markdown: "Markdown",
+    mermaid: "Diagram",
   }
   return titles[type] || "Artifact"
 }
