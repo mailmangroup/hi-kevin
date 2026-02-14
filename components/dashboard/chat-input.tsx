@@ -20,6 +20,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [input, setInput] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(true)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
+  const [deepResearch, setDeepResearch] = useState(false)
   const [model, setModel] = useState("qwen-max")
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
@@ -89,6 +90,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
       q: input,
       thinking: thinkingEnabled.toString(),
       search: includeWebSearch.toString(),
+      deepResearch: deepResearch.toString(),
       model
     })
 
@@ -155,6 +157,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setThinkingEnabled={setThinkingEnabled}
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
+                deepResearch={deepResearch}
+                setDeepResearch={setDeepResearch}
                 model={model}
                 setModel={setModel}
                 selectedImages={selectedImages}
@@ -181,6 +185,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setThinkingEnabled={setThinkingEnabled}
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
+                deepResearch={deepResearch}
+                setDeepResearch={setDeepResearch}
                 model={model}
                 setModel={setModel}
                 selectedImages={selectedImages}

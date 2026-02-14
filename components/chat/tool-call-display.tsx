@@ -18,6 +18,8 @@ const TOOL_ICONS: Record<string, string> = {
   list_available_documents: "📂",
   retrieve_document: "📄",
   extract_post_analysis: "✨",
+  crawl_url: "🌐",
+  python_execute: "🐍",
   default: "⚡",
 }
 
@@ -33,6 +35,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   list_available_documents: "Checking Documents",
   retrieve_document: "Reading Document",
   extract_post_analysis: "Extracting Post Analysis",
+  crawl_url: "Crawling Web Page",
+  python_execute: "Running Python Code",
 }
 
 export interface ToolCall {

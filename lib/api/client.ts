@@ -323,7 +323,9 @@ export const aiService = {
             report_page_number?: number,
             report_section_indexes?: number[]
         },
-        fastPath?: string
+        fastPath?: string,
+        deepResearch?: boolean,
+        maxResearchSteps?: number
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -360,7 +362,9 @@ export const aiService = {
         document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate,
         report_context: options.reportContext,
-        fast_path: options.fastPath
+        fast_path: options.fastPath,
+        deep_research: options.deepResearch ?? false,
+        max_research_steps: options.maxResearchSteps ?? 5
     }
 
     const payloadString = JSON.stringify(payload)

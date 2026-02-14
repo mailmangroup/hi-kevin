@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Sparkles } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Sparkles, Microscope } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -55,6 +55,8 @@ export interface ChatInputAreaProps {
   setThinkingEnabled: (enabled: boolean) => void
   includeWebSearch: boolean
   setIncludeWebSearch: (enabled: boolean) => void
+  deepResearch: boolean
+  setDeepResearch: (enabled: boolean) => void
   model: string
   setModel: (model: string) => void
   selectedImages: UploadedImage[]
@@ -84,6 +86,8 @@ export function ChatInputArea({
   setThinkingEnabled,
   includeWebSearch,
   setIncludeWebSearch,
+  deepResearch,
+  setDeepResearch,
   model,
   setModel,
   selectedImages,
@@ -598,6 +602,20 @@ export function ChatInputArea({
             >
                 <Globe className="h-3.5 w-3.5 mr-1.5" />
                 Search
+            </Button>
+            <Button
+                variant={deepResearch ? "secondary" : "ghost"}
+                onClick={() => setDeepResearch(!deepResearch)}
+                className={cn(
+                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                deepResearch
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
+                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+                disabled={disabled}
+            >
+                <Microscope className="h-3.5 w-3.5 mr-1.5" />
+                Deep Research
             </Button>
 
             {/* Generate Artifact Button - Only visible in command_center mode */}

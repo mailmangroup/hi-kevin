@@ -137,6 +137,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     const param = searchParams?.get('search')
     return param === 'false' ? false : true
   })
+  const [deepResearch, setDeepResearch] = React.useState(() => {
+    const param = searchParams?.get('deepResearch')
+    return param === 'true' ? true : false
+  })
   const [model, setModel] = React.useState(() => {
     return searchParams?.get('model') || "qwen-max"
   })
@@ -567,6 +571,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
         brandId: credentials.brandId,
         thinkingEnabled,
         includeWebSearch,
+        deepResearch,
         model,
         images: validImages.map(img => img.key!), // Only send OSS keys
         documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
@@ -747,6 +752,71 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
                   data: reportData
               }
               openArtifact(reportArtifact)
+          }
+
+          // Deep Research events
+          if (chunk.research_plan) {
+              const planData = chunk.research_plan
+              const planText = `**Research Plan: ${planData.title || ""}**\n${(planData.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title} _(${s.type})_`).join("\n")}\n\n`
+              contentParts.push({ type: "text", content: planText })
+              // Reset text tracking so subsequent content creates a new part
+              lastPartWasText = false
+              lastPartWasThinking = false
+              currentTextContent = ""
+              fullContent += planText
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+                      : msg
+              ))
+          }
+
+          if (chunk.research_step_start) {
+              const stepData = chunk.research_step_start
+              // step_index -1 = planning, others are 0-indexed research steps
+              const label = stepData.step_index < 0
+                  ? stepData.title || "Planning..."
+                  : `Step ${stepData.step_index + 1}: ${stepData.title || "Researching..."}`
+              const stepText = `\n---\n**${label}**\n\n`
+              contentParts.push({ type: "text", content: stepText })
+              // Reset text tracking so subsequent content (e.g. reporter) creates a new part
+              lastPartWasText = false
+              lastPartWasThinking = false
+              currentTextContent = ""
+              fullContent += stepText
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+                      : msg
+              ))
+          }
+
+          if (chunk.research_step_complete) {
+              const completeData = chunk.research_step_complete
+              const doneText = `\n_${completeData.title || "Step completed"}_\n\n`
+              fullContent += doneText
+              // Append to the last text part if it is one, otherwise create new
+              if (lastPartWasText && contentParts.length > 0) {
+                  const lastPart = contentParts[contentParts.length - 1]
+                  if (lastPart.type === "text") {
+                      lastPart.content = (lastPart.content || "") + doneText
+                  }
+              } else {
+                  contentParts.push({ type: "text", content: doneText })
+              }
+              lastPartWasText = false
+              lastPartWasThinking = false
+              currentTextContent = ""
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+                      : msg
+              ))
+          }
+
+          if (chunk.research_report) {
+              // The report content was already streamed via content chunks from the reporter node.
+              // This event signals that the full report is ready — no additional rendering needed.
           }
 
 
@@ -1065,6 +1135,8 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
             setThinkingEnabled={setThinkingEnabled}
             includeWebSearch={includeWebSearch}
             setIncludeWebSearch={setIncludeWebSearch}
+            deepResearch={deepResearch}
+            setDeepResearch={setDeepResearch}
             model={model}
             setModel={setModel}
             selectedImages={selectedImages}
