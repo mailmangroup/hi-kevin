@@ -1322,6 +1322,22 @@ function parseSubContentList(subContentList: any[] = []): {
       contentParts.push({ type: 'text', content: item.text || item.content })
     } else if (item.type === 'thinking') {
       contentParts.push({ type: 'thinking', content: item.thinking || item.content })
+    } else if (item.type === 'research_plan') {
+      // Deep research plan — render the same way as the streaming handler
+      const planData = item.content || {}
+      const planText = `**Research Plan: ${planData.title || ""}**\n${
+        (planData.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title} _(${s.type})_`).join("\n")
+      }\n\n`
+      textContent += planText
+      contentParts.push({ type: 'text', content: planText })
+    } else if (item.type === 'research_step') {
+      // Deep research step marker — render the same way as the streaming handler
+      const label = (item.step_index ?? 0) < 0
+        ? item.title || "Planning..."
+        : `Step ${(item.step_index ?? 0) + 1}: ${item.title || "Researching..."}`
+      const stepText = `\n---\n**${label}**\n\n`
+      textContent += stepText
+      contentParts.push({ type: 'text', content: stepText })
     }
   }
 
