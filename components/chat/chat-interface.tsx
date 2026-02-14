@@ -14,13 +14,15 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
+import { DeepResearchDisplay, DeepResearchData, ResearchActivity, ResearchPlanData } from "@/components/chat/deep-research-display"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 
 // Types
 export interface ContentPart {
-  type: "text" | "thinking" | "tool"
+  type: "text" | "thinking" | "tool" | "deep_research"
   content?: string
   tool?: ToolCall
+  deepResearch?: DeepResearchData
 }
 
 export interface ToolCall {
@@ -536,6 +538,10 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
     let currentThinkingContent = "" // Track current thinking segment
     let lastPartWasThinking = false // Track if the last part was thinking
 
+    // Deep research tracking
+    let deepResearchData: DeepResearchData | null = null
+    let deepResearchActivities: ResearchActivity[] = []
+
     let activeConversationId = conversationId;
 
     try {
@@ -582,6 +588,36 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
         } : undefined, // Include report context if available
         fastPath
       })
+
+      // Helper to update deep research content part in message
+      const updateDeepResearchMessage = () => {
+        const drData: DeepResearchData = {
+          plan: deepResearchData?.plan || null,
+          activities: [...deepResearchActivities],
+          isComplete: deepResearchData?.isComplete || false,
+        }
+        deepResearchData = drData
+
+        // Find or create the deep_research content part
+        const drPartIndex = contentParts.findIndex((p) => p.type === "deep_research")
+        if (drPartIndex >= 0) {
+          contentParts[drPartIndex] = { type: "deep_research", deepResearch: drData }
+        } else {
+          contentParts.push({ type: "deep_research", deepResearch: drData })
+        }
+
+        lastPartWasText = false
+        lastPartWasThinking = false
+        currentTextContent = ""
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId
+              ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+              : msg
+          )
+        )
+      }
 
       for await (const chunk of stream) {
           // Handle different event types
@@ -754,69 +790,124 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
               openArtifact(reportArtifact)
           }
 
-          // Deep Research events
+          // Deep Research events — structured display via DeepResearchDisplay component
+
           if (chunk.research_plan) {
               const planData = chunk.research_plan
-              const planText = `**Research Plan: ${planData.title || ""}**\n${(planData.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title} _(${s.type})_`).join("\n")}\n\n`
-              contentParts.push({ type: "text", content: planText })
-              // Reset text tracking so subsequent content creates a new part
-              lastPartWasText = false
-              lastPartWasThinking = false
-              currentTextContent = ""
-              fullContent += planText
-              setMessages((prev) => prev.map(msg =>
-                  msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
-                      : msg
-              ))
+              if (!deepResearchData) {
+                deepResearchData = { plan: null, activities: [], isComplete: false }
+              }
+              deepResearchData.plan = {
+                title: planData.title || "",
+                steps: (planData.steps || []).map((s: any) => ({
+                  title: s.title,
+                  type: s.type,
+                  status: "pending" as const,
+                })),
+              }
+
+              // Remove any "Creating research plan" text part that was added before plan arrived
+              contentParts = contentParts.filter(
+                (p) => !(p.type === "text" && p.content?.includes("Creating research plan"))
+              )
+
+              updateDeepResearchMessage()
           }
 
           if (chunk.research_step_start) {
               const stepData = chunk.research_step_start
-              // step_index -1 = planning, others are 0-indexed research steps
-              const label = stepData.step_index < 0
-                  ? stepData.title || "Planning..."
-                  : `Step ${stepData.step_index + 1}: ${stepData.title || "Researching..."}`
-              const stepText = `\n---\n**${label}**\n\n`
-              contentParts.push({ type: "text", content: stepText })
-              // Reset text tracking so subsequent content (e.g. reporter) creates a new part
-              lastPartWasText = false
-              lastPartWasThinking = false
-              currentTextContent = ""
-              fullContent += stepText
-              setMessages((prev) => prev.map(msg =>
-                  msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
-                      : msg
-              ))
+              if (!deepResearchData) {
+                deepResearchData = { plan: null, activities: [], isComplete: false }
+              }
+              // Update plan step status to in_progress
+              if (deepResearchData.plan && stepData.step_index >= 0 && stepData.step_index < deepResearchData.plan.steps.length) {
+                deepResearchData.plan.steps = deepResearchData.plan.steps.map((s, i) =>
+                  i === stepData.step_index ? { ...s, status: "in_progress" as const } : s
+                )
+              }
+              updateDeepResearchMessage()
           }
 
           if (chunk.research_step_complete) {
               const completeData = chunk.research_step_complete
-              const doneText = `\n_${completeData.title || "Step completed"}_\n\n`
-              fullContent += doneText
-              // Append to the last text part if it is one, otherwise create new
-              if (lastPartWasText && contentParts.length > 0) {
-                  const lastPart = contentParts[contentParts.length - 1]
-                  if (lastPart.type === "text") {
-                      lastPart.content = (lastPart.content || "") + doneText
-                  }
-              } else {
-                  contentParts.push({ type: "text", content: doneText })
+              if (deepResearchData?.plan && completeData.step_index >= 0 && completeData.step_index < deepResearchData.plan.steps.length) {
+                deepResearchData.plan.steps = deepResearchData.plan.steps.map((s, i) =>
+                  i === completeData.step_index ? { ...s, status: "completed" as const } : s
+                )
               }
-              lastPartWasText = false
-              lastPartWasThinking = false
-              currentTextContent = ""
-              setMessages((prev) => prev.map(msg =>
-                  msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
-                      : msg
-              ))
+              updateDeepResearchMessage()
+          }
+
+          if (chunk.research_activity) {
+              const activity = chunk.research_activity
+              if (!deepResearchData) {
+                deepResearchData = { plan: null, activities: [], isComplete: false }
+              }
+
+              if (activity.activity_type === "chunk") {
+                // Accumulate content for the current agent/step
+                const existingIdx = deepResearchActivities.findIndex(
+                  (a) => a.agent === activity.agent && a.stepIndex === activity.step_index && !a.isComplete
+                )
+                if (existingIdx >= 0) {
+                  deepResearchActivities[existingIdx] = {
+                    ...deepResearchActivities[existingIdx],
+                    content: deepResearchActivities[existingIdx].content + activity.content,
+                  }
+                } else {
+                  deepResearchActivities.push({
+                    agent: activity.agent,
+                    stepIndex: activity.step_index,
+                    content: activity.content,
+                    isComplete: false,
+                  })
+                }
+              } else if (activity.activity_type === "end") {
+                // Mark activity as complete with final content
+                const existingIdx = deepResearchActivities.findIndex(
+                  (a) => a.agent === activity.agent && a.stepIndex === activity.step_index && !a.isComplete
+                )
+                if (existingIdx >= 0) {
+                  deepResearchActivities[existingIdx] = {
+                    ...deepResearchActivities[existingIdx],
+                    content: activity.content || deepResearchActivities[existingIdx].content,
+                    isComplete: true,
+                  }
+                } else if (activity.content) {
+                  deepResearchActivities.push({
+                    agent: activity.agent,
+                    stepIndex: activity.step_index,
+                    content: activity.content,
+                    isComplete: true,
+                  })
+                }
+              } else if (activity.activity_type === "start") {
+                // Create placeholder for new agent activity
+                deepResearchActivities.push({
+                  agent: activity.agent,
+                  stepIndex: activity.step_index,
+                  content: "",
+                  isComplete: false,
+                })
+              }
+
+              updateDeepResearchMessage()
           }
 
           if (chunk.research_report) {
               // The report content was already streamed via content chunks from the reporter node.
               // This event signals that the full report is ready — no additional rendering needed.
+          }
+
+          if (chunk.research_report_artifact) {
+              // Open final report in artifact panel as markdown
+              const reportArtifact: ArtifactData = {
+                id: `research-report-${Date.now()}`,
+                type: "markdown" as any,
+                title: chunk.research_report_artifact.title || "Research Report",
+                data: chunk.research_report_artifact.content,
+              }
+              openArtifact(reportArtifact)
           }
 
 
@@ -1040,6 +1131,11 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
                             content={part.content || ""}
                             isStreaming={message.isStreaming}
                           />
+                        ) : part.type === "deep_research" ? (
+                          <DeepResearchDisplay
+                            data={part.deepResearch!}
+                            isStreaming={message.isStreaming || false}
+                          />
                         ) : (
                           <MessageContent
                             content={part.content || ""}
@@ -1255,6 +1351,7 @@ function parseSubContentList(subContentList: any[] = []): {
   const incompleteToolCalls = new Map<string, ToolCall>()
   let lastToolCall: ToolCall | null = null
   let textContent = ""
+  let deepResearchData: DeepResearchData | null = null
 
   if (!Array.isArray(subContentList)) {
     return { toolCalls, content: textContent, images, documents, contentParts }
@@ -1272,7 +1369,7 @@ function parseSubContentList(subContentList: any[] = []): {
       }
       toolCalls.push(toolCall)
       contentParts.push({ type: 'tool', tool: toolCall })
-      
+
       if (toolCall.state === 'running') {
          if (toolCall.id) incompleteToolCalls.set(toolCall.id, toolCall)
          lastToolCall = toolCall
@@ -1287,23 +1384,23 @@ function parseSubContentList(subContentList: any[] = []): {
       }
       toolCalls.push(toolCall)
       contentParts.push({ type: 'tool', tool: toolCall })
-      
+
       incompleteToolCalls.set(id, toolCall)
       lastToolCall = toolCall
     } else if (item.type === 'tool_output') {
        // Try to find matching tool call
        let toolCall: ToolCall | undefined
-       
+
        if (item.tool_call_id) {
            toolCall = incompleteToolCalls.get(item.tool_call_id)
        }
-       
-       // Fallback to last tool call if no ID match or ID not provided, 
+
+       // Fallback to last tool call if no ID match or ID not provided,
        // but only if name matches
        if (!toolCall && lastToolCall && lastToolCall.name === item.tool) {
            toolCall = lastToolCall
        }
-       
+
        if (toolCall) {
            toolCall.output = item.tool_output
            toolCall.state = 'completed'
@@ -1323,22 +1420,39 @@ function parseSubContentList(subContentList: any[] = []): {
     } else if (item.type === 'thinking') {
       contentParts.push({ type: 'thinking', content: item.thinking || item.content })
     } else if (item.type === 'research_plan') {
-      // Deep research plan — render the same way as the streaming handler
+      // Deep research plan — render via DeepResearchDisplay
+      if (!deepResearchData) {
+        deepResearchData = { plan: null, activities: [], isComplete: true }
+      }
       const planData = item.content || {}
-      const planText = `**Research Plan: ${planData.title || ""}**\n${
-        (planData.steps || []).map((s: any, i: number) => `${i + 1}. ${s.title} _(${s.type})_`).join("\n")
-      }\n\n`
-      textContent += planText
-      contentParts.push({ type: 'text', content: planText })
+      deepResearchData.plan = {
+        title: planData.title || "",
+        steps: (planData.steps || []).map((s: any) => ({
+          title: s.title,
+          type: s.type,
+          status: "completed" as const,
+        })),
+      }
     } else if (item.type === 'research_step') {
-      // Deep research step marker — render the same way as the streaming handler
-      const label = (item.step_index ?? 0) < 0
-        ? item.title || "Planning..."
-        : `Step ${(item.step_index ?? 0) + 1}: ${item.title || "Researching..."}`
-      const stepText = `\n---\n**${label}**\n\n`
-      textContent += stepText
-      contentParts.push({ type: 'text', content: stepText })
+      // Deep research step — tracked by plan, no separate rendering needed
+      // (handled by DeepResearchDisplay via plan steps)
+    } else if (item.type === 'research_activity') {
+      // Deep research agent activity from history
+      if (!deepResearchData) {
+        deepResearchData = { plan: null, activities: [], isComplete: true }
+      }
+      deepResearchData.activities.push({
+        agent: item.agent,
+        stepIndex: item.step_index,
+        content: item.content || "",
+        isComplete: true,
+      })
     }
+  }
+
+  // Add deep research content part if we found research data
+  if (deepResearchData) {
+    contentParts.push({ type: 'deep_research', deepResearch: deepResearchData })
   }
 
   return { toolCalls, content: textContent, images, documents, contentParts }
