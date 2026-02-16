@@ -4,6 +4,7 @@ import * as React from "react"
 import { BarChart3, Code, Table2, FileText, ExternalLink, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
+import { isWebSearch as isWebSearchData, extractWebSearchResults } from "@/lib/utils/artifact-types"
 
 const ARTIFACT_ICONS = {
   chart: BarChart3,
@@ -270,42 +271,3 @@ function getArtifactDescription(artifact: any, toolName?: string): string | null
   return "Click to view details"
 }
 
-// Helper to check if data is web search results
-function isWebSearchData(data: any): boolean {
-  if (!data) return false
-  if (Array.isArray(data)) {
-    if (data.length > 0 && data[0]?.type === "web_search_result") return true
-    if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
-      return data[0].cards.some((card: any) => card?.type === "web_search_result")
-    }
-  }
-  if (data.cards && Array.isArray(data.cards)) {
-    return data.cards.some((card: any) => card?.type === "web_search_result")
-  }
-  if (data.type === "web_search_result") return true
-  return false
-}
-
-// Helper to extract web search results from various data structures
-function extractWebSearchResults(data: any): any[] {
-  if (!data) return []
-  
-  if (Array.isArray(data)) {
-    if (data.length > 0 && data[0]?.type === "web_search_result") {
-      return data
-    }
-    if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
-      return data[0].cards.filter((card: any) => card?.type === "web_search_result")
-    }
-  }
-  
-  if (data.cards && Array.isArray(data.cards)) {
-    return data.cards.filter((card: any) => card?.type === "web_search_result")
-  }
-  
-  if (data.type === "web_search_result") {
-    return [data]
-  }
-  
-  return []
-}

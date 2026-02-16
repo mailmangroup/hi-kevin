@@ -62,8 +62,6 @@ export async function compressImage(
           iterations++
         }
 
-        console.log(`[Image Compression] Original: ${(e.target?.result as string).length / 1024}KB -> Compressed: ${compressedDataUrl.length / 1024}KB (quality: ${currentQuality})`)
-
         resolve(compressedDataUrl)
       }
 
@@ -145,8 +143,6 @@ export async function compressBase64Image(
         compressedDataUrl = canvas.toDataURL(mimeType, currentQuality)
         iterations++
       }
-
-      console.log(`[Image Compression] Original: ${dataUrl.length / 1024}KB -> Compressed: ${compressedDataUrl.length / 1024}KB (quality: ${currentQuality})`)
 
       resolve(compressedDataUrl)
     }

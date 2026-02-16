@@ -10,9 +10,11 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen overflow-hidden bg-transparent relative">
-      <div className="hidden md:block z-20">
-        <Sidebar />
-      </div>
+      <Suspense fallback={<div className="hidden md:block w-[280px] bg-background border-r" />}>
+        <div className="hidden md:block z-20">
+          <Sidebar />
+        </div>
+      </Suspense>
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent relative z-10">
         <RouteMain>{children}</RouteMain>
       </div>

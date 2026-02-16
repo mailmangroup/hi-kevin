@@ -1,4 +1,5 @@
 import * as React from "react"
+import Image from "next/image"
 import { format } from "date-fns"
 import { ExternalLink, Instagram, Facebook, Linkedin, Twitter, Youtube, Video, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
@@ -182,10 +183,12 @@ function BrandPostCard({ post }: { post: BrandPost }) {
           {firstVideo ? (
             <>
               {videoThumbnail ? (
-                <img 
-                  src={videoThumbnail} 
-                  alt="Video thumbnail" 
-                  className="w-full h-full object-cover"
+                <Image
+                  src={videoThumbnail}
+                  alt="Video thumbnail"
+                  fill
+                  className="object-cover"
+                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
@@ -209,10 +212,12 @@ function BrandPostCard({ post }: { post: BrandPost }) {
               )}
             </>
           ) : imageUrl ? (
-            <img 
-              src={imageUrl} 
+            <Image
+              src={imageUrl}
               alt={title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              unoptimized
             />
           ) : null}
           
@@ -266,10 +271,12 @@ function BrandPostCard({ post }: { post: BrandPost }) {
               if (!url) return null;
               return (
                 <div key={`image-${idx + 1}`} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <img 
-                    src={url} 
+                  <Image
+                    src={url}
                     alt={`Post image ${idx + 2}`}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    unoptimized
                   />
                 </div>
               )

@@ -162,8 +162,8 @@ export function ChatInputArea({
               p.id === img.id ? { ...p, uploading: false, key: objectKey } : p
           ))
       } catch (e) {
-          console.error('Upload failed:', e)
-          setSelectedImages(prev => prev.map(p => 
+          if (process.env.NODE_ENV === 'development') console.error('Upload failed:', e)
+          setSelectedImages(prev => prev.map(p =>
               p.id === img.id ? { ...p, uploading: false, error: true } : p
           ))
       }
@@ -267,7 +267,7 @@ export function ChatInputArea({
                       break
                   }
               } catch (e) {
-                  console.error('Error polling document status:', e)
+                  if (process.env.NODE_ENV === 'development') console.error('Error polling document status:', e)
                   break
               }
 
@@ -287,7 +287,7 @@ export function ChatInputArea({
                   : d
           ))
       } catch (e: any) {
-          console.error('Document upload failed:', e)
+          if (process.env.NODE_ENV === 'development') console.error('Document upload failed:', e)
           setSelectedDocuments(prev => prev.map(d =>
               d.id === doc.id
                   ? { ...d, uploading: false, processing: false, error: e.message || 'Upload failed' }

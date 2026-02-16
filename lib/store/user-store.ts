@@ -37,11 +37,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const hasLocalEnv = token && orgId && brandId
 
       if (isDev && hasLocalEnv) {
-        console.log('[UserStore] Using local environment credentials')
         set({
           profile: {
-            full_name: 'Jeremy',
-            email: 'jeremy@kawo.com',
+            full_name: process.env.NEXT_PUBLIC_DEV_USER_NAME || 'Developer',
+            email: process.env.NEXT_PUBLIC_DEV_USER_EMAIL || 'dev@localhost',
             kawo_token: token,
             kawo_org_id: orgId,
             kawo_brand_id: brandId,
@@ -53,7 +52,6 @@ export const useUserStore = create<UserStore>((set, get) => ({
       }
 
       // Production mode: fetch from Supabase
-      console.log('[UserStore] Loading credentials from Supabase profile')
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user

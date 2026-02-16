@@ -6,8 +6,9 @@
  */
 
 import { useUserStore } from '@/lib/store/user-store'
+import type { ContentItem } from '@/types'
 
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false' // Default to mock
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
 /**
  * Helper function to get KAWO configuration
@@ -44,9 +45,11 @@ export function getKawoConfig() {
  * Direct API call to KAWO backend.
  * Always calls the backend directly with auth headers.
  */
+const DEFAULT_TIMEOUT_MS = 30_000 // 30 seconds
+
 export async function directApiCall<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit & { timeoutMs?: number }
 ): Promise<T> {
   const config = getKawoConfig()
 
@@ -55,12 +58,6 @@ export async function directApiCall<T>(
   }
 
   const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`
-  console.log('[API] Direct call:', targetUrl, 'Config:', {
-    apiUrl: config.apiUrl,
-    token: config.token ? '***' : 'missing',
-    orgId: config.orgId,
-    brandId: config.brandId
-  })
 
   // Ensure headers are properly set
   const headers = new Headers(options?.headers)
@@ -69,39 +66,46 @@ export async function directApiCall<T>(
   headers.set('X-KAWO-Org-Id', config.orgId)
   headers.set('X-KAWO-Brand-Id', config.brandId)
 
-  const response = await fetch(targetUrl, {
-    ...options,
-    headers,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), options?.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 
-  if (!response.ok) {
-    let errorData: any = {}
-    try {
-      errorData = await response.json()
-    } catch (e) {
-      // If parsing JSON fails, try text
-      try {
-        const text = await response.text()
-        errorData = { error: response.statusText, text }
-      } catch (e2) {
-        errorData = { error: response.statusText }
-      }
-    }
-
-    console.error('[API] Error:', {
-      status: response.status,
-      endpoint,
-      errorData: JSON.stringify(errorData, null, 2)
+  try {
+    const response = await fetch(targetUrl, {
+      ...options,
+      headers,
+      signal: options?.signal ?? controller.signal,
     })
 
-    const error: any = new Error(errorData.error || errorData.message || response.statusText)
-    error.status = response.status
-    error.code = errorData.code
-    error.details = errorData
-    throw error
-  }
+    clearTimeout(timeoutId)
 
-  return response.json()
+    if (!response.ok) {
+      let errorData: any = {}
+      try {
+        errorData = await response.json()
+      } catch {
+        try {
+          const text = await response.text()
+          errorData = { error: response.statusText, text }
+        } catch {
+          errorData = { error: response.statusText }
+        }
+      }
+
+      const error: any = new Error(errorData.error || errorData.message || response.statusText)
+      error.status = response.status
+      error.code = errorData.code
+      error.details = errorData
+      throw error
+    }
+
+    return response.json()
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(`Request to ${endpoint} timed out`)
+    }
+    throw err
+  }
 }
 
 
@@ -368,10 +372,6 @@ export const aiService = {
     }
 
     const payloadString = JSON.stringify(payload)
-    const payloadSizeKB = (payloadString.length / 1024).toFixed(2)
-
-    console.log('[API] Sending chat query payload:', payload)
-    console.log(`[API] Payload size: ${payloadSizeKB} KB`)
 
     // Direct backend call for better streaming performance
     const config = getKawoConfig()
@@ -385,7 +385,6 @@ export const aiService = {
     if (!payload.brand_id) payload.brand_id = config.brandId
 
     const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
-    console.log('[API] Direct backend call:', targetUrl)
 
     let response
     try {
@@ -399,15 +398,14 @@ export const aiService = {
           },
           body: payloadString,
         })
-        console.log('[API] Fetch completed, status:', response.status)
     } catch (fetchError) {
-        console.error('[API] Fetch failed:', fetchError)
+        if (process.env.NODE_ENV === 'development') console.error('[API] Fetch failed:', fetchError)
         throw new Error(`Network error: ${fetchError}`)
     }
 
     if (!response.ok) {
         const errorText = await response.text()
-        console.error('[API] Response not OK:', response.status, errorText)
+        if (process.env.NODE_ENV === 'development') console.error('[API] Response not OK:', response.status, errorText)
         throw new Error(`Chat request failed: ${response.statusText} - ${errorText}`)
     }
 
@@ -434,7 +432,7 @@ export const aiService = {
                     const parsed = JSON.parse(data)
                     yield parsed
                 } catch (e) {
-                    console.error('Error parsing SSE data:', e)
+                    if (process.env.NODE_ENV === 'development') console.error('Error parsing SSE data:', e)
                 }
             }
         }
@@ -522,6 +520,38 @@ export const aiService = {
       method: 'POST',
       body: JSON.stringify({ content }),
     })
+  },
+
+  /**
+   * Get a single content item by ID
+   */
+  async getContentItem(id: string): Promise<ContentItem | null> {
+    if (USE_MOCK) {
+      const { getContentItem } = await import('@/lib/mock/content')
+      return getContentItem(id)
+    }
+
+    try {
+      return await directApiCall<ContentItem>(`content/items/${id}`)
+    } catch {
+      return null
+    }
+  },
+
+  /**
+   * Get list of content items with optional filters
+   */
+  async getContentItems(filters?: { platform?: string; status?: string }): Promise<ContentItem[]> {
+    if (USE_MOCK) {
+      const { getContentItems } = await import('@/lib/mock/content')
+      return getContentItems(filters)
+    }
+
+    const params = new URLSearchParams()
+    if (filters?.platform) params.set('platform', filters.platform)
+    if (filters?.status) params.set('status', filters.status)
+    const query = params.toString()
+    return directApiCall<ContentItem[]>(`content/items${query ? `?${query}` : ''}`)
   },
 
   /**

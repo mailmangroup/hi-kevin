@@ -21,7 +21,7 @@ import {
   Edit,
   Trash2,
 } from "lucide-react"
-import { getContentItem } from "@/lib/mock/content"
+import { aiService } from "@/lib/api/client"
 import { formatDate } from "@/lib/utils/date"
 import type { ContentItem } from "@/types"
 
@@ -64,7 +64,7 @@ export default function ContentDetailPage() {
   const loadContent = async () => {
     setLoading(true)
     try {
-      const data = await getContentItem(contentId)
+      const data = await aiService.getContentItem(contentId)
       setContent(data)
     } catch (error) {
       console.error("Failed to load content:", error)

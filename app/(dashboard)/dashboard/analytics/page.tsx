@@ -66,7 +66,7 @@ export default function AnalyticsPage() {
 
         setAnalyticsData(data)
       } catch (err) {
-        console.error('Analytics error:', err)
+        if (process.env.NODE_ENV === 'development') console.error('Analytics error:', err)
         setError(err instanceof Error ? err : new Error('Failed to load analytics'))
       } finally {
         setIsLoading(false)

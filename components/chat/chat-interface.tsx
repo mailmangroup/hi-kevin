@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, Copy, Check, ThumbsUp, ThumbsDown } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { useSearchParams } from "next/navigation"
@@ -14,8 +15,11 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepResearchDisplay, DeepResearchData, ResearchActivity, ResearchPlanData } from "@/components/chat/deep-research-display"
+import { DeepResearchDisplay, DeepResearchData, ResearchActivity } from "@/components/chat/deep-research-display"
+import { MessageActions } from "@/components/chat/message-actions"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
+import { parseSubContentList } from "@/lib/utils/parse-sub-content"
+import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
 
 // Types
 export interface ContentPart {
@@ -81,11 +85,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     return initialMessage ?? searchParams?.get('q') ?? undefined
   }, [initialMessage, searchParams])
 
-  const { profile, fetchProfile, isLoading: isProfileLoading } = useUserStore()
-
-  React.useEffect(() => {
-    fetchProfile()
-  }, [fetchProfile])
+  const { profile, isLoading: isProfileLoading } = useUserStore()
 
   const credentials = React.useMemo(() => ({
     orgId: profile?.kawo_org_id || undefined,
@@ -209,11 +209,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                  const projectData = await aiService.getProject(conversation.project_id)
                  setProject({ id: projectData.id, name: projectData.name })
              } catch (e) {
-                 console.error("Failed to load project details", e)
+                 if (process.env.NODE_ENV === 'development') console.error("Failed to load project details", e)
              }
           }
       } catch (error) {
-          console.error("Failed to load conversation title:", error)
+          if (process.env.NODE_ENV === 'development') console.error("Failed to load conversation title:", error)
       }
   }
 
@@ -222,7 +222,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     if (projectId) {
        aiService.getProject(projectId)
          .then(p => setProject({ id: p.id, name: p.name }))
-         .catch(err => console.error("Failed to load project", err))
+         .catch(err => { if (process.env.NODE_ENV === 'development') console.error("Failed to load project", err) })
     }
   }, [projectId])
 
@@ -288,7 +288,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               const detectedReportId = reportMessage.report_id || reportMessage.report?.id
               if (detectedReportId) {
                   setReportId(detectedReportId)
-                  console.log('[Chat] Detected report in conversation:', detectedReportId)
 
                   // Fetch full report content
                   try {
@@ -303,12 +302,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                           openArtifact(reportArtifact)
                       }
                   } catch (err) {
-                      console.error("Failed to fetch report content:", err)
+                      if (process.env.NODE_ENV === 'development') console.error("Failed to fetch report content:", err)
                   }
               }
           }
       } catch (error) {
-          console.error("Failed to load history:", error)
+          if (process.env.NODE_ENV === 'development') console.error("Failed to load history:", error)
       }
   }
 
@@ -329,7 +328,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             sessionStorage.removeItem('pending_chat_images')
             setSelectedImages(images)
         } catch (e) {
-            console.error("Failed to parse pending images", e)
+            if (process.env.NODE_ENV === 'development') console.error("Failed to parse pending images", e)
         }
     }
 
@@ -342,7 +341,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             sessionStorage.removeItem('pending_chat_documents')
             setSelectedDocuments(documents)
         } catch (e) {
-            console.error("Failed to parse pending documents", e)
+            if (process.env.NODE_ENV === 'development') console.error("Failed to parse pending documents", e)
         }
     }
 
@@ -365,7 +364,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       try {
         await aiService.stopChat(conversationId)
       } catch (error) {
-        console.error("Failed to stop chat:", error)
+        if (process.env.NODE_ENV === 'development') console.error("Failed to stop chat:", error)
       }
     }
     setIsThinking(false)
@@ -376,7 +375,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop()
 
     if (!lastAssistantMessage?.content) {
-      console.error("No assistant message found to generate artifact from")
       return
     }
 
@@ -432,7 +430,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
         })
       }
     } catch (error: any) {
-      console.error("Failed to generate artifact:", error)
+      if (process.env.NODE_ENV === 'development') console.error("Failed to generate artifact:", error)
 
       // Add error message to chat
       const errorMessage: Message = {
@@ -454,14 +452,12 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
     // Bypass check in development mode to allow local testing with env vars
     const isDev = process.env.NODE_ENV === 'development'
     if (credentialsLoading || (!credentials.orgId && !isDev)) {
-      console.error("Cannot send message: credentials not ready")
       return
     }
 
     // Check if any images are still uploading
     const uploadingImages = images.filter(img => img.uploading)
     if (uploadingImages.length > 0) {
-      console.warn("Cannot send message: images are still uploading")
       return
     }
 
@@ -469,21 +465,18 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
     // We allow sending while processing (vectorization), but not while uploading to OSS
     const uploadingDocs = documents.filter(doc => doc.uploading)
     if (uploadingDocs.length > 0) {
-      console.warn("Cannot send message: documents are still uploading")
       return
     }
 
     // Check if any images failed to upload (no OSS key)
     const failedImages = images.filter(img => !img.uploading && !img.key)
     if (failedImages.length > 0) {
-      console.error("Cannot send message: some images failed to upload. Please remove them and try again.")
       return
     }
 
     // Check if any documents failed
     const failedDocs = documents.filter(doc => doc.error || doc.processingStatus === 'failed')
     if (failedDocs.length > 0) {
-      console.error("Cannot send message: some documents failed to process. Please remove them and try again.")
       return
     }
 
@@ -777,7 +770,6 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
               const detectedReportId = reportData.id || chunk.report_id
               if (detectedReportId && !reportId) {
                   setReportId(detectedReportId)
-                  console.log('[Chat] Report generated in conversation:', detectedReportId)
               }
 
               // Create artifact and open it
@@ -936,7 +928,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
       }
 
     } catch (error) {
-      console.error("Chat error:", error)
+      if (process.env.NODE_ENV === 'development') console.error("Chat error:", error)
       setMessages((prev) => prev.map(msg =>
           msg.id === assistantMsgId
               ? { ...msg, content: "Sorry, I encountered an error connecting to the server." }
@@ -1041,7 +1033,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
                 {message.images && message.images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {message.images.map((img, i) => (
-                      <img key={i} src={img} alt="Uploaded" className="max-w-full h-auto rounded-lg max-h-64 object-contain bg-black/5" />
+                      <Image key={i} src={img} alt="Uploaded" width={500} height={300} className="max-w-full h-auto rounded-lg max-h-64 object-contain bg-black/5" style={{ width: 'auto', height: 'auto' }} unoptimized />
                     ))}
                   </div>
                 )}
@@ -1261,199 +1253,3 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
   )
 }
 
-// Helper functions for artifact type detection
-function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
-  if (artifact?.type === "artifact" && artifact?.artifact_type) {
-    return artifact.artifact_type
-  }
-  if (artifact?.type && artifact.type !== "artifact") {
-    return artifact.type
-  }
-  if (toolName) {
-    if (toolName.includes("chart") || toolName.includes("analytics")) {
-      return "chart"
-    }
-    if (toolName.includes("code") || toolName.includes("generate")) {
-      return "code"
-    }
-    if (toolName.includes("table") || toolName.includes("data")) {
-      return "table"
-    }
-    if (toolName.includes("report") || toolName.includes("insights") || toolName.includes("performance")) {
-      return "report"
-    }
-  }
-  if (artifact?.data) {
-    if (Array.isArray(artifact.data)) {
-      return "table"
-    }
-    if (typeof artifact.data === "string" && artifact.data.includes("```")) {
-      return "code"
-    }
-  }
-  return "data"
-}
-
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  get_account_insights: "Account Insights",
-  get_content_performance: "Content Performance",
-  search_web: "Web Search Results",
-  analyze_competitors: "Competitor Analysis",
-  generate_content: "Generated Content",
-  schedule_post: "Scheduled Post",
-  get_audience_data: "Audience Data",
-}
-
-function getToolDisplayName(toolName: string): string {
-  return TOOL_DISPLAY_NAMES[toolName] || toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function MessageActions({ message, onRegenerate }: { message: Message, onRegenerate?: () => void }) {
-  const [copied, setCopied] = React.useState(false)
-
-  const handleCopy = () => {
-    const textToCopy = message.content || ""
-    navigator.clipboard.writeText(textToCopy)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div className="flex items-center gap-1 mt-2 -ml-2">
-      <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" title="Like">
-        <ThumbsUp className="h-3.5 w-3.5" />
-      </button>
-      <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" title="Dislike">
-        <ThumbsDown className="h-3.5 w-3.5" />
-      </button>
-      <button 
-        onClick={handleCopy}
-        className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" 
-        title="Copy"
-      >
-        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-      </button>
-    </div>
-  )
-}
-
-function parseSubContentList(subContentList: any[] = []): {
-  toolCalls: ToolCall[],
-  content: string,
-  images: string[],
-  documents: any[],
-  contentParts: ContentPart[]
-} {
-  const toolCalls: ToolCall[] = []
-  const images: string[] = []
-  const documents: any[] = []
-  const contentParts: ContentPart[] = []
-  const incompleteToolCalls = new Map<string, ToolCall>()
-  let lastToolCall: ToolCall | null = null
-  let textContent = ""
-  let deepResearchData: DeepResearchData | null = null
-
-  if (!Array.isArray(subContentList)) {
-    return { toolCalls, content: textContent, images, documents, contentParts }
-  }
-
-  for (const item of subContentList) {
-    if (item.type === 'tool_call' || item.type === 'tool_use') {
-      const toolCall: ToolCall = {
-        id: item.id || Date.now().toString(),
-        name: item.name || item.tool,
-        input: item.input || item.args || {},
-        output: item.output,
-        state: item.output ? 'completed' : 'running', // Assume completed if output exists in history
-        artifact: item.artifact
-      }
-      toolCalls.push(toolCall)
-      contentParts.push({ type: 'tool', tool: toolCall })
-
-      if (toolCall.state === 'running') {
-         if (toolCall.id) incompleteToolCalls.set(toolCall.id, toolCall)
-         lastToolCall = toolCall
-      }
-    } else if (item.type === 'tool_input') {
-      const id = item.tool_call_id || Date.now().toString()
-      const toolCall: ToolCall = {
-        id: id,
-        name: item.tool,
-        input: item.tool_input || {},
-        state: 'running'
-      }
-      toolCalls.push(toolCall)
-      contentParts.push({ type: 'tool', tool: toolCall })
-
-      incompleteToolCalls.set(id, toolCall)
-      lastToolCall = toolCall
-    } else if (item.type === 'tool_output') {
-       // Try to find matching tool call
-       let toolCall: ToolCall | undefined
-
-       if (item.tool_call_id) {
-           toolCall = incompleteToolCalls.get(item.tool_call_id)
-       }
-
-       // Fallback to last tool call if no ID match or ID not provided,
-       // but only if name matches
-       if (!toolCall && lastToolCall && lastToolCall.name === item.tool) {
-           toolCall = lastToolCall
-       }
-
-       if (toolCall) {
-           toolCall.output = item.tool_output
-           toolCall.state = 'completed'
-           if (item.artifact) {
-               toolCall.artifact = item.artifact
-           }
-           // Remove from incomplete map since it's done
-           if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
-       }
-    } else if (item.type === 'image') {
-      if (item.url) images.push(item.url)
-    } else if (item.type === 'document') {
-      documents.push(item)
-    } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
-      textContent += item.text || item.content || ""
-      contentParts.push({ type: 'text', content: item.text || item.content })
-    } else if (item.type === 'thinking') {
-      contentParts.push({ type: 'thinking', content: item.thinking || item.content })
-    } else if (item.type === 'research_plan') {
-      // Deep research plan — render via DeepResearchDisplay
-      if (!deepResearchData) {
-        deepResearchData = { plan: null, activities: [], isComplete: true }
-      }
-      const planData = item.content || {}
-      deepResearchData.plan = {
-        title: planData.title || "",
-        steps: (planData.steps || []).map((s: any) => ({
-          title: s.title,
-          type: s.type,
-          status: "completed" as const,
-        })),
-      }
-    } else if (item.type === 'research_step') {
-      // Deep research step — tracked by plan, no separate rendering needed
-      // (handled by DeepResearchDisplay via plan steps)
-    } else if (item.type === 'research_activity') {
-      // Deep research agent activity from history
-      if (!deepResearchData) {
-        deepResearchData = { plan: null, activities: [], isComplete: true }
-      }
-      deepResearchData.activities.push({
-        agent: item.agent,
-        stepIndex: item.step_index,
-        content: item.content || "",
-        isComplete: true,
-      })
-    }
-  }
-
-  // Add deep research content part if we found research data
-  if (deepResearchData) {
-    contentParts.push({ type: 'deep_research', deepResearch: deepResearchData })
-  }
-
-  return { toolCalls, content: textContent, images, documents, contentParts }
-}

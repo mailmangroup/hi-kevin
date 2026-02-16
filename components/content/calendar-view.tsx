@@ -1,14 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
+import { useState, useEffect } from "react"
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  addMonths,
   subMonths,
   startOfWeek,
   endOfWeek
@@ -18,17 +18,22 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils/cn"
-import { mockContentItems } from "@/lib/mock/content"
+import { aiService } from "@/lib/api/client"
 import type { ContentItem } from "@/types"
 
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  
+  const [contentItems, setContentItems] = useState<ContentItem[]>([])
+
+  useEffect(() => {
+    aiService.getContentItems().then(setContentItems).catch(() => {})
+  }, [])
+
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
   const startDate = startOfWeek(monthStart)
   const endDate = endOfWeek(monthEnd)
-  
+
   const calendarDays = eachDayOfInterval({
     start: startDate,
     end: endDate,
@@ -39,7 +44,7 @@ export function CalendarView() {
   const goToToday = () => setCurrentDate(new Date())
 
   const getDayContent = (date: Date) => {
-    return mockContentItems.filter(item => {
+    return contentItems.filter(item => {
       const itemDate = item.scheduledAt || item.createdAt
       return isSameDay(new Date(itemDate), date)
     })

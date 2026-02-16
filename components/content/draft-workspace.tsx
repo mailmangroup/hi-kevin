@@ -1,15 +1,23 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MoreHorizontal, FileText, Video, Image as ImageIcon, Calendar } from "lucide-react"
-import { mockContentItems } from "@/lib/mock/content"
+import { aiService } from "@/lib/api/client"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils/cn"
+import type { ContentItem } from "@/types"
 
 export function DraftWorkspace() {
-  const drafts = mockContentItems.filter(item => item.status === 'draft' || item.status === 'idea')
+  const [drafts, setDrafts] = useState<ContentItem[]>([])
+
+  useEffect(() => {
+    aiService.getContentItems({ status: 'draft' }).then(items => {
+      setDrafts(items.filter(item => item.status === 'draft' || item.status === 'idea'))
+    }).catch(() => {})
+  }, [])
 
   const getPlatformIcon = (platform: string) => {
     // In a real app, use SVG icons. Using colored dots/text for now as per design system hints

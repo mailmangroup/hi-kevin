@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
@@ -30,12 +30,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [isNavigating, setIsNavigating] = useState(false)
   const router = useRouter()
 
-  const { profile, fetchProfile } = useUserStore()
-
-  useEffect(() => {
-    fetchProfile()
-  }, [fetchProfile])
-
+  const profile = useUserStore((state) => state.profile)
   const fullName = profile?.full_name
 
   const handleSend = async () => {

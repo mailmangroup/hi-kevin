@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { cn } from "@/lib/utils/cn"
 import {
   LayoutDashboard,
@@ -17,17 +17,9 @@ import {
   FolderKanban
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { frostService } from "@/lib/api/frost"
-import { aiService, Conversation } from "@/lib/api/client"
-
-// Simple cache to avoid refetching on every navigation
-const sidebarCache = {
-  leadsCount: null as number | null,
-  chatHistory: null as Conversation[] | null,
-  totalChats: 0,
-  lastFetch: 0,
-  CACHE_DURATION: 30000, // 30 seconds
-}
+import { Conversation } from "@/lib/api/client"
+import { useNewLeadsCount, useConversations } from "@/lib/hooks/use-dashboard-data"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface NavItem {
   title: string
@@ -93,105 +85,38 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
-  const [navItems, setNavItems] = useState<NavItem[]>(INITIAL_NAV_ITEMS)
-  const [chatHistory, setChatHistory] = useState<Conversation[]>([])
-  const [totalChats, setTotalChats] = useState(0)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const queryClient = useQueryClient()
 
-  const fetchHistory = async (options?: { refresh?: boolean; loadMore?: boolean }) => {
-    const isLoadMore = options?.loadMore
+  // Use TanStack Query for data fetching (replaces manual cache)
+  const { data: leadsData } = useNewLeadsCount()
+  const { data: conversationsData } = useConversations()
 
-    // If loading more and already loading, skip
-    if (isLoadMore && isLoadingMore) return
+  const leadsCount = leadsData?.count ?? null
+  const chatHistory = conversationsData?.conversations ?? []
+  const totalChats = conversationsData?.total ?? 0
 
-    if (isLoadMore) setIsLoadingMore(true)
-
-    try {
-        const limit = 20
-        const skip = isLoadMore ? chatHistory.length : 0
-        
-        const { conversations, total } = await aiService.getConversations(limit, skip)
-        
-        if (isLoadMore) {
-            const newHistory = [...chatHistory, ...conversations]
-            setChatHistory(newHistory)
-            sidebarCache.chatHistory = newHistory
-        } else {
-            setChatHistory(conversations)
-            sidebarCache.chatHistory = conversations
-        }
-        setTotalChats(total)
-        sidebarCache.totalChats = total
-    } catch (error: any) {
-        // Ignore missing credentials error as it's expected during onboarding
-        if (error?.code === 'CREDENTIALS_MISSING') return
-        console.error("Failed to fetch chat history:", error)
-    } finally {
-        if (isLoadMore) setIsLoadingMore(false)
+  // Build nav items with dynamic leads badge
+  const navItems: NavItem[] = INITIAL_NAV_ITEMS.map(item => {
+    if (item.title === 'Leads' && leadsCount !== null && leadsCount > 0) {
+      return { ...item, badge: leadsCount }
     }
-  }
+    return item
+  })
 
+  // Invalidate conversations cache when chat events fire
   useEffect(() => {
-    // Defer non-critical fetches to after initial paint
-    // This ensures navigation feels instant even if sidebar data is stale briefly
-    const timeoutId = setTimeout(() => {
-      const now = Date.now()
-      const isCacheValid = now - sidebarCache.lastFetch < sidebarCache.CACHE_DURATION
-
-      const fetchLeadsCount = async () => {
-        try {
-          const response = await frostService.getNewLeadsCount()
-          const count = response.count
-          sidebarCache.leadsCount = count
-
-          setNavItems(prev => prev.map(item => {
-            if (item.title === "Leads") {
-              return { ...item, badge: count > 0 ? count : undefined }
-            }
-            return item
-          }))
-        } catch (error: any) {
-          // Ignore missing credentials error as it's expected during onboarding
-          if (error?.code === 'CREDENTIALS_MISSING') return
-          console.error("Failed to fetch new leads count:", error)
-        }
-      }
-
-      // Use cached data immediately if available
-      if (isCacheValid && sidebarCache.leadsCount !== null) {
-        setNavItems(prev => prev.map(item => {
-          if (item.title === "Leads") {
-            return { ...item, badge: sidebarCache.leadsCount! > 0 ? sidebarCache.leadsCount! : undefined }
-          }
-          return item
-        }))
-      }
-
-      if (isCacheValid && sidebarCache.chatHistory !== null) {
-        setChatHistory(sidebarCache.chatHistory)
-        setTotalChats(sidebarCache.totalChats)
-      }
-
-      // Fetch fresh data in background (won't block navigation)
-      if (!isCacheValid) {
-        fetchLeadsCount()
-        fetchHistory()
-        sidebarCache.lastFetch = now
-      }
-    }, 100) // Small delay to let navigation complete first
-
-    // Event listeners remain immediate
-    const handleChatEvent = () => fetchHistory({ refresh: true })
+    const handleChatEvent = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    }
 
     window.addEventListener('chat-created', handleChatEvent)
     window.addEventListener('chat-title-updated', handleChatEvent)
 
     return () => {
-      clearTimeout(timeoutId)
       window.removeEventListener('chat-created', handleChatEvent)
       window.removeEventListener('chat-title-updated', handleChatEvent)
     }
-  }, [])
+  }, [queryClient])
 
   return (
     <div className={cn("relative flex h-full w-64 flex-col bg-transparent", className)}>
@@ -275,15 +200,9 @@ export function Sidebar({ className }: { className?: string }) {
                 })}
             </div>
             {chatHistory.length < totalChats && (
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full text-xs text-muted-foreground hover:text-primary mt-2"
-                    onClick={() => fetchHistory({ loadMore: true })}
-                    disabled={isLoadingMore}
-                >
-                    {isLoadingMore ? "Loading..." : "Load More"}
-                </Button>
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                    Showing {chatHistory.length} of {totalChats} chats
+                </p>
             )}
         </div>
       </div>

@@ -18,6 +18,7 @@ import { type DashboardData } from "@/lib/api/frost"
 import { useDashboardData, useNewLeadsCount } from "@/lib/hooks/use-dashboard-data"
 import { PipelineColumn } from "@/components/leads/pipeline-column"
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog"
+import { transformHubSpotContact } from "@/lib/utils/lead-transforms"
 import type { Lead } from "@/types"
 import {
   Select,
@@ -99,28 +100,7 @@ export default function LeadsPage() {
   }
 
   const leads: Lead[] = useMemo(() => {
-    return dashboardData?.leads?.map((lead: any) => {
-      const props = lead.properties || {}
-      return {
-        id: lead.id,
-        name: `${props.firstname || ''} ${props.lastname || ''}`.trim() || 'Unknown Name',
-        title: props.jobtitle,
-        company: props.company,
-        email: props.email,
-        phone: props.phone,
-        stage: (props.hs_lead_status?.toLowerCase() || 'new') as Lead['stage'],
-        source: props.hs_analytics_source || props.lead_source || 'Unknown',
-        tags: [], // Mock or extract if available
-        score: parseInt(props.hubspot_score || '0'), 
-        createdAt: new Date(props.createdate || Date.now()),
-        updatedAt: new Date(props.lastmodifieddate || Date.now()),
-        // Defaults
-        fitScore: 0,
-        behaviorScore: 0,
-        scoreBreakdown: [],
-        activities: [],
-      }
-    }) || []
+    return dashboardData?.leads?.map(transformHubSpotContact) || []
   }, [dashboardData])
 
   const handleLeadClick = (lead: Lead) => {

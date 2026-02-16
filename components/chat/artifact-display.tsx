@@ -18,6 +18,7 @@ import { MessageContent } from "./message-content"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
 import { WebSearchArtifact } from "./web-search-artifact"
 import { HelpCenterArtifact } from "./help-center-artifact"
+import { isBrandPosts, isWebSearch, isHelpCenter, parseArtifactData } from "@/lib/utils/artifact-types"
 
 export interface Artifact {
   type: "chart" | "code" | "table" | "report" | "data"
@@ -63,7 +64,7 @@ export function ArtifactDisplay({ artifact, className }: ArtifactDisplayProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error("Failed to copy:", err)
+      if (process.env.NODE_ENV === 'development') console.error("Failed to copy:", err)
     }
   }
 
@@ -110,162 +111,18 @@ export function ArtifactDisplay({ artifact, className }: ArtifactDisplayProps) {
 }
 
 function ArtifactContent({ artifact }: { artifact: Artifact }) {
-  // Check for brand posts
-  const isBrandPosts = (data: any, toolName?: string) => {
-    // Explicitly check for specific tools
-    if (toolName === 'analyze_brand_content' || toolName === 'search_post' || toolName === 'get_brand_posts' || toolName === 'extract_post_analysis') return true
+  const toolName = (artifact as any).toolName
 
-    if (!data) return false
-    // Check if it's the brand posts structure
-    if (Array.isArray(data) && data.length > 0 && (data[0].brandId || data[0].publishId || data[0].competitor_posts)) return true
-    if (data.brand_posts && Array.isArray(data.brand_posts)) return true
-    if (data.competitor_posts && Array.isArray(data.competitor_posts)) return true
-    
-    // Check if string and looks like brand posts
-    if (typeof data === 'string' && (data.includes('brandId') || data.includes('brand_posts') || data.includes('competitor_posts'))) {
-        try {
-            const parsed = JSON.parse(data);
-            if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0].brandId || parsed[0].publishId || parsed[0].competitor_posts)) return true;
-            if (parsed.brand_posts && Array.isArray(parsed.brand_posts)) return true;
-            if (parsed.competitor_posts && Array.isArray(parsed.competitor_posts)) return true;
-        } catch (e) {
-            return false;
-        }
-    }
-    return false
+  if (isBrandPosts(artifact.data, toolName)) {
+    return <BrandPostsArtifact data={parseArtifactData(artifact.data)} />
   }
 
-  // Check for web search results
-  const isWebSearch = (data: any, toolName?: string) => {
-    // Explicitly check for specific tools
-    if (toolName === 'search_web' || toolName === 'web_search') return true
-
-    if (!data) return false
-    // Check if it's the web search structure
-    if (Array.isArray(data)) {
-      // Check if array elements are web search results
-      if (data.length > 0 && data[0]?.type === "web_search_result") return true
-      // Check if array contains objects with cards property
-      if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
-        return data[0].cards.some((card: any) => card?.type === "web_search_result")
-      }
-    }
-    if (data.cards && Array.isArray(data.cards)) {
-      return data.cards.some((card: any) => card?.type === "web_search_result")
-    }
-    if (data.type === "web_search_result") return true
-    // Check if string and looks like web search
-    if (typeof data === 'string' && (data.includes('web_search_result') || data.includes('"cards"'))) {
-        try {
-            const parsed = JSON.parse(data);
-            if (Array.isArray(parsed)) {
-              if (parsed.length > 0 && parsed[0]?.type === "web_search_result") return true;
-              if (parsed.length > 0 && parsed[0]?.cards) {
-                return parsed[0].cards.some((card: any) => card?.type === "web_search_result");
-              }
-            }
-            if (parsed.cards && Array.isArray(parsed.cards)) {
-              return parsed.cards.some((card: any) => card?.type === "web_search_result");
-            }
-            if (parsed.type === "web_search_result") return true;
-        } catch (e) {
-            return false;
-        }
-    }
-    return false
+  if (isWebSearch(artifact.data, toolName)) {
+    return <WebSearchArtifact data={parseArtifactData(artifact.data)} />
   }
 
-  if (isBrandPosts(artifact.data, (artifact as any).toolName)) {
-    let data = artifact.data
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data)
-      } catch (e) {
-        console.error("Failed to parse brand posts data", e)
-      }
-    }
-    return <BrandPostsArtifact data={data} />
-  }
-
-  if (isWebSearch(artifact.data, (artifact as any).toolName)) {
-    let data = artifact.data
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data)
-      } catch (e) {
-        console.error("Failed to parse web search data", e)
-      }
-    }
-    return <WebSearchArtifact data={data} />
-  }
-
-  // Check for help center articles
-  const isHelpCenter = (data: any, toolName?: string) => {
-    // Explicitly check for specific tools
-    if (toolName === 'kawo_website_search') return true
-
-    if (!data) return false
-    
-    // Check for standard render data structure (nested sections)
-    if (data.data && Array.isArray(data.data)) {
-       // Check if any section contains helpcenter cards
-       const hasHelpCenterCards = data.data.some((section: any) => 
-         section.cards && Array.isArray(section.cards) && 
-         section.cards.some((card: any) => card.type === "helpcenter_article")
-       )
-       if (hasHelpCenterCards) return true
-    }
-
-    // Check if it's the help center structure (direct array)
-    if (Array.isArray(data)) {
-      // Check if array elements are help center articles
-      if (data.length > 0 && data[0]?.type === "helpcenter_article") return true
-      // Check if array contains objects with cards property
-      if (data.length > 0 && data[0]?.cards && Array.isArray(data[0].cards)) {
-        return data[0].cards.some((card: any) => card?.type === "helpcenter_article")
-      }
-    }
-    if (data.cards && Array.isArray(data.cards)) {
-      return data.cards.some((card: any) => card?.type === "helpcenter_article")
-    }
-    if (data.type === "helpcenter_article") return true
-    
-    try {
-        const str = JSON.stringify(data);
-        if (str.includes('"type":"helpcenter_article"')) return true;
-    } catch (e) {}
-
-    // Check if string and looks like help center
-    if (typeof data === 'string' && (data.includes('helpcenter_article'))) {
-        try {
-            const parsed = JSON.parse(data);
-             if (Array.isArray(parsed)) {
-              if (parsed.length > 0 && parsed[0]?.type === "helpcenter_article") return true;
-              if (parsed.length > 0 && parsed[0]?.cards) {
-                return parsed[0].cards.some((card: any) => card?.type === "helpcenter_article");
-              }
-            }
-            if (parsed.cards && Array.isArray(parsed.cards)) {
-              return parsed.cards.some((card: any) => card?.type === "helpcenter_article");
-            }
-            if (parsed.type === "helpcenter_article") return true;
-        } catch (e) {
-            return false;
-        }
-    }
-    return false
-  }
-
-  if (isHelpCenter(artifact.data, (artifact as any).toolName)) {
-    let data = artifact.data
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data)
-      } catch (e) {
-        console.error("Failed to parse help center data", e)
-      }
-    }
-    return <HelpCenterArtifact data={data} />
+  if (isHelpCenter(artifact.data, toolName)) {
+    return <HelpCenterArtifact data={parseArtifactData(artifact.data)} />
   }
 
   switch (artifact.type) {

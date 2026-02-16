@@ -1,4 +1,6 @@
+import { Suspense } from "react"
 import { ChatInterface } from "@/components/chat/chat-interface"
+import { LoadingState } from "@/components/ui/loading"
 
 export default function NewChatPage({
   searchParams,
@@ -6,9 +8,11 @@ export default function NewChatPage({
   searchParams: { q?: string; projectId?: string }
 }) {
   return (
-    <ChatInterface
-      initialMessage={searchParams.q}
-      projectId={searchParams.projectId}
-    />
+    <Suspense fallback={<LoadingState />}>
+      <ChatInterface
+        initialMessage={searchParams.q}
+        projectId={searchParams.projectId}
+      />
+    </Suspense>
   )
 }

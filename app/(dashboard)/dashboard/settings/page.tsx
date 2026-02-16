@@ -65,7 +65,7 @@ export default function SettingsPage() {
           .maybeSingle()
 
         if (error) {
-          console.error('Error loading profile:', error)
+          if (process.env.NODE_ENV === 'development') console.error('Error loading profile:', error)
           setError('Failed to load settings. Please try refreshing.')
           return
         }
@@ -95,7 +95,7 @@ export default function SettingsPage() {
           })
         }
       } catch (e) {
-        console.error('Unexpected error:', e)
+        if (process.env.NODE_ENV === 'development') console.error('Unexpected error:', e)
         setError('An unexpected error occurred.')
       }
     }
@@ -155,7 +155,7 @@ export default function SettingsPage() {
         email: profile.email || null
       })
     } catch (e: any) {
-      console.error('Save error:', e)
+      if (process.env.NODE_ENV === 'development') console.error('Save error:', e)
       setError(e.message || 'Failed to save settings')
       toast({
         title: "Error",
@@ -181,7 +181,7 @@ export default function SettingsPage() {
         type: "success"
       })
     } catch (e: any) {
-      console.error('Test connection error:', e)
+      if (process.env.NODE_ENV === 'development') console.error('Test connection error:', e)
       setConnectionStatus('error')
       toast({
         title: "Connection failed",

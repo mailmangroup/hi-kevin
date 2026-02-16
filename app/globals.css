@@ -2,7 +2,8 @@
 
 @plugin "tailwindcss-animate";
 
-@custom-variant dark (&:is(.dark *));
+/* TODO: Dark mode — uncomment when dark mode toggle is implemented */
+/* @custom-variant dark (&:is(.dark *)); */
 
 :root {
   --background: 228 33% 98%; /* #F8F9FC */
