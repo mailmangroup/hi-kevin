@@ -296,6 +296,24 @@ export const aiService = {
   },
 
   /**
+   * Update report section insights
+   */
+  async updateReportInsights(
+    reportId: string,
+    pageNumber: number,
+    sectionIdx: number,
+    insights: string[]
+  ): Promise<any> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return { success: true }
+    }
+    return directApiCall(`agent/reports/${reportId}/pages/${pageNumber}/sections/${sectionIdx}/insights`, {
+        method: 'PUT',
+        body: JSON.stringify({ insights })
+    })
+  },
+
+  /**
    * Create a new conversation
    */
   async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {

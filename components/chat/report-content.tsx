@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus, MessageSquare } from "lucide-react"
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus, MessageSquare, Pencil, X, Check, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { useArtifact } from "./artifact-context"
 import { MessageContent } from "./message-content"
 import { formatDateRangeDisplay } from "@/lib/utils/date-range"
+import { aiService } from "@/lib/api/client"
 import { TableContent, DataContent } from "./artifact-renderers"
 import {
   BarChart,
@@ -231,9 +233,73 @@ function ReportChart({ data }: { data: any }) {
   )
 }
 
-function ReportSectionRenderer({ section, pageIndex, sectionIndex }: { section: any, pageIndex?: number, sectionIndex?: number }) {
+function ReportSectionRenderer({ section, pageIndex, sectionIndex, reportId }: { section: any, pageIndex?: number, sectionIndex?: number, reportId?: string }) {
   const { type, title, description, content, data, insights, stat_tiles, table_data, chart_spec } = section
-  const { setReportNavigation } = useArtifact()
+  const { setReportNavigation, selectedArtifact, openArtifact } = useArtifact()
+  
+  // Editing state
+  const [isEditing, setIsEditing] = React.useState(false)
+  const [editingInsights, setEditingInsights] = React.useState<string[]>([])
+
+  const startEditing = () => {
+      if (insights && Array.isArray(insights)) {
+          setEditingInsights([...insights])
+          setIsEditing(true)
+      }
+  }
+
+  const cancelEditing = () => {
+      setIsEditing(false)
+      setEditingInsights([])
+  }
+
+  const saveInsights = async () => {
+      if (!selectedArtifact) return
+
+      // Optimistically update UI
+      const newData = JSON.parse(JSON.stringify(selectedArtifact.data))
+
+      // Update the specific section in the data structure
+      // Note: pageIndex and sectionIndex are 1-based
+      if (pageIndex && sectionIndex && newData.pages && newData.pages[pageIndex - 1]) {
+          if (newData.pages[pageIndex - 1].sections && newData.pages[pageIndex - 1].sections[sectionIndex - 1]) {
+              newData.pages[pageIndex - 1].sections[sectionIndex - 1].insights = editingInsights
+          }
+      }
+
+      // Update artifact to trigger re-render
+      openArtifact({
+          ...selectedArtifact,
+          data: newData
+      })
+
+      setIsEditing(false)
+
+      // Update backend
+      if (reportId && pageIndex && sectionIndex) {
+          try {
+              await aiService.updateReportInsights(reportId, pageIndex, sectionIndex, editingInsights)
+          } catch (err) {
+              console.error("Failed to update insights on backend", err)
+              // Ideally we should revert the UI change here or show an error
+          }
+      }
+  }
+
+  const updateInsight = (idx: number, value: string) => {
+      const newInsights = [...editingInsights]
+      newInsights[idx] = value
+      setEditingInsights(newInsights)
+  }
+
+  const removeInsight = (idx: number) => {
+      const newInsights = editingInsights.filter((_, i) => i !== idx)
+      setEditingInsights(newInsights)
+  }
+
+  const addInsight = () => {
+      setEditingInsights([...editingInsights, ""])
+  }
 
   const handleChatToKevin = () => {
       if (pageIndex && sectionIndex) {
@@ -269,13 +335,52 @@ function ReportSectionRenderer({ section, pageIndex, sectionIndex }: { section: 
         <p className="text-sm text-gray-500">{description}</p>
       )}
 
-      {insights && Array.isArray(insights) && insights.length > 0 && (
-        <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
-          <div className="space-y-2">
-            {insights.map((insight: string, idx: number) => (
-               <MessageContent key={idx} content={insight} className="text-sm text-gray-700" />
-            ))}
-          </div>
+      {/* Editable Insights Section */}
+      {((insights && Array.isArray(insights) && insights.length > 0) || isEditing) && (
+        <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100 relative group/insights">
+          {!isEditing ? (
+            <>
+                <div className="absolute top-2 right-2 opacity-0 group-hover/insights:opacity-100 transition-opacity">
+                    <Button size="icon" variant="ghost" className="h-6 w-6 hover:bg-blue-100" onClick={startEditing}>
+                        <Pencil className="h-3 w-3 text-blue-600" />
+                    </Button>
+                </div>
+                <div className="space-y-2">
+                    {insights.map((insight: string, idx: number) => (
+                    <MessageContent key={idx} content={insight} className="text-sm text-gray-700" />
+                    ))}
+                </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+                {editingInsights.map((insight, idx) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                        <Textarea
+                            value={insight}
+                            onChange={(e) => updateInsight(idx, e.target.value)}
+                            className="text-sm bg-white min-h-[60px]"
+                        />
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+                            onClick={() => removeInsight(idx)}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addInsight} className="w-full border-dashed border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700">
+                    <Plus className="h-3 w-3 mr-1" /> Add Insight
+                </Button>
+                <div className="flex gap-2 justify-end pt-2">
+                    <Button size="sm" variant="ghost" onClick={cancelEditing}>Cancel</Button>
+                    <Button size="sm" onClick={saveInsights} className="bg-blue-600 hover:bg-blue-700 text-white gap-1">
+                        <Check className="h-3 w-3" /> Save Changes
+                    </Button>
+                </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -441,6 +546,7 @@ export function ReportContent({ data }: { data: any }) {
                         section={section}
                         pageIndex={activePage + 1}
                         sectionIndex={sIdx + 1}
+                        reportId={data.id}
                     />
                 </div>
               ))}

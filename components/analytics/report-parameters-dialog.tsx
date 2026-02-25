@@ -171,7 +171,12 @@ export function ReportParametersDialog({
 
       for await (const chunk of stream) {
         if (chunk.new_conversation) {
-          setGeneratedConversationId(chunk.new_conversation.conversation_id)
+          const convId = chunk.conversation_id || chunk.new_conversation.conversation_id
+          if (convId) {
+            setGeneratedConversationId(convId)
+            // Dispatch event to update sidebar
+            window.dispatchEvent(new CustomEvent('chat-created'))
+          }
         }
         
         if (chunk.progress) {
@@ -206,7 +211,12 @@ export function ReportParametersDialog({
 
   const handleViewReport = () => {
     if (generatedConversationId) {
-      router.push(`/chat?id=${generatedConversationId}`)
+      router.push(`/chat/${generatedConversationId}`)
+      onOpenChange(false)
+    } else {
+      // Fallback: if we don't have the ID for some reason, try to go to the latest chat
+      // or just close the dialog.
+      console.warn("No conversation ID found for report")
       onOpenChange(false)
     }
   }
