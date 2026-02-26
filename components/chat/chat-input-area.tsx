@@ -376,13 +376,13 @@ export function ChatInputArea({
   // Get file color class based on color name
   const getFileColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
-      red: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-      blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-      orange: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-      green: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
-      gray: 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700',
-      purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-      yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+      red: 'bg-red-100 text-red-700 border-red-200',
+      blue: 'bg-blue-100 text-blue-700 border-blue-200',
+      orange: 'bg-orange-100 text-orange-700 border-orange-200',
+      green: 'bg-green-100 text-green-700 border-green-200',
+      gray: 'bg-gray-100 text-gray-700 border-gray-200',
+      purple: 'bg-purple-100 text-purple-700 border-purple-200',
+      yellow: 'bg-yellow-100 text-yellow-700 border-yellow-200',
     }
     return colorMap[color] || colorMap['gray']
   }
@@ -414,7 +414,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] bg-white dark:bg-gray-900 border border-border shadow-[0_12px_40px_rgba(30,58,138,0.15)] flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-[0_16px_48px_rgba(99,102,241,0.2)]", className)}>
+    <div className={cn("relative rounded-[1.5rem] bg-white border border-border shadow-[0_12px_40px_rgba(30,58,138,0.15)] flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-[0_16px_48px_rgba(99,102,241,0.2)]", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">
@@ -431,7 +431,7 @@ export function ChatInputArea({
           <div className="flex justify-start px-4 pt-2">
             {fastPath === 'analyze_video' && (
               <div 
-                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700 cursor-pointer hover:bg-blue-100 transition-colors"
                 onClick={() => setFastPath?.(undefined)}
               >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500"></span>
@@ -441,7 +441,7 @@ export function ChatInputArea({
             )}
             {fastPath === 'helpcenter' && (
               <div 
-                className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-700 cursor-pointer hover:bg-green-100 transition-colors"
                 onClick={() => setFastPath?.(undefined)}
               >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
@@ -451,7 +451,7 @@ export function ChatInputArea({
             )}
             {fastPath === 'extract_video_script' && (
                 <div 
-                  className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-3 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 cursor-pointer hover:bg-purple-100 transition-colors"
                   onClick={() => setFastPath?.(undefined)}
                 >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500"></span>
@@ -461,7 +461,7 @@ export function ChatInputArea({
             )}
             {fastPath === 'analyze_audio' && (
                 <div
-                  className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-xs font-medium text-orange-700 cursor-pointer hover:bg-orange-100 transition-colors"
                   onClick={() => setFastPath?.(undefined)}
                 >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500"></span>
@@ -471,7 +471,7 @@ export function ChatInputArea({
             )}
             {fastPath === 'query_database' && (
                 <div
-                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-medium text-indigo-700 cursor-pointer hover:bg-indigo-100 transition-colors"
                   onClick={() => setFastPath?.(undefined)}
                 >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
@@ -581,7 +581,7 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 thinkingEnabled
-                    ? "bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800"
+                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
@@ -609,7 +609,7 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 deepResearch
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
+                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}

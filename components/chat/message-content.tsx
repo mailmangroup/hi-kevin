@@ -96,7 +96,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
                 {!isUser && (
                   <button
                     onClick={onCopy}
-                    className="absolute top-2 right-2 p-1.5 bg-white/80 dark:bg-gray-800/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                    className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white border border-gray-200"
                     title="Copy code"
                   >
                     {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
@@ -158,17 +158,17 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
             }
 
             return (
-              <div className="relative group my-2 border rounded-lg border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div className="relative group my-2 border rounded-lg border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table ref={ref} className={cn(
                     "min-w-full text-xs border-collapse",
-                    isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
+                    isUser ? "text-white" : "text-gray-700"
                   )}>
                     {children}
                   </table>
                 </div>
                 {!isUser && (
-                  <div className="flex justify-end items-center gap-2 p-1 bg-gray-50 border-t border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+                  <div className="flex justify-end items-center gap-2 p-1 bg-gray-50 border-t border-gray-100">
                     <button
                       onClick={onDownloadCSV}
                       className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
@@ -177,7 +177,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
                       <Download className="h-3 w-3" />
                       CSV
                     </button>
-                    <div className="h-3 w-px bg-gray-300 dark:bg-gray-700" />
+                    <div className="h-3 w-px bg-gray-300" />
                     <button
                       onClick={onCopy}
                       className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
@@ -192,7 +192,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           },
           thead: ({ children }) => (
             <thead className={cn(
-              isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/50"
+              isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50"
             )}>
               {children}
             </thead>
@@ -201,7 +201,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           tr: ({ children }) => (
             <tr className={cn(
               "border-b",
-              isUser ? "border-white/20" : "border-gray-100 dark:border-gray-800"
+              isUser ? "border-white/20" : "border-gray-100"
             )}>
               {children}
             </tr>
@@ -209,7 +209,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           th: ({ children }) => (
             <th className={cn(
               "px-3 py-2 text-left font-semibold",
-              isUser ? "text-white" : "text-gray-700 dark:text-gray-200"
+              isUser ? "text-white" : "text-gray-700"
             )}>
               {children}
             </th>
@@ -217,7 +217,7 @@ export function MessageContent({ content, className, isUser = false }: MessageCo
           td: ({ children }) => (
             <td className={cn(
               "px-3 py-2",
-              isUser ? "text-white" : "text-gray-600 dark:text-gray-300"
+              isUser ? "text-white" : "text-gray-600"
             )}>
               {children}
             </td>

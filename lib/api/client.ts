@@ -359,15 +359,7 @@ export const aiService = {
         return
     }
 
-    // Dynamic model selection based on images
-    let model = options.model || "qwen-max"
-    if (options.images && options.images.length > 0) {
-        if (model === 'qwen-max') {
-            model = 'qwen-vl-max'
-        } else if (model === 'qwen-plus') {
-            model = 'qwen3-vl-plus'
-        }
-    }
+    const model = options.model || "qwen-max"
 
     const payload: any = {
         query: message,
