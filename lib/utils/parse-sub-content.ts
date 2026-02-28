@@ -1,5 +1,5 @@
 import type { ContentPart, ToolCall, Message } from "@/components/chat/chat-interface"
-import type { DeepResearchData, ResearchActivity } from "@/components/chat/deep-research-display"
+import type { DeepResearchData, ResearchTask } from "@/components/chat/deep-research-display"
 
 export function parseSubContentList(subContentList: any[] = []): {
   toolCalls: ToolCall[],
@@ -81,31 +81,21 @@ export function parseSubContentList(subContentList: any[] = []): {
       contentParts.push({ type: 'text', content: item.text || item.content })
     } else if (item.type === 'thinking') {
       contentParts.push({ type: 'thinking', content: item.thinking || item.content })
-    } else if (item.type === 'research_plan') {
+    } else if (item.type === 'research_task') {
       if (!deepResearchData) {
-        deepResearchData = { plan: null, activities: [], isComplete: true }
+        deepResearchData = { tasks: {}, taskOrder: [], isComplete: true }
       }
-      const planData = item.content || {}
-      deepResearchData.plan = {
-        title: planData.title || "",
-        steps: (planData.steps || []).map((s: any) => ({
-          title: s.title,
-          type: s.type,
-          status: "completed" as const,
-        })),
+      const task: ResearchTask = {
+        id: item.task_id,
+        description: item.description || item.task_id,
+        status: item.status || "completed",
+        result: item.result,
+        error: item.error,
       }
-    } else if (item.type === 'research_step') {
-      // Tracked by plan steps, no separate rendering needed
-    } else if (item.type === 'research_activity') {
-      if (!deepResearchData) {
-        deepResearchData = { plan: null, activities: [], isComplete: true }
+      deepResearchData.tasks[item.task_id] = task
+      if (!deepResearchData.taskOrder.includes(item.task_id)) {
+        deepResearchData.taskOrder.push(item.task_id)
       }
-      deepResearchData.activities.push({
-        agent: item.agent,
-        stepIndex: item.step_index,
-        content: item.content || "",
-        isComplete: true,
-      })
     }
   }
 

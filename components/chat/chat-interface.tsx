@@ -15,7 +15,7 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepResearchDisplay, DeepResearchData, ResearchActivity } from "@/components/chat/deep-research-display"
+import { DeepResearchDisplay, DeepResearchData } from "@/components/chat/deep-research-display"
 import { MessageActions } from "@/components/chat/message-actions"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
@@ -537,7 +537,6 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
 
     // Deep research tracking
     let deepResearchData: DeepResearchData | null = null
-    let deepResearchActivities: ResearchActivity[] = []
 
     let activeConversationId = conversationId;
 
@@ -589,19 +588,19 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
 
       // Helper to update deep research content part in message
       const updateDeepResearchMessage = () => {
-        const drData: DeepResearchData = {
-          plan: deepResearchData?.plan || null,
-          activities: [...deepResearchActivities],
-          isComplete: deepResearchData?.isComplete || false,
-        }
-        deepResearchData = drData
+        if (!deepResearchData) return
 
-        // Find or create the deep_research content part
+        const snapshot: DeepResearchData = {
+          tasks: { ...deepResearchData.tasks },
+          taskOrder: [...deepResearchData.taskOrder],
+          isComplete: deepResearchData.isComplete,
+        }
+
         const drPartIndex = contentParts.findIndex((p) => p.type === "deep_research")
         if (drPartIndex >= 0) {
-          contentParts[drPartIndex] = { type: "deep_research", deepResearch: drData }
+          contentParts[drPartIndex] = { type: "deep_research", deepResearch: snapshot }
         } else {
-          contentParts.push({ type: "deep_research", deepResearch: drData })
+          contentParts.push({ type: "deep_research", deepResearch: snapshot })
         }
 
         lastPartWasText = false
@@ -787,124 +786,53 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
               openArtifact(reportArtifact)
           }
 
-          // Deep Research events — structured display via DeepResearchDisplay component
+          // Deep Research task lifecycle events
 
-          if (chunk.research_plan) {
-              const planData = chunk.research_plan
+          if (chunk.type === "task_started") {
+              const taskId = chunk.task_id
+              const description = chunk.description || taskId
               if (!deepResearchData) {
-                deepResearchData = { plan: null, activities: [], isComplete: false }
+                deepResearchData = { tasks: {}, taskOrder: [], isComplete: false }
               }
-              deepResearchData.plan = {
-                title: planData.title || "",
-                steps: (planData.steps || []).map((s: any) => ({
-                  title: s.title,
-                  type: s.type,
-                  status: "pending" as const,
-                })),
-              }
-
-              // Remove any "Creating research plan" text part that was added before plan arrived
-              contentParts = contentParts.filter(
-                (p) => !(p.type === "text" && p.content?.includes("Creating research plan"))
-              )
-
+              deepResearchData.tasks[taskId] = { id: taskId, description, status: "in_progress" }
+              deepResearchData.taskOrder.push(taskId)
               updateDeepResearchMessage()
           }
 
-          if (chunk.research_step_start) {
-              const stepData = chunk.research_step_start
+          if (chunk.type === "task_running") {
+              const taskId = chunk.task_id
               if (!deepResearchData) {
-                deepResearchData = { plan: null, activities: [], isComplete: false }
+                deepResearchData = { tasks: {}, taskOrder: [], isComplete: false }
               }
-              // Update plan step status to in_progress
-              if (deepResearchData.plan && stepData.step_index >= 0 && stepData.step_index < deepResearchData.plan.steps.length) {
-                deepResearchData.plan.steps = deepResearchData.plan.steps.map((s, i) =>
-                  i === stepData.step_index ? { ...s, status: "in_progress" as const } : s
-                )
+              const existing = deepResearchData.tasks[taskId]
+              if (existing) {
+                deepResearchData.tasks[taskId] = { ...existing, latestMessage: chunk.message }
               }
               updateDeepResearchMessage()
           }
 
-          if (chunk.research_step_complete) {
-              const completeData = chunk.research_step_complete
-              if (deepResearchData?.plan && completeData.step_index >= 0 && completeData.step_index < deepResearchData.plan.steps.length) {
-                deepResearchData.plan.steps = deepResearchData.plan.steps.map((s, i) =>
-                  i === completeData.step_index ? { ...s, status: "completed" as const } : s
-                )
-              }
-              updateDeepResearchMessage()
-          }
-
-          if (chunk.research_activity) {
-              const activity = chunk.research_activity
-              if (!deepResearchData) {
-                deepResearchData = { plan: null, activities: [], isComplete: false }
-              }
-
-              if (activity.activity_type === "chunk") {
-                // Accumulate content for the current agent/step
-                const existingIdx = deepResearchActivities.findIndex(
-                  (a) => a.agent === activity.agent && a.stepIndex === activity.step_index && !a.isComplete
-                )
-                if (existingIdx >= 0) {
-                  deepResearchActivities[existingIdx] = {
-                    ...deepResearchActivities[existingIdx],
-                    content: deepResearchActivities[existingIdx].content + activity.content,
-                  }
-                } else {
-                  deepResearchActivities.push({
-                    agent: activity.agent,
-                    stepIndex: activity.step_index,
-                    content: activity.content,
-                    isComplete: false,
-                  })
+          if (chunk.type === "task_completed") {
+              const taskId = chunk.task_id
+              if (deepResearchData?.tasks[taskId]) {
+                deepResearchData.tasks[taskId] = {
+                  ...deepResearchData.tasks[taskId],
+                  status: "completed",
+                  result: chunk.result,
                 }
-              } else if (activity.activity_type === "end") {
-                // Mark activity as complete with final content
-                const existingIdx = deepResearchActivities.findIndex(
-                  (a) => a.agent === activity.agent && a.stepIndex === activity.step_index && !a.isComplete
-                )
-                if (existingIdx >= 0) {
-                  deepResearchActivities[existingIdx] = {
-                    ...deepResearchActivities[existingIdx],
-                    content: activity.content || deepResearchActivities[existingIdx].content,
-                    isComplete: true,
-                  }
-                } else if (activity.content) {
-                  deepResearchActivities.push({
-                    agent: activity.agent,
-                    stepIndex: activity.step_index,
-                    content: activity.content,
-                    isComplete: true,
-                  })
-                }
-              } else if (activity.activity_type === "start") {
-                // Create placeholder for new agent activity
-                deepResearchActivities.push({
-                  agent: activity.agent,
-                  stepIndex: activity.step_index,
-                  content: "",
-                  isComplete: false,
-                })
               }
-
               updateDeepResearchMessage()
           }
 
-          if (chunk.research_report) {
-              // The report content was already streamed via content chunks from the reporter node.
-              // This event signals that the full report is ready — no additional rendering needed.
-          }
-
-          if (chunk.research_report_artifact) {
-              // Open final report in artifact panel as markdown
-              const reportArtifact: ArtifactData = {
-                id: `research-report-${Date.now()}`,
-                type: "markdown" as any,
-                title: chunk.research_report_artifact.title || "Research Report",
-                data: chunk.research_report_artifact.content,
+          if (chunk.type === "task_failed" || chunk.type === "task_timed_out") {
+              const taskId = chunk.task_id
+              if (deepResearchData?.tasks[taskId]) {
+                deepResearchData.tasks[taskId] = {
+                  ...deepResearchData.tasks[taskId],
+                  status: chunk.type === "task_timed_out" ? "timed_out" : "failed",
+                  error: chunk.error,
+                }
               }
-              openArtifact(reportArtifact)
+              updateDeepResearchMessage()
           }
 
 
