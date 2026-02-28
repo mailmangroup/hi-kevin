@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Sparkles, Microscope } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Sparkles, Microscope, Database } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -72,6 +72,8 @@ export interface ChatInputAreaProps {
   fastPath?: string | null
   setFastPath?: (value: string | undefined) => void
   onGenerateArtifact?: () => Promise<void>
+  sqlEnabled?: boolean
+  setSqlEnabled?: (enabled: boolean) => void
 }
 
 import { useArtifact } from "./artifact-context"
@@ -102,7 +104,9 @@ export function ChatInputArea({
   showBorder = true,
   fastPath,
   setFastPath,
-  onGenerateArtifact
+  onGenerateArtifact,
+  sqlEnabled,
+  setSqlEnabled
 }: ChatInputAreaProps) {
   const [isGeneratingArtifact, setIsGeneratingArtifact] = React.useState(false)
   const imageInputRef = React.useRef<HTMLInputElement>(null)
@@ -427,8 +431,8 @@ export function ChatInputArea({
       )}
 
       {/* Mode Indicators */}
-      {(fastPath) && (
-          <div className="flex justify-start px-4 pt-2">
+      {(fastPath || deepResearch) && (
+          <div className="flex justify-start px-4 pt-2 gap-2 flex-wrap">
             {fastPath === 'analyze_video' && (
               <div 
                 className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700 cursor-pointer hover:bg-blue-100 transition-colors"
@@ -476,6 +480,16 @@ export function ChatInputArea({
                 >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
                 Query Database Mode
+                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
+              </div>
+            )}
+            {deepResearch && (
+              <div
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 cursor-pointer hover:bg-emerald-100 transition-colors"
+                onClick={() => setDeepResearch(false)}
+              >
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Deep Research Mode
                 <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
               </div>
             )}
@@ -604,18 +618,18 @@ export function ChatInputArea({
                 Search
             </Button>
             <Button
-                variant={deepResearch ? "secondary" : "ghost"}
-                onClick={() => setDeepResearch(!deepResearch)}
+                variant={sqlEnabled ? "secondary" : "ghost"}
+                onClick={() => setSqlEnabled?.(!sqlEnabled)}
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
-                deepResearch
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                sqlEnabled
+                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
             >
-                <Microscope className="h-3.5 w-3.5 mr-1.5" />
-                Deep Research
+                <Database className="h-3.5 w-3.5 mr-1.5" />
+                SQL
             </Button>
 
             {/* Generate Artifact Button - Only visible in command_center mode */}

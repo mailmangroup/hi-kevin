@@ -8,6 +8,13 @@ import { ArtifactProvider } from "@/components/chat/artifact-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { ReportParametersDialog } from "@/components/analytics/report-parameters-dialog"
 import { CommandCenterDialog } from "@/components/dashboard/command-center-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Video, FileText, Music, ChevronDown } from "lucide-react"
 
 interface ChatInputProps {
   projectId?: string
@@ -21,6 +28,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [thinkingEnabled, setThinkingEnabled] = useState(true)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
   const [deepResearch, setDeepResearch] = useState(false)
+  const [sqlEnabled, setSqlEnabled] = useState(false)
   const [model, setModel] = useState("qwen-max")
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
   const [selectedDocuments, setSelectedDocuments] = useState<UploadedDocument[]>([])
@@ -86,6 +94,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
       thinking: thinkingEnabled.toString(),
       search: includeWebSearch.toString(),
       deepResearch: deepResearch.toString(),
+      sql: sqlEnabled.toString(),
       model
     })
 
@@ -104,31 +113,27 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   }
 
 
+  // Only one mode can be active at a time
+  const activateFastPath = (path: string | null) => {
+    setDeepResearch(false)
+    setFastPath(path)
+  }
+
+  const activateDeepResearch = (enabled: boolean) => {
+    if (enabled) setFastPath(null)
+    setDeepResearch(enabled)
+  }
+
   const greeting = projectName
     ? projectName
     : fullName
       ? `Hi ${fullName}, how can I help you today?`
       : "How can I help you today?"
 
-  const handleAnalyzeVideo = () => {
-    setFastPath("analyze_video")
-  }
-
-  const handleGetHelp = () => {
-    setFastPath("helpcenter")
-  }
-
-  const handleExtractScript = () => {
-    setFastPath("extract_video_script")
-  }
-
-  const handleAnalyzeAudio = () => {
-    setFastPath("analyze_audio")
-  }
-
-  const handleQueryDatabase = () => {
-    setFastPath("query_database")
-  }
+  const handleAnalyzeVideo = () => activateFastPath("analyze_video")
+  const handleGetHelp = () => activateFastPath("helpcenter")
+  const handleExtractScript = () => activateFastPath("extract_video_script")
+  const handleAnalyzeAudio = () => activateFastPath("analyze_audio")
 
   const handleCreateReport = () => {
     setIsReportDialogOpen(true)
@@ -153,7 +158,9 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
                 deepResearch={deepResearch}
-                setDeepResearch={setDeepResearch}
+                setDeepResearch={activateDeepResearch}
+                sqlEnabled={sqlEnabled}
+                setSqlEnabled={setSqlEnabled}
                 model={model}
                 setModel={setModel}
                 selectedImages={selectedImages}
@@ -163,7 +170,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 placeholder="Reply..."
                 disabled={isNavigating}
                 fastPath={fastPath}
-                setFastPath={(val) => setFastPath(val ?? null)}
+                setFastPath={(val) => activateFastPath(val ?? null)}
               />
           </div>
         ) : (
@@ -181,7 +188,9 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
                 deepResearch={deepResearch}
-                setDeepResearch={setDeepResearch}
+                setDeepResearch={activateDeepResearch}
+                sqlEnabled={sqlEnabled}
+                setSqlEnabled={setSqlEnabled}
                 model={model}
                 setModel={setModel}
                 selectedImages={selectedImages}
@@ -191,46 +200,51 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 placeholder=""
                 disabled={isNavigating}
                 fastPath={fastPath}
-                setFastPath={(val) => setFastPath(val ?? null)}
+                setFastPath={(val) => activateFastPath(val ?? null)}
               />
             </div>
 
             {!hideActions && (
               <div className="flex flex-wrap justify-center gap-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                    >
+                      Analyze Media <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={handleAnalyzeVideo}>
+                      <Video className="mr-2 h-4 w-4" />
+                      Analyze Video
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExtractScript}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Extract Script
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAnalyzeAudio}>
+                      <Music className="mr-2 h-4 w-4" />
+                      Analyze Audio
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
-                  onClick={handleAnalyzeVideo}
+                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-emerald-500/10 hover:border-emerald-200 transition-all"
+                  onClick={() => activateDeepResearch(!deepResearch)}
                 >
-                  Analyze Video
+                  Deep Research
                 </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
-                  onClick={handleExtractScript}
-                >
-                  Extract Script
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
-                  onClick={handleAnalyzeAudio}
-                >
-                  Analyze Audio
-                </Button>
+
                 <Button
                   variant="outline"
                   className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleGetHelp}
                 >
                   Get Help
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
-                  onClick={handleQueryDatabase}
-                >
-                  Query Database
                 </Button>
                 <Button
                   variant="outline"

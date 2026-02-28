@@ -143,6 +143,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     const param = searchParams?.get('deepResearch')
     return param === 'true' ? true : false
   })
+  const [sqlEnabled, setSqlEnabled] = React.useState(() => {
+    const param = searchParams?.get('sql')
+    return param === 'true' ? true : false
+  })
   const [model, setModel] = React.useState(() => {
     return searchParams?.get('model') || "qwen-max"
   })
@@ -571,6 +575,7 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
         thinkingEnabled,
         includeWebSearch,
         deepResearch,
+        sqlEnabled,
         model,
         images: validImages.map(img => img.key!), // Only send OSS keys
         documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
@@ -1225,6 +1230,8 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
             setIncludeWebSearch={setIncludeWebSearch}
             deepResearch={deepResearch}
             setDeepResearch={setDeepResearch}
+            sqlEnabled={sqlEnabled}
+            setSqlEnabled={setSqlEnabled}
             model={model}
             setModel={setModel}
             selectedImages={selectedImages}

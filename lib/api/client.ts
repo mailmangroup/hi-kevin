@@ -347,7 +347,8 @@ export const aiService = {
         },
         fastPath?: string,
         deepResearch?: boolean,
-        maxResearchSteps?: number
+        maxResearchSteps?: number,
+        sqlEnabled?: boolean
     }
   ): AsyncGenerator<any, void, unknown> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
@@ -378,7 +379,8 @@ export const aiService = {
         report_context: options.reportContext,
         fast_path: options.fastPath,
         deep_research: options.deepResearch ?? false,
-        max_research_steps: options.maxResearchSteps ?? 5
+        max_research_steps: options.maxResearchSteps ?? 5,
+        query_database: options.sqlEnabled ?? false
     }
 
     const payloadString = JSON.stringify(payload)
