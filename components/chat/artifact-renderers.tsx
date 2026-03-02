@@ -38,11 +38,17 @@ export function ChartContent({ data }: { data: any }) {
 }
 
 export function CodeContent({ data }: { data: any }) {
-  const code = typeof data === "string" ? data : data?.code || JSON.stringify(data, null, 2)
+  const code = typeof data === "string" ? data : data?.content ?? data?.code ?? JSON.stringify(data, null, 2)
+  const language = typeof data === "object" ? (data?.language || "") : ""
 
   return (
-    <div className="overflow-x-auto">
-      <pre className="text-sm font-mono overflow-x-auto p-4 bg-gray-900 text-gray-100 rounded-lg border border-gray-700">
+    <div className="overflow-x-auto rounded-lg border border-gray-700 overflow-hidden">
+      {language && (
+        <div className="flex items-center justify-between px-4 py-1.5 bg-gray-800 border-b border-gray-700">
+          <span className="text-xs text-gray-400 font-mono">{language}</span>
+        </div>
+      )}
+      <pre className="text-sm font-mono overflow-x-auto p-4 bg-gray-900 text-gray-100 m-0">
         <code className="text-gray-100">{code}</code>
       </pre>
     </div>
@@ -51,14 +57,31 @@ export function CodeContent({ data }: { data: any }) {
 
 export function HtmlContent({ data }: { data: any }) {
   const html = typeof data === "string" ? data : data?.content ?? data?.html ?? ""
+  const iframeRef = React.useRef<HTMLIFrameElement>(null)
+  const [iframeHeight, setIframeHeight] = React.useState(500)
+
+  const handleLoad = React.useCallback(() => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentDocument?.body) return
+    // Give the document a moment to finish rendering before measuring
+    requestAnimationFrame(() => {
+      if (!iframe.contentDocument?.body) return
+      const h = iframe.contentDocument.documentElement.scrollHeight || iframe.contentDocument.body.scrollHeight
+      setIframeHeight(Math.max(400, h + 24))
+    })
+  }, [])
+
   if (!html) return <p className="text-sm text-gray-500">No HTML content</p>
   return (
-    <div className="w-full min-h-[200px] rounded-lg border border-gray-200 overflow-hidden bg-white">
+    <div className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white">
       <iframe
+        ref={iframeRef}
         title="HTML artifact"
         srcDoc={html}
-        className="w-full min-h-[400px] border-0"
-        sandbox="allow-same-origin"
+        style={{ height: iframeHeight }}
+        className="w-full border-0 block"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+        onLoad={handleLoad}
       />
     </div>
   )
@@ -68,7 +91,7 @@ export function MarkdownContent({ data }: { data: any }) {
   const md = typeof data === "string" ? data : data?.content ?? data?.markdown ?? ""
   if (!md) return <p className="text-sm text-gray-500">No markdown content</p>
   return (
-    <div className="prose prose-sm max-w-none">
+    <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-a:text-blue-600">
       <MessageContent content={md} />
     </div>
   )
@@ -76,21 +99,69 @@ export function MarkdownContent({ data }: { data: any }) {
 
 export function MermaidContent({ data }: { data: any }) {
   const code = typeof data === "string" ? data : data?.content ?? data?.code ?? ""
+  const [svg, setSvg] = React.useState<string | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const idRef = React.useRef(`mermaid-${Math.random().toString(36).slice(2)}`)
+
+  React.useEffect(() => {
+    if (!code) return
+    let cancelled = false
+
+    import("mermaid").then(({ default: mermaid }) => {
+      mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" })
+      mermaid.render(idRef.current, code)
+        .then(({ svg: rendered }) => {
+          if (!cancelled) setSvg(rendered)
+        })
+        .catch((err) => {
+          if (!cancelled) setError(String(err?.message || err))
+        })
+    })
+
+    return () => { cancelled = true }
+  }, [code])
+
   if (!code) return <p className="text-sm text-gray-500">No diagram content</p>
-  return <CodeContent data={code} />
+
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-red-500">Failed to render diagram: {error}</p>
+        <CodeContent data={code} />
+      </div>
+    )
+  }
+
+  if (!svg) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-gray-400">
+        <span className="animate-spin">⟳</span> Rendering diagram…
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="w-full overflow-auto rounded-lg border border-gray-200 bg-white p-4"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
 }
 
 export function TableContent({ data }: { data: any }) {
-  if (isBrandPosts(data)) {
-    return <BrandPostsArtifact data={parseArtifactData(data)} />
+  // Unwrap create_artifact envelope so content-level checks work on the actual payload.
+  const tableData = (data?.type === "artifact") ? (data?.content ?? data?.data ?? data) : data
+
+  if (isBrandPosts(tableData)) {
+    return <BrandPostsArtifact data={parseArtifactData(tableData)} />
   }
 
-  if (isWebSearch(data)) {
-    return <WebSearchArtifact data={parseArtifactData(data)} />
+  if (isWebSearch(tableData)) {
+    return <WebSearchArtifact data={parseArtifactData(tableData)} />
   }
 
-  if (Array.isArray(data) && data.length > 0) {
-    const headers = Object.keys(data[0])
+  if (Array.isArray(tableData) && tableData.length > 0) {
+    const headers = Object.keys(tableData[0])
 
     return (
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -105,7 +176,7 @@ export function TableContent({ data }: { data: any }) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {data.map((row, idx) => (
+            {tableData.map((row: any, idx: number) => (
               <tr key={idx} className="hover:bg-gray-50 transition-colors">
                 {headers.map((header) => (
                   <td key={header} className="px-4 py-3 text-sm text-gray-600">
@@ -121,8 +192,8 @@ export function TableContent({ data }: { data: any }) {
   }
 
   // Handle structured table data { headers: [], rows: [] }
-  if (data && typeof data === 'object' && Array.isArray(data.headers) && Array.isArray(data.rows)) {
-    const { headers, rows } = data
+  if (tableData && typeof tableData === 'object' && Array.isArray(tableData.headers) && Array.isArray(tableData.rows)) {
+    const { headers, rows } = tableData
     return (
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
         <table className="min-w-full text-sm divide-y divide-gray-200">
@@ -151,15 +222,15 @@ export function TableContent({ data }: { data: any }) {
     )
   }
 
-  if (typeof data === "string" && data.includes("|")) {
+  if (typeof tableData === "string" && tableData.includes("|")) {
     return (
       <div className="prose prose-sm max-w-none">
-        <MessageContent content={data} />
+        <MessageContent content={tableData} />
       </div>
     )
   }
 
-  return <DataContent data={data} />
+  return <DataContent data={tableData} />
 }
 
 export function DataContent({ data }: { data: any }) {

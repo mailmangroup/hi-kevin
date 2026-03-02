@@ -10,6 +10,7 @@ const BRAND_POST_TOOLS = new Set([
   'analyze_brand_content',
   'search_post',
   'get_brand_posts',
+  'get_brand_data',
   'extract_post_analysis',
 ])
 

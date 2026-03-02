@@ -374,79 +374,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     setIsThinking(false)
   }
 
-  const handleGenerateArtifact = async () => {
-    // Get the last assistant message (treated as generated insights)
-    const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop()
-
-    if (!lastAssistantMessage?.content) {
-      return
-    }
-
-    const insightsPrompt = `Based on the following insights, generate a canvas to visualize them in HTML.
-
-<insights>
-${lastAssistantMessage.content}
-</insights>
-
-Create a clear, self-contained HTML visualization (with inline CSS) that best represents these insights. Include data where appropriate.`
-
-    try {
-      const result = await aiService.generateCanvas(insightsPrompt, {
-        orgId: credentials.orgId,
-        brandId: credentials.brandId
-      })
-
-      // Create a new assistant message with the artifact
-      if (result.artifacts && result.artifacts.length > 0) {
-        const artifact = result.artifacts[0]
-        const artifactDisplayType = artifact.artifact_type || artifact.type
-        const artifactContent = artifact.content ?? artifact.data
-
-        // Add as a new message in the chat
-        const artifactMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: result.response || 'Here is your visualization:',
-          timestamp: new Date(),
-          toolCalls: [{
-            id: `artifact-${Date.now()}`,
-            name: 'generate_artifact',
-            input: { query: lastAssistantMessage.content.substring(0, 100) },
-            output: artifactContent,
-            state: 'completed',
-            artifact: {
-              type: artifactDisplayType,
-              artifact_type: artifact.artifact_type,
-              data: artifactContent,
-              title: artifact.title || 'Generated Artifact'
-            }
-          }]
-        }
-
-        setMessages(prev => [...prev, artifactMessage])
-
-        // Also open in artifact panel
-        openArtifact({
-          id: `artifact-${Date.now()}`,
-          type: artifactDisplayType as any,
-          data: artifactContent,
-          title: artifact.title || 'Generated Artifact'
-        })
-      }
-    } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error("Failed to generate artifact:", error)
-
-      // Add error message to chat
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `Failed to generate artifact: ${error.message || 'Unknown error'}`,
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-    }
-  }
-
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
     if ((!text.trim() && images.length === 0 && documents.length === 0) || isThinking) return
 
@@ -636,10 +563,10 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
 
               // Update contentParts - append to last thinking part or create new one
               if (lastPartWasThinking && contentParts.length > 0) {
-                  // Update the last thinking part
+                  // Replace the last thinking part with a new object to ensure React detects the change
                   const lastPart = contentParts[contentParts.length - 1]
                   if (lastPart.type === "thinking") {
-                      lastPart.content = currentThinkingContent
+                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
                   }
               } else {
                   // Create a new thinking part
@@ -661,10 +588,10 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
 
               // Update contentParts - append to last text part or create new one
               if (lastPartWasText && contentParts.length > 0) {
-                  // Update the last text part
+                  // Replace the last text part with a new object to ensure React detects the change
                   const lastPart = contentParts[contentParts.length - 1]
                   if (lastPart.type === "text") {
-                      lastPart.content = currentTextContent
+                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentTextContent }
                   }
               } else {
                   // Create a new text part
@@ -752,7 +679,8 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
                   id: `${toolName}-${Date.now()}`,
                   type: determineArtifactType(toolArtifact, toolName),
                   title: toolArtifact.title || getToolDisplayName(toolName),
-                  data: toolArtifact.content ?? toolArtifact.data ?? toolArtifact,
+                  // Pass full artifact object for create_artifact tools so renderers can access content + language
+                  data: toolArtifact.type === "artifact" ? toolArtifact : (toolArtifact.content ?? toolArtifact.data ?? toolArtifact),
                   toolName,
                   session: toolArtifact.session,
                 }
@@ -899,9 +827,8 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
     <div className="flex h-full min-h-0 bg-transparent">
       {/* Chat Area */}
       <div className={cn(
-        "flex flex-col h-full min-h-0 transition-all duration-300",
-        isReportOpen ? "w-[450px] flex-shrink-0 border-r border-border" : "flex-1",
-        isPanelOpen && !isReportOpen ? "mr-0" : ""
+        "flex flex-col h-full min-h-0 min-w-[400px] transition-all duration-300",
+        isReportOpen ? "w-[450px] flex-shrink-0 border-r border-border" : "flex-1"
       )}>
         {/* Project Breadcrumb */}
         <div className="flex items-center gap-2 border-b border-border/50 bg-transparent px-6 py-3 text-sm sticky top-0 z-10">
@@ -1173,7 +1100,6 @@ Create a clear, self-contained HTML visualization (with inline CSS) that best re
             showBorder={true}
             fastPath={fastPath}
             setFastPath={setFastPath}
-            onGenerateArtifact={handleGenerateArtifact}
           />
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Kevin can make mistakes. Consider checking important information.

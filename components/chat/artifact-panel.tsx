@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw } from "lucide-react"
+import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
 import { ReportOutlineSidebar } from "./report-outline-sidebar"
@@ -44,9 +44,43 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_audience_data: "Audience Data",
 }
 
+const MIN_PANEL_WIDTH = 400
+const MAX_PANEL_RATIO = 0.6 // Panel can take at most 60% of the container
+
 export function ArtifactPanel() {
-  const { selectedArtifact, isPanelOpen, closePanel } = useArtifact()
+  const { selectedArtifact, isPanelOpen, closePanel, panelWidth, setPanelWidth } = useArtifact()
   const [copied, setCopied] = React.useState(false)
+  const [isResizing, setIsResizing] = React.useState(false)
+  const panelRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = panelRef.current?.parentElement
+      if (!container) return
+      const containerRect = container.getBoundingClientRect()
+      const maxWidth = containerRect.width * MAX_PANEL_RATIO
+      const newWidth = containerRect.right - e.clientX
+      setPanelWidth(Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxWidth)))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+    }
+  }, [isResizing, setPanelWidth])
 
   const handleCopy = async () => {
     if (!selectedArtifact) return
@@ -73,11 +107,25 @@ export function ArtifactPanel() {
 
   return (
     <div
+      ref={panelRef}
+      style={isReportType ? undefined : { width: panelWidth }}
       className={cn(
-        "flex flex-col border-l border-border bg-white transition-all duration-300 h-full max-w-full",
-        isReportType ? "flex-1" : "w-[600px]"
+        "flex flex-col border-l border-border bg-white h-full max-w-full relative",
+        isReportType ? "flex-1" : "flex-shrink-0",
+        !isResizing && "transition-all duration-300"
       )}
     >
+      {/* Resize Handle */}
+      {!isReportType && (
+        <div
+          onMouseDown={() => setIsResizing(true)}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-20 group hover:bg-primary/20 active:bg-primary/30"
+        >
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 -translate-x-1.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white flex-shrink-0">
         <div className="flex items-center gap-3 flex-1 min-w-0">

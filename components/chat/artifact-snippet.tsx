@@ -107,8 +107,8 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
     return `${toolName || "artifact"}-${JSON.stringify(artifact).slice(0, 50)}`
   }, [artifact, toolName])
 
-  // Normalize data: backend sends content, frontend often uses data
-  const artifactData = artifact?.data ?? artifact?.content ?? artifact
+  // Normalize data: pass full artifact object for create_artifact so renderers can access content + language
+  const artifactData = (artifact?.type === "artifact") ? artifact : (artifact?.data ?? artifact?.content ?? artifact)
 
   // Extract title and description
   const title = artifact?.title ||
