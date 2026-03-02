@@ -873,6 +873,12 @@ export const aiService = {
     })
   },
 
+  async clearGlobalMemoryCategory(category: string): Promise<{ success: boolean; message: string }> {
+    return directApiCall(`memory/me/category/${category}`, {
+      method: 'DELETE'
+    })
+  },
+
   async getProjectMemory(projectId: string): Promise<ProjectMemoryResponse> {
     return directApiCall(`memory/projects/${projectId}`)
   },

@@ -101,3 +101,13 @@ export function useGlobalMemory() {
     queryFn: () => aiService.getGlobalMemory(),
   })
 }
+
+export function useClearGlobalMemoryCategory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (category: string) => aiService.clearGlobalMemoryCategory(category),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['global-memory'] })
+    },
+  })
+}
