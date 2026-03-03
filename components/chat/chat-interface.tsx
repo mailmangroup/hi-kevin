@@ -54,6 +54,64 @@ export interface Message {
   followUpQuestions?: string[]
 }
 
+/**
+ * Extract fields from a partial JSON string being streamed as tool call args.
+ * Handles incomplete JSON where the content value may still be streaming.
+ */
+function extractPartialArtifactArgs(partial: string): {
+  title: string | null
+  content: string | null
+  artifact_type: string | null
+  language: string | null
+} {
+  // Try full parse first
+  try {
+    const obj = JSON.parse(partial)
+    return {
+      title: obj.title ?? null,
+      content: obj.content ?? null,
+      artifact_type: obj.artifact_type ?? null,
+      language: obj.language ?? null,
+    }
+  } catch {
+    // Fall through to partial extraction
+  }
+
+  const extractField = (field: string): string | null => {
+    const re = new RegExp(`"${field}"\\s*:\\s*"`)
+    const match = re.exec(partial)
+    if (!match) return null
+    const start = match.index + match[0].length
+    let result = ''
+    let i = start
+    while (i < partial.length) {
+      if (partial[i] === '\\' && i + 1 < partial.length) {
+        const next = partial[i + 1]
+        if (next === '"') { result += '"'; i += 2 }
+        else if (next === '\\') { result += '\\'; i += 2 }
+        else if (next === 'n') { result += '\n'; i += 2 }
+        else if (next === 't') { result += '\t'; i += 2 }
+        else if (next === 'r') { result += '\r'; i += 2 }
+        else if (next === '/') { result += '/'; i += 2 }
+        else { result += partial[i]; i += 1 }
+      } else if (partial[i] === '"') {
+        break // closing quote
+      } else {
+        result += partial[i]
+        i += 1
+      }
+    }
+    return result
+  }
+
+  return {
+    title: extractField('title'),
+    content: extractField('content'),
+    artifact_type: extractField('artifact_type'),
+    language: extractField('language'),
+  }
+}
+
 interface ChatInterfaceProps {
   initialMessage?: string
   chatId?: string
@@ -69,7 +127,7 @@ export function ChatInterface({ initialMessage, chatId, projectId }: ChatInterfa
 }
 
 function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
-  const { openArtifact, isPanelOpen, reportNavigation, selectedArtifact } = useArtifact()
+  const { openArtifact, updateArtifactContent, isPanelOpen, reportNavigation, selectedArtifact } = useArtifact()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
@@ -490,6 +548,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     // Deep research tracking
     let deepResearchData: DeepResearchData | null = null
 
+    // Artifact streaming accumulator (for create_artifact tool input streaming)
+    const artifactStreamAccum: Record<number, { name: string; args: string }> = {}
+    let artifactPanelOpened = false
+
     let activeConversationId = conversationId;
     // Hoisted so the finally block can reference it even if the try throws early
     let currentSessionKey = conversationId || "new"
@@ -755,9 +817,59 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   data: toolArtifact.type === "artifact" ? toolArtifact : (toolArtifact.content ?? toolArtifact.data ?? toolArtifact),
                   toolName,
                   session: toolArtifact.session,
+                  isStreaming: false,
                 }
-                openArtifact(artifactData)
+                // If we already opened the panel during streaming, update content + mark complete
+                if (artifactPanelOpened && toolName === 'create_artifact') {
+                  updateArtifactContent(artifactData.data, {
+                    title: artifactData.title,
+                    isStreaming: false,
+                  })
+                } else {
+                  openArtifact(artifactData)
+                }
                 streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
+              }
+          }
+
+          // Handle streaming tool input args (for create_artifact content preview)
+          if (chunk.tool_input_stream) {
+              const { index, name, args_chunk } = chunk.tool_input_stream
+              const idx = index ?? 0
+              if (!artifactStreamAccum[idx]) {
+                  artifactStreamAccum[idx] = { name: name || '', args: '' }
+              }
+              if (name) artifactStreamAccum[idx].name = name
+              artifactStreamAccum[idx].args += args_chunk
+
+              const acc = artifactStreamAccum[idx]
+              if (acc.name === 'create_artifact') {
+                  const parsed = extractPartialArtifactArgs(acc.args)
+                  if (parsed.content !== null) {
+                      const artifactType = (parsed.artifact_type || 'code') as ArtifactData['type']
+                      const artifactData: ArtifactData = {
+                          id: `streaming-artifact-${idx}`,
+                          type: artifactType,
+                          title: parsed.title || 'Generating...',
+                          data: {
+                              type: 'artifact',
+                              artifact_type: parsed.artifact_type || 'code',
+                              title: parsed.title || 'Generating...',
+                              content: parsed.content,
+                              language: parsed.language,
+                          },
+                          isStreaming: true,
+                      }
+                      if (!artifactPanelOpened) {
+                          openArtifact(artifactData)
+                          artifactPanelOpened = true
+                      } else {
+                          updateArtifactContent(artifactData.data, {
+                              title: artifactData.title,
+                              isStreaming: true,
+                          })
+                      }
+                  }
               }
           }
 

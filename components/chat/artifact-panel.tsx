@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical } from "lucide-react"
+import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical, Eye, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
 import { ReportOutlineSidebar } from "./report-outline-sidebar"
@@ -205,19 +205,98 @@ export function ArtifactPanel() {
   )
 }
 
+/** Types that support a code/render toggle */
+const TOGGLEABLE_TYPES = new Set(["html", "markdown", "mermaid"])
+
 function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
+  const isStreaming = artifact.isStreaming ?? false
+  const canToggle = TOGGLEABLE_TYPES.has(artifact.type)
+  // Default to code view while streaming, render view when complete
+  const [viewMode, setViewMode] = React.useState<"code" | "render">(isStreaming ? "code" : "render")
+
+  // Auto-switch to render when streaming completes
+  const prevStreamingRef = React.useRef(isStreaming)
+  React.useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      setViewMode("render")
+    }
+    prevStreamingRef.current = isStreaming
+  }, [isStreaming])
+
+  // Domain-specific artifacts don't get the toggle
   if (isBrandPosts(artifact.data, artifact.toolName)) {
     return <BrandPostsArtifact data={parseArtifactData(artifact.data)} />
   }
-
   if (isWebSearch(artifact.data, artifact.toolName)) {
     return <WebSearchArtifact data={parseArtifactData(artifact.data)} />
   }
-
   if (isHelpCenter(artifact.data, artifact.toolName)) {
     return <HelpCenterArtifact data={parseArtifactData(artifact.data)} />
   }
 
+  // Extract raw content string for code view
+  const rawContent = typeof artifact.data === "string"
+    ? artifact.data
+    : artifact.data?.content ?? artifact.data?.html ?? artifact.data?.code ?? artifact.data?.markdown ?? null
+
+  const showCodeView = canToggle && viewMode === "code" && rawContent !== null
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Code / Render toggle */}
+      {canToggle && (
+        <div className="flex items-center gap-1 mb-3 flex-shrink-0">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+            <button
+              onClick={() => setViewMode("render")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                viewMode === "render"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              <Eye className="h-3 w-3" />
+              Render
+            </button>
+            <button
+              onClick={() => setViewMode("code")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                viewMode === "code"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              <Code className="h-3 w-3" />
+              Code
+            </button>
+          </div>
+          {isStreaming && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 ml-2">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Streaming...
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Content */}
+      {showCodeView ? (
+        <div className="overflow-x-auto rounded-lg border border-gray-700 overflow-hidden flex-1">
+          <pre className="text-sm font-mono overflow-x-auto p-4 bg-gray-900 text-gray-100 m-0 whitespace-pre-wrap">
+            <code>{rawContent}</code>
+          </pre>
+        </div>
+      ) : (
+        <ArtifactRenderedContent artifact={artifact} />
+      )}
+    </div>
+  )
+}
+
+/** The actual rendered output (no toggle logic) */
+function ArtifactRenderedContent({ artifact }: { artifact: ArtifactData }) {
   const rawData = artifact.data
   if (typeof rawData === "string" && looksLikeHtml(rawData) && artifact.type !== "code" && artifact.type !== "markdown") {
     return <HtmlContent data={rawData} />

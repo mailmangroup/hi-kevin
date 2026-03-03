@@ -14,6 +14,8 @@ export interface ArtifactData {
     date_end?: string
     networks?: string[]
   }
+  /** True while the artifact content is still being streamed from the LLM */
+  isStreaming?: boolean
 }
 
 export interface ReportNavigation {
@@ -28,6 +30,8 @@ interface ArtifactContextValue {
   isPanelOpen: boolean
   // Open the panel with a specific artifact
   openArtifact: (artifact: ArtifactData) => void
+  // Update the content of the currently open artifact (for streaming)
+  updateArtifactContent: (data: any, opts?: { title?: string; isStreaming?: boolean }) => void
   // Close the panel
   closePanel: () => void
   // Toggle panel visibility
@@ -57,6 +61,18 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     setIsPanelOpen(true)
   }, [])
 
+  const updateArtifactContent = React.useCallback((data: any, opts?: { title?: string; isStreaming?: boolean }) => {
+    setSelectedArtifact(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        data,
+        ...(opts?.title !== undefined ? { title: opts.title } : {}),
+        isStreaming: opts?.isStreaming ?? prev.isStreaming,
+      }
+    })
+  }, [])
+
   const closePanel = React.useCallback(() => {
     setIsPanelOpen(false)
   }, [])
@@ -69,6 +85,7 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     selectedArtifact,
     isPanelOpen,
     openArtifact,
+    updateArtifactContent,
     closePanel,
     togglePanel,
     reportNavigation,
@@ -77,7 +94,7 @@ export function ArtifactProvider({ children }: { children: React.ReactNode }) {
     setIsOutlineCollapsed,
     panelWidth,
     setPanelWidth
-  }), [selectedArtifact, isPanelOpen, openArtifact, closePanel, togglePanel, reportNavigation, isOutlineCollapsed, panelWidth])
+  }), [selectedArtifact, isPanelOpen, openArtifact, updateArtifactContent, closePanel, togglePanel, reportNavigation, isOutlineCollapsed, panelWidth])
 
   return (
     <ArtifactContext.Provider value={value}>
