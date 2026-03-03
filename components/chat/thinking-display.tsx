@@ -10,40 +10,48 @@ interface ThinkingDisplayProps {
 }
 
 export function ThinkingDisplay({ content, isStreaming = false }: ThinkingDisplayProps) {
-  const [isExpanded, setIsExpanded] = React.useState(false)
+  const [isExpanded, setIsExpanded] = React.useState(true)
 
   if (!content) return null
 
   return (
-    <div className="mb-3 rounded-lg border border-purple-200 bg-purple-50/50 overflow-hidden">
+    <div className="mb-4 group">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-purple-100/50 transition-colors"
+        className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors select-none"
       >
-        <Brain className="h-4 w-4 text-purple-600 flex-shrink-0" />
-        <span className="text-xs font-medium text-purple-700 flex-1">
-          Thinking{isStreaming ? "..." : ""}
+        <div className={cn(
+          "flex items-center justify-center w-4 h-4 rounded-full border border-border bg-background",
+          isStreaming && "animate-pulse border-primary/50"
+        )}>
+          <Brain className="h-2.5 w-2.5" />
+        </div>
+        <span>
+          Thinking Process
         </span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-purple-600 transition-transform flex-shrink-0",
+            "h-3 w-3 transition-transform duration-200",
             isExpanded ? "transform rotate-180" : ""
           )}
         />
       </button>
 
-      {isExpanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-purple-100 relative z-10">
-          <div className="text-xs text-purple-900/80 whitespace-pre-wrap leading-relaxed">
-            {content}
-            {isStreaming && (
-              <span className="inline-flex ml-1">
-                <span className="animate-pulse">▊</span>
-              </span>
-            )}
+      <div className={cn(
+        "grid transition-all duration-300 ease-in-out",
+        isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
+      )}>
+        <div className="overflow-hidden">
+          <div className="pl-2 border-l-2 border-primary/20 ml-2">
+            <div className="pl-4 py-1 text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {content}
+              {isStreaming && (
+                <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-primary/50 animate-pulse" />
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

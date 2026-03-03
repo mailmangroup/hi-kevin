@@ -403,7 +403,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] bg-white border border-border shadow-[0_12px_40px_rgba(30,58,138,0.15)] flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-[0_16px_48px_rgba(99,102,241,0.2)]", className)}>
+    <div className={cn("relative rounded-[1.5rem] bg-background border border-border/50 shadow-lg flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-xl", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">

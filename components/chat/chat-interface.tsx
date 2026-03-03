@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, MoreHorizontal, Pencil, Star, Trash2 } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, MoreHorizontal, Pencil, Star, Trash2, Sparkles, Bot, User } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
@@ -1202,200 +1202,203 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             <div
               key={message.id}
               className={cn(
-                "flex gap-4",
-                message.role === "user" ? "flex-row-reverse" : "flex-row"
+                "flex w-full animate-fade-in-up group",
+                message.role === "user" ? "justify-end" : "justify-start gap-4"
               )}
             >
-              {/* Avatar for AI */}
-              {/* {message.role !== "user" && (
+              {/* Assistant Avatar */}
+              {message.role !== "user" && (
                 <div className="flex-shrink-0 mt-1">
-                   <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center border border-indigo-200 shadow-sm">
-                     <span className="text-lg">🤖</span>
+                   <div className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center shadow-sm">
+                     <Sparkles className="w-4 h-4 text-primary" />
                    </div>
                 </div>
-              )} */}
+              )}
 
-              {/* Content */}
-              <div className={cn("flex flex-col max-w-[80%]", message.role === "user" ? "items-end" : "items-start")}>
-              <div
+              {/* Message Content Container */}
+              <div 
                 className={cn(
-                  "relative w-full text-sm leading-relaxed overflow-hidden",
-                  message.role === "user"
-                    ? "bg-gradient-to-br from-indigo-600 to-indigo-700 shadow-[0_8px_24px_rgba(99,102,241,0.25)] rounded-2xl rounded-tr-sm text-white px-5 py-3"
-                    : "glass-premium border border-white/20 rounded-[2rem] rounded-tl-sm p-6 shadow-[0_8px_30px_rgba(30,58,138,0.1)] text-foreground"
+                  "flex flex-col max-w-[85%] md:max-w-[75%]", 
+                  message.role === "user" ? "items-end" : "items-start"
                 )}
               >
-                {/* Light Leak for Assistant Message */}
-                {message.role !== "user" && (
-                  <div className="absolute top-0 left-0 w-full h-full overflow-hidden rounded-[inherit] pointer-events-none z-0">
-                    <div className="absolute -top-20 -left-20 w-64 h-64 bg-purple-500/5 blur-[60px] rounded-full" />
-                  </div>
-                )}
-                
-                <div className="relative z-10">
-                {/* Uploaded Images */}
-                {message.images && message.images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {message.images.map((img, i) => (
-                      <Image key={i} src={img} alt="Uploaded" width={500} height={300} className="max-w-full h-auto rounded-lg max-h-64 object-contain bg-black/5" style={{ width: 'auto', height: 'auto' }} unoptimized />
-                    ))}
-                  </div>
-                )}
+                <div
+                    className={cn(
+                      "relative text-sm leading-relaxed",
+                      message.role === "user"
+                        ? "bg-secondary/80 text-foreground px-5 py-3 rounded-[1.5rem] rounded-tr-sm shadow-sm"
+                        : "px-0 py-1 text-foreground"
+                    )}
+                >
+                    {/* Uploaded Images */}
+                    {message.images && message.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2 justify-end">
+                        {message.images.map((img, i) => (
+                          <Image key={i} src={img} alt="Uploaded" width={300} height={200} className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-border bg-muted" style={{ width: 'auto', height: 'auto' }} unoptimized />
+                        ))}
+                      </div>
+                    )}
 
-                {/* Uploaded Documents */}
-                {message.documents && message.documents.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {message.documents.map((doc, i) => {
-                      const fileColor = getFileColor(doc.filename)
-                      const getColorClass = (color: string) => {
-                        const colorMap: Record<string, string> = {
-                          red: 'bg-red-50 text-red-700 border-red-200',
-                          blue: 'bg-blue-50 text-blue-700 border-blue-200',
-                          orange: 'bg-orange-50 text-orange-700 border-orange-200',
-                          green: 'bg-green-50 text-green-700 border-green-200',
-                          gray: 'bg-gray-50 text-gray-700 border-gray-200',
-                          purple: 'bg-purple-50 text-purple-700 border-purple-200',
-                          yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                        }
-                        return colorMap[color] || colorMap['gray']
-                      }
+                    {/* Uploaded Documents */}
+                    {message.documents && message.documents.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2 justify-end">
+                        {message.documents.map((doc, i) => {
+                          const fileColor = getFileColor(doc.filename)
+                          const getColorClass = (color: string) => {
+                            const colorMap: Record<string, string> = {
+                              red: 'bg-red-50 text-red-700 border-red-200',
+                              blue: 'bg-blue-50 text-blue-700 border-blue-200',
+                              orange: 'bg-orange-50 text-orange-700 border-orange-200',
+                              green: 'bg-green-50 text-green-700 border-green-200',
+                              gray: 'bg-gray-50 text-gray-700 border-gray-200',
+                              purple: 'bg-purple-50 text-purple-700 border-purple-200',
+                              yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                            }
+                            return colorMap[color] || colorMap['gray']
+                          }
 
-                      return (
-                        <div
-                          key={i}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-lg border",
-                            getColorClass(fileColor)
-                          )}
-                        >
-                          <FileText className="h-4 w-4 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium truncate">
-                              {truncateFilename(doc.filename, 25)}
-                            </div>
-                            <div className="text-[10px] opacity-70">
-                              {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
-                              {doc.chunk_strategy && (
-                                <span className="ml-1">
-                                  • {doc.chunk_strategy === 'full_text' ? 'Full text' : 'Vectorized'}
-                                </span>
+                          return (
+                            <div
+                              key={i}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg border",
+                                getColorClass(fileColor)
+                              )}
+                            >
+                              <FileText className="h-4 w-4 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium truncate">
+                                  {truncateFilename(doc.filename, 25)}
+                                </div>
+                                <div className="text-[10px] opacity-70">
+                                  {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
+                                  {doc.chunk_strategy && (
+                                    <span className="ml-1">
+                                      • {doc.chunk_strategy === 'full_text' ? 'Full text' : 'Vectorized'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {doc.processing_status === 'completed' && (
+                                <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                              )}
+                              {(doc.processing_status === 'processing' || doc.processing_status === 'pending') && (
+                                <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
+                              )}
+                              {doc.processing_status === 'failed' && (
+                                <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
                               )}
                             </div>
-                          </div>
-                          {doc.processing_status === 'completed' && (
-                            <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
-                          )}
-                          {(doc.processing_status === 'processing' || doc.processing_status === 'pending') && (
-                            <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
-                          )}
-                          {doc.processing_status === 'failed' && (
-                            <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                          )
+                        })}
+                      </div>
+                    )}
 
-                {/* Report Snippet */}
-                {message.report && (
-                  <div className="mb-3">
-                    <ArtifactSnippet 
-                      artifact={{
-                        type: 'report',
-                        title: message.report.title || "Brand Report",
-                        data: message.report,
-                        id: message.report.id
-                      }}
-                      toolName="report"
-                    />
-                  </div>
-                )}
+                    {/* Report Snippet */}
+                    {message.report && (
+                      <div className="mb-3">
+                        <ArtifactSnippet 
+                          artifact={{
+                            type: 'report',
+                            title: message.report.title || "Brand Report",
+                            data: message.report,
+                            id: message.report.id
+                          }}
+                          toolName="report"
+                        />
+                      </div>
+                    )}
 
 
-                {/* Content Parts - renders tool calls, thinking, and text in order */}
-                {message.contentParts && message.contentParts.length > 0 ? (
-                  <>
-                    {message.contentParts.map((part, index) => (
-                      <React.Fragment key={index}>
-                        {part.type === "tool" ? (
-                          <div className="mb-3">
-                            <ToolCallDisplay tool={part.tool!} />
-                          </div>
-                        ) : part.type === "thinking" ? (
-                          <ThinkingDisplay
-                            content={part.content || ""}
-                            isStreaming={message.isStreaming}
-                          />
-                        ) : part.type === "deep_research" ? (
-                          <DeepResearchDisplay
-                            data={part.deepResearch!}
-                            isStreaming={message.isStreaming || false}
-                          />
-                        ) : (
+                    {/* Content Parts - renders tool calls, thinking, and text in order */}
+                    {message.contentParts && message.contentParts.length > 0 ? (
+                      <div className="space-y-4">
+                        {message.contentParts.map((part, index) => (
+                          <React.Fragment key={index}>
+                            {part.type === "tool" ? (
+                              <div className="my-2">
+                                <ToolCallDisplay tool={part.tool!} isFirst={true} isLast={true} />
+                              </div>
+                            ) : part.type === "thinking" ? (
+                              <ThinkingDisplay
+                                content={part.content || ""}
+                                isStreaming={message.isStreaming}
+                              />
+                            ) : part.type === "deep_research" ? (
+                              <DeepResearchDisplay
+                                data={part.deepResearch!}
+                                isStreaming={message.isStreaming || false}
+                              />
+                            ) : (
+                              <MessageContent
+                                content={part.content || ""}
+                                isUser={message.role === "user"}
+                              />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {/* Fallback: Tool Calls at top (legacy behavior) */}
+                        {message.toolCalls && message.toolCalls.length > 0 && (
+                          <ToolCallList toolCalls={message.toolCalls} />
+                        )}
+
+                        {/* Message Content with Markdown */}
+                        {message.content && (
                           <MessageContent
-                            content={part.content || ""}
+                            content={message.content}
                             isUser={message.role === "user"}
                           />
                         )}
-                      </React.Fragment>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {/* Fallback: Tool Calls at top (legacy behavior) */}
-                    {message.toolCalls && message.toolCalls.length > 0 && (
-                      <ToolCallList toolCalls={message.toolCalls} />
+                      </div>
                     )}
 
-                    {/* Message Content with Markdown */}
-                    {message.content && (
-                      <MessageContent
-                        content={message.content}
-                        isUser={message.role === "user"}
-                      />
+                    {/* Streaming indicator */}
+                    {message.isStreaming && !message.content && !message.contentParts?.length && (
+                      <div className="flex items-center gap-1 h-6 px-2">
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce"></span>
+                      </div>
                     )}
-                  </>
-                )}
-
-                {/* Streaming indicator */}
-                {message.isStreaming && !message.content && !message.contentParts?.length && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="inline-flex gap-0.5">
-                      <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
-                      <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
-                      <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
-                    </span>
-                  </div>
-                )}
+                </div>
 
                 {/* Follow-up Questions */}
                 {message.followUpQuestions && message.followUpQuestions.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                        <p className="text-xs font-medium text-gray-500">Suggested follow-ups:</p>
-                        <div className="flex flex-col gap-2">
-                            {message.followUpQuestions.map((question, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => handleSend(question)}
-                                    className="text-left text-xs text-primary hover:bg-primary/5 px-3 py-2 rounded-lg border border-primary/20 transition-colors bg-white"
-                                >
-                                    {question}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {message.followUpQuestions.map((question, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleSend(question)}
+                                className="text-xs text-muted-foreground hover:text-primary hover:bg-secondary/50 px-3 py-1.5 rounded-full border border-border transition-all bg-background text-left"
+                            >
+                                {question}
+                            </button>
+                        ))}
                     </div>
                 )}
-
-                <span className="mt-1 block text-[10px] opacity-70">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                
+                <div className="flex items-center gap-2 mt-1 px-1">
+                   <span className="text-[10px] text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                   </span>
+                   {message.role === "assistant" && !message.isStreaming && (
+                      <MessageActions message={message} />
+                   )}
                 </div>
+
               </div>
-              {message.role === "assistant" && !message.isStreaming && (
-                  <MessageActions message={message} />
+
+              {/* User Avatar */}
+              {message.role === "user" && (
+                <div className="flex-shrink-0 mt-1 ml-3">
+                   <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                     <User className="w-4 h-4 text-muted-foreground" />
+                   </div>
+                </div>
               )}
-              </div>
             </div>
           ))}
 

@@ -19,29 +19,29 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
   const components: Components = React.useMemo(() => ({
     // Headings
     h1: ({ children }) => (
-      <h1 className={cn("text-lg font-bold mt-4 mb-2 first:mt-0", isUser && "text-white")}>{children}</h1>
+      <h1 className={cn("text-lg font-bold mt-4 mb-2 first:mt-0")}>{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className={cn("text-base font-bold mt-3 mb-2 first:mt-0", isUser && "text-white")}>{children}</h2>
+      <h2 className={cn("text-base font-bold mt-3 mb-2 first:mt-0")}>{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className={cn("text-sm font-bold mt-2 mb-1 first:mt-0", isUser && "text-white")}>{children}</h3>
+      <h3 className={cn("text-sm font-bold mt-2 mb-1 first:mt-0")}>{children}</h3>
     ),
 
     // Paragraphs
     p: ({ children }) => (
-      <p className={cn("mb-2 last:mb-0 leading-relaxed", isUser ? "text-white" : "")}>{children}</p>
+      <p className={cn("mb-2 last:mb-0 leading-relaxed")}>{children}</p>
     ),
 
     // Lists
     ul: ({ children }) => (
-      <ul className={cn("list-disc list-inside mb-2 space-y-1", isUser ? "text-white" : "")}>{children}</ul>
+      <ul className={cn("list-disc list-inside mb-2 space-y-1")}>{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className={cn("list-decimal list-inside mb-2 space-y-1", isUser ? "text-white" : "")}>{children}</ol>
+      <ol className={cn("list-decimal list-inside mb-2 space-y-1")}>{children}</ol>
     ),
     li: ({ children }) => (
-      <li className={cn("leading-relaxed", isUser ? "text-white" : "")}>{children}</li>
+      <li className={cn("leading-relaxed")}>{children}</li>
     ),
 
     // Code
@@ -53,8 +53,8 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
             className={cn(
               "px-1.5 py-0.5 rounded text-xs font-mono",
               isUser
-                ? "bg-white/20 text-white"
-                : "bg-gray-100 text-gray-800"
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground"
             )}
             {...props}
           >
@@ -83,22 +83,17 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
       return (
         <div className="relative group">
           <pre ref={ref} className={cn(
-            "p-3 rounded-lg overflow-x-auto text-xs my-2",
-            isUser
-              ? "bg-white/10 text-white"
-              : "bg-gray-50 border border-gray-100"
+            "p-3 rounded-lg overflow-x-auto text-xs my-2 bg-muted border border-border"
           )}>
             {children}
           </pre>
-          {!isUser && (
-            <button
-              onClick={onCopy}
-              className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white border border-gray-200"
-              title="Copy code"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
-            </button>
-          )}
+          <button
+            onClick={onCopy}
+            className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background border border-border"
+            title="Copy code"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
         </div>
       )
     },
@@ -109,10 +104,7 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn(
-          "underline underline-offset-2 hover:opacity-80 break-all",
-          isUser ? "text-white" : "text-primary"
-        )}
+        className="underline underline-offset-2 hover:opacity-80 break-all text-primary"
       >
         {children}
       </a>
@@ -154,97 +146,73 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
       }
 
       return (
-        <div className="relative group my-2 border rounded-lg border-gray-200 overflow-hidden">
+        <div className="relative group my-2 border rounded-lg border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table ref={ref} className={cn(
-              "min-w-full text-xs border-collapse",
-              isUser ? "text-white" : "text-gray-700"
-            )}>
+            <table ref={ref} className="min-w-full text-xs border-collapse text-foreground">
               {children}
             </table>
           </div>
-          {!isUser && (
-            <div className="flex justify-end items-center gap-2 p-1 bg-gray-50 border-t border-gray-100">
-              <button
-                onClick={onDownloadCSV}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
-                title="Download as CSV"
-              >
-                <Download className="h-3 w-3" />
-                CSV
-              </button>
-              <div className="h-3 w-px bg-gray-300" />
-              <button
-                onClick={onCopy}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 rounded transition-colors"
-              >
-                {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-          )}
+          <div className="flex justify-end items-center gap-2 p-1 bg-muted/50 border-t border-border">
+            <button
+              onClick={onDownloadCSV}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+              title="Download as CSV"
+            >
+              <Download className="h-3 w-3" />
+              CSV
+            </button>
+            <div className="h-3 w-px bg-border" />
+            <button
+              onClick={onCopy}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+            >
+              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
       )
     },
     thead: ({ children }) => (
-      <thead className={cn(
-        isUser ? "border-b border-white/30" : "border-b border-gray-200 bg-gray-50"
-      )}>
+      <thead className="border-b border-border bg-muted/30">
         {children}
       </thead>
     ),
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => (
-      <tr className={cn(
-        "border-b",
-        isUser ? "border-white/20" : "border-gray-100"
-      )}>
+      <tr className="border-b border-border">
         {children}
       </tr>
     ),
     th: ({ children }) => (
-      <th className={cn(
-        "px-3 py-2 text-left font-semibold",
-        isUser ? "text-white" : "text-gray-700"
-      )}>
+      <th className="px-3 py-2 text-left font-semibold text-foreground">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className={cn(
-        "px-3 py-2",
-        isUser ? "text-white" : "text-gray-600"
-      )}>
+      <td className="px-3 py-2 text-foreground">
         {children}
       </td>
     ),
 
     // Blockquote
     blockquote: ({ children }) => (
-      <blockquote className={cn(
-        "border-l-2 pl-3 my-2 italic",
-        isUser
-          ? "border-white/50 text-white/90"
-          : "border-gray-300 text-gray-600"
-      )}>
+      <blockquote className="border-l-2 pl-3 my-2 italic border-muted-foreground/30 text-muted-foreground">
         {children}
       </blockquote>
     ),
 
     // Horizontal rule
     hr: () => (
-      <hr className={cn(
-        "my-3",
-        isUser ? "border-white/30" : "border-gray-200"
-      )} />
+      <hr className="my-3 border-border" />
     ),
 
     // Strong and emphasis
     strong: ({ children }) => (
-      <strong className={cn("font-semibold", isUser && "text-white")}>{children}</strong>
+      <strong className="font-semibold">{children}</strong>
     ),
     em: ({ children }) => (
-      <em className={cn(isUser && "text-white")}>{children}</em>
+      <em>{children}</em>
     ),
   }), [isUser])
 

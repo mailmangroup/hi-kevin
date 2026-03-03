@@ -51,9 +51,11 @@ export interface ToolCall {
 interface ToolCallDisplayProps {
   tool: ToolCall
   defaultExpanded?: boolean
+  isFirst?: boolean
+  isLast?: boolean
 }
 
-export function ToolCallDisplay({ tool, defaultExpanded = false }: ToolCallDisplayProps) {
+export function ToolCallDisplay({ tool, defaultExpanded = false, isFirst = false, isLast = false }: ToolCallDisplayProps) {
   // Use a ref to track if user has manually toggled, otherwise auto-collapse when complete
   const [isExpanded, setIsExpanded] = React.useState(defaultExpanded)
   const [userToggled, setUserToggled] = React.useState(false)
@@ -79,74 +81,98 @@ export function ToolCallDisplay({ tool, defaultExpanded = false }: ToolCallDispl
   const outputSummary = extractSummary(tool.output)
 
   return (
-    <div className="mb-2 rounded-lg border border-border bg-gray-50/50 overflow-hidden">
+    <div className="group relative pl-6 pb-2">
+      {/* Timeline Line */}
+      <div 
+        className={cn(
+          "absolute left-[11px] top-0 bottom-0 w-px bg-border",
+          isFirst && "top-3",
+          isLast && "bottom-auto h-3"
+        )} 
+      />
+      
       {/* Header */}
       <button
         onClick={handleToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-gray-100/50 transition-colors"
+        className="flex items-center gap-3 w-full text-left group/btn"
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-sm flex-shrink-0">{icon}</span>
+        <div className={cn(
+          "absolute left-0 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border bg-background transition-colors shadow-sm",
+          tool.state === "running" ? "border-primary text-primary" : 
+          tool.state === "failed" ? "border-destructive text-destructive" : 
+          "border-muted-foreground/30 text-muted-foreground group-hover/btn:border-primary/50 group-hover/btn:text-primary"
+        )}>
           {tool.state === "running" ? (
-            <Loader2 className="h-3 w-3 animate-spin text-primary flex-shrink-0" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : tool.state === "failed" ? (
-            <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+            <AlertCircle className="h-3 w-3" />
           ) : (
-            <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+            <CheckCircle2 className="h-3 w-3" />
           )}
-          <span className="font-medium text-gray-700 truncate">
-            {tool.state === "running" ? displayName : `${displayName}`}
-          </span>
         </div>
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 transform rotate-180 transition-transform" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 transition-transform" />
-        )}
+        
+        <div className="flex flex-1 items-center justify-between min-w-0 py-1.5 pl-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm flex-shrink-0">{icon}</span>
+            <span className="text-sm font-medium text-foreground truncate">
+              {displayName}
+            </span>
+            <span className="text-xs text-muted-foreground hidden sm:inline-block opacity-0 group-hover/btn:opacity-100 transition-opacity truncate ml-1">
+              {tool.name}
+            </span>
+          </div>
+          <ChevronDown className={cn(
+            "h-3 w-3 text-muted-foreground transition-transform duration-200 ml-2 flex-shrink-0",
+            isExpanded ? "rotate-180" : ""
+          )} />
+        </div>
       </button>
 
       {/* Expanded Content */}
-      {isExpanded && (
-        <div className="border-t border-border bg-white">
-          {/* Input Section */}
-          <div className="px-3 py-2 border-b border-gray-100">
-            <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Input</div>
-            <ToolInputDisplay input={tool.input} />
-          </div>
-
-          {/* Output Section */}
-          {tool.output && (
-            <div className="px-3 py-2 border-b border-gray-100">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5">Output</div>
-              <ToolOutputDisplay output={tool.output} />
+      <div className={cn(
+        "grid transition-all duration-300 ease-in-out",
+        isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
+      )}>
+        <div className="overflow-hidden pl-7 pr-2">
+          <div className="rounded-md border border-border bg-muted/30 text-xs overflow-hidden">
+            {/* Input Section */}
+            <div className="border-b border-border/50 px-3 py-2">
+              <div className="font-mono text-[10px] font-medium text-muted-foreground uppercase mb-1">Input</div>
+              <ToolInputDisplay input={tool.input} />
             </div>
-          )}
 
-          {/* Artifact Section */}
-          {tool.artifact && (
-            <div className="px-3 py-2">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase mb-1.5 flex items-center gap-1">
-                <Database className="h-3 w-3" />
-                Data
+            {/* Output Section */}
+            {tool.output && (
+              <div className="px-3 py-2 bg-background/50">
+                <div className="font-mono text-[10px] font-medium text-muted-foreground uppercase mb-1">Output</div>
+                <ToolOutputDisplay output={tool.output} />
               </div>
-              <ArtifactSnippet artifact={tool.artifact} toolName={tool.name} />
-            </div>
-          )}
-        </div>
-      )}
+            )}
 
-      {/* Inline Summary (when collapsed and has markdown_summary) */}
-      {!isExpanded && outputSummary && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-white">
-          <div className="text-xs text-gray-600">
-            <MessageContent content={outputSummary} className="prose-xs" />
+            {/* Artifact Section */}
+            {tool.artifact && (
+              <div className="border-t border-border/50 px-3 py-2 bg-background">
+                <div className="flex items-center gap-1.5 font-mono text-[10px] font-medium text-muted-foreground uppercase mb-1">
+                  <Database className="h-3 w-3" />
+                  Generated Data
+                </div>
+                <ArtifactSnippet artifact={tool.artifact} toolName={tool.name} />
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Artifact snippet when collapsed */}
+      {/* Inline Summary (when collapsed) */}
+      {!isExpanded && outputSummary && (
+        <div className="pl-7 mt-1 text-xs text-muted-foreground line-clamp-2">
+          <MessageContent content={outputSummary} className="prose-xs" />
+        </div>
+      )}
+      
+      {/* Artifact snippet (when collapsed) */}
       {!isExpanded && tool.artifact && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-white">
+        <div className="pl-7 mt-2 pr-2">
           <ArtifactSnippet artifact={tool.artifact} toolName={tool.name} />
         </div>
       )}
@@ -316,9 +342,14 @@ export function ToolCallList({ toolCalls }: ToolCallListProps) {
   if (!toolCalls || toolCalls.length === 0) return null
 
   return (
-    <div className="mb-3 space-y-1">
-      {toolCalls.map((tool) => (
-        <ToolCallDisplay key={tool.id} tool={tool} />
+    <div className="mb-4 flex flex-col">
+      {toolCalls.map((tool, index) => (
+        <ToolCallDisplay 
+          key={tool.id} 
+          tool={tool} 
+          isFirst={index === 0}
+          isLast={index === toolCalls.length - 1}
+        />
       ))}
     </div>
   )
