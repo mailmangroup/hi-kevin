@@ -5,6 +5,7 @@ import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "luci
 import Image from "next/image"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
+import { streamRegistry } from "@/lib/streaming/stream-registry"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useUserStore } from "@/lib/store/user-store"
@@ -169,6 +170,30 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       // don't reload history as it would overwrite the current streaming state.
       if (justCreatedConversationId.current === chatId) {
         return
+      }
+
+      // Reconnect: if there's an active stream for this conversation (user
+      // navigated away and came back mid-stream), subscribe to the registry
+      // and sync state from the buffered snapshot instead of loading history.
+      const session = streamRegistry.getSession(chatId)
+      if (session?.isStreaming) {
+        setConversationId(chatId)
+        setMessages([...session.messages])
+        setIsThinking(true)
+        if (session.lastArtifact) {
+          openArtifact(session.lastArtifact as ArtifactData)
+        }
+        const unsubscribe = streamRegistry.subscribe(chatId, () => {
+          const s = streamRegistry.getSession(chatId)
+          if (!s) return
+          setMessages([...s.messages])
+          setIsThinking(s.isStreaming)
+          if (!s.isStreaming) {
+            // Stream finished while we were away — load the authoritative title
+            loadConversationTitle(chatId)
+          }
+        })
+        return unsubscribe
       }
 
       setConversationId(chatId)
@@ -466,6 +491,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let deepResearchData: DeepResearchData | null = null
 
     let activeConversationId = conversationId;
+    // Hoisted so the finally block can reference it even if the try throws early
+    let currentSessionKey = conversationId || "new"
 
     try {
       // Ensure conversation exists and documents are attached
@@ -513,6 +540,38 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         fastPath
       })
 
+      // --- Stream registry setup for reconnect support ---
+      // Seed the registry with the current messages snapshot (including the
+      // user message and placeholder that were queued via setMessages above).
+      currentSessionKey = activeConversationId || "new"
+      const initialRegistryMessages: Message[] = [
+        ...messages,
+        userMessage,
+        { id: assistantMsgId, role: "assistant", content: "", timestamp: new Date(), isStreaming: true },
+      ]
+      streamRegistry.createSession(currentSessionKey, initialRegistryMessages)
+      // Track report data separately so pushToRegistry can include it
+      let localReport: any = undefined
+      // Build a snapshot of the streaming assistant message from closure vars
+      // and push it into the registry, notifying any reconnected subscriber.
+      const pushToRegistry = () => {
+        const snap: Message = {
+          id: assistantMsgId,
+          role: "assistant",
+          content: fullContent,
+          timestamp: new Date(),
+          isStreaming: true,
+          thinking: thinkingContent || undefined,
+          contentParts: contentParts.length > 0 ? [...contentParts] : undefined,
+          toolCalls: contentParts.filter(p => p.type === "tool" && p.tool).map(p => p.tool!),
+          report: localReport,
+        }
+        streamRegistry.update(currentSessionKey, s => {
+          s.messages = s.messages.map(m => (m.id === assistantMsgId ? snap : m))
+        })
+      }
+      // --- end registry setup ---
+
       // Helper to update deep research content part in message
       const updateDeepResearchMessage = () => {
         if (!deepResearchData) return
@@ -541,6 +600,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               : msg
           )
         )
+        pushToRegistry()
       }
 
       for await (const chunk of stream) {
@@ -554,6 +614,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
               // Notify sidebar to refresh chat history
               window.dispatchEvent(new Event('chat-created'))
+
+              // Move the registry session from "new" to the real conversation ID
+              // so that navigating back to /chat/{id} can reconnect to it
+              if (newConversationId && currentSessionKey !== newConversationId) {
+                streamRegistry.renameKey(currentSessionKey, newConversationId)
+                currentSessionKey = newConversationId
+              }
           }
 
           // Handle thinking chunks - accumulate them and add to contentParts
@@ -580,6 +647,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts] }
                       : msg
               ))
+              pushToRegistry()
           }
 
           if (chunk.content) {
@@ -605,6 +673,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       ? { ...msg, content: fullContent, contentParts: [...contentParts] }
                       : msg
               ))
+              pushToRegistry()
           }
 
           if (chunk.follow_up_questions) {
@@ -639,6 +708,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                         }
                       : msg
               ))
+              pushToRegistry()
           }
 
           if (chunk.tool_end) {
@@ -673,6 +743,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   return { ...msg, toolCalls: updatedToolCalls, contentParts: updatedContentParts }
               }))
 
+              pushToRegistry()
+
               // Auto-open artifact panel when artifact is received
               if (toolArtifact) {
                 const artifactData: ArtifactData = {
@@ -685,11 +757,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   session: toolArtifact.session,
                 }
                 openArtifact(artifactData)
+                streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
               }
           }
 
           if (chunk.report) {
               const reportData = chunk.report
+              localReport = reportData
 
               // Update message with report data
               setMessages((prev) => prev.map(msg =>
@@ -697,6 +771,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       ? { ...msg, report: reportData }
                       : msg
               ))
+              pushToRegistry()
 
               // Set report ID for future messages in this conversation
               const detectedReportId = reportData.id || chunk.report_id
@@ -712,6 +787,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   data: reportData
               }
               openArtifact(reportArtifact)
+              streamRegistry.update(currentSessionKey, s => { s.lastArtifact = reportArtifact })
           }
 
           // Deep Research task lifecycle events
@@ -785,6 +861,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       ? { ...msg, content: fullContent, contentParts: [...contentParts] }
                       : msg
               ))
+              pushToRegistry()
           }
       }
 
@@ -803,13 +880,22 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               : msg
       ))
 
+      // Persist final message state + mark session complete so any reconnected
+      // subscriber sees isStreaming=false and correct followUpQuestions
+      streamRegistry.update(currentSessionKey, s => {
+        s.messages = s.messages.map(m =>
+          m.id === assistantMsgId ? { ...m, isStreaming: false, followUpQuestions } : m
+        )
+      })
+      streamRegistry.complete(currentSessionKey)
+
       // Fetch conversation title after first message (title is generated by backend)
       if (newConversationId) {
           // Small delay to allow backend to generate title
           setTimeout(() => {
               loadConversationTitle(newConversationId!)
           }, 1000)
-          
+
           // Reset the justCreatedConversationId after streaming is done
           // This allows future navigation back to this conversation to properly load history
           setTimeout(() => {
