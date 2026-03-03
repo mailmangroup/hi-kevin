@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect,
+  useState
+} from "react"
 import { cn } from "@/lib/utils/cn"
 import {
   LayoutDashboard,
@@ -14,12 +16,33 @@ import {
   Shield,
   Settings,
   MessageSquare,
-  FolderKanban
+  FolderKanban,
+  MoreHorizontal,
+  Star,
+  Trash2,
+  Pencil
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Conversation } from "@/lib/api/client"
+import { Conversation, aiService } from "@/lib/api/client"
 import { useNewLeadsCount, useConversations } from "@/lib/hooks/use-dashboard-data"
 import { useQueryClient } from "@tanstack/react-query"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/toast"
 
 interface NavItem {
   title: string
@@ -83,6 +106,171 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
   },
 ]
 
+function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boolean }) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const router = useRouter()
+  const [isRenameOpen, setIsRenameOpen] = useState(false)
+  const [newTitle, setNewTitle] = useState(chat.title || "New Chat")
+
+  const handleRename = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTitle.trim()) {
+        toast({
+            title: "Title cannot be empty",
+            type: "error"
+        })
+        return
+    }
+
+    if (newTitle === chat.title) {
+        setIsRenameOpen(false)
+        return
+    }
+    
+    try {
+        await aiService.updateConversationTitle(chat.id, newTitle)
+        queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        toast({
+            title: "Title updated",
+            type: "success"
+        })
+        setIsRenameOpen(false)
+    } catch (error) {
+        toast({
+            title: "Failed to update title",
+            type: "error"
+        })
+    }
+  }
+
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      await aiService.updateConversationFavorite(chat.id, !chat.is_favorite)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast({
+        title: chat.is_favorite ? "Removed from favorites" : "Added to favorites",
+        type: "success"
+      })
+    } catch (error) {
+      toast({
+        title: "Failed to update favorite status",
+        type: "error"
+      })
+    }
+  }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Simple confirm for now
+    if (!confirm("Are you sure you want to permanently delete this chat? This action cannot be undone.")) return
+    
+    try {
+      await aiService.deleteConversation(chat.id, true)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast({
+        title: "Conversation deleted",
+        type: "success"
+      })
+      // If current chat is deleted, redirect to new chat
+      if (isActive) {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to delete conversation",
+        type: "error"
+      })
+    }
+  }
+
+  return (
+    <>
+    <div className="group/item relative flex items-center">
+        <Link
+            href={`/chat/${chat.id}`}
+            prefetch={false}
+            className={cn(
+                "flex-1 flex items-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all pr-8", 
+                isActive
+                    ? "bg-white text-primary shadow-sm"
+                    : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
+            )}
+        >
+            <span className="truncate flex-1 flex items-center gap-1.5" title={chat.title}>
+                {chat.is_favorite && <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />}
+                <span className="truncate">{chat.title || "New Chat"}</span>
+            </span>
+        </Link>
+        
+        <div className={cn(
+            "absolute right-1 opacity-0 transition-opacity", 
+            isActive ? "opacity-100" : "group-hover/item:opacity-100"
+        )}>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-slate-200">
+                        <MoreHorizontal className="h-3 w-3 text-slate-500" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation()
+                        setNewTitle(chat.title || "New Chat")
+                        setIsRenameOpen(true)
+                    }}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Change Title
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleFavorite}>
+                        <Star className={cn("mr-2 h-4 w-4", chat.is_favorite ? "fill-yellow-500 text-yellow-500" : "")} />
+                        {chat.is_favorite ? "Unfavorite" : "Favorite"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    </div>
+
+    <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Rename Chat</DialogTitle>
+                <DialogDescription>
+                    Enter a new title for this conversation.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRename}>
+                <div className="grid gap-4 py-4">
+                    <Input
+                        id="name"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        placeholder="Enter chat title"
+                        autoFocus
+                    />
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsRenameOpen(false)}>
+                        Cancel
+                    </Button>
+                    <Button type="submit">Save changes</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+    </>
+  )
+}
+
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const queryClient = useQueryClient()
@@ -119,18 +307,18 @@ export function Sidebar({ className }: { className?: string }) {
   }, [queryClient])
 
   return (
-    <div className={cn("relative flex h-full w-64 flex-col bg-transparent", className)}>
+    <div className={cn("relative flex h-full w-60 flex-col bg-transparent", className)}>
       {/* Header */}
-      <div className="flex h-16 items-center gap-2 px-6 mb-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
+      <div className="flex h-14 items-center gap-2 px-4 mb-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white font-bold text-sm">
           K
         </div>
-        <span className="text-xl font-bold text-slate-900">Kevin</span>
+        <span className="text-lg font-bold text-slate-900">Kevin</span>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4">
-        <nav className="space-y-1">
+      {/* Navigation - fixed, no scroll */}
+      <div className="flex-shrink-0 px-3">
+        <nav className="space-y-0.5">
             {navItems.map((item) => {
             const Icon = item.icon
             // Dashboard should only be active on exact match, not sub-routes
@@ -143,13 +331,13 @@ export function Sidebar({ className }: { className?: string }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                    "group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all",
+                    "group flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all",
                     isActive
                         ? "bg-white text-primary shadow-sm"
                         : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
                 )}
                 >
-                <item.icon className={cn("mr-3 h-5 w-5 flex-shrink-0 transition-colors", 
+                <item.icon className={cn("mr-2 h-4 w-4 flex-shrink-0 transition-colors",
                     isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
                 )} />
                 <span className="flex-1 truncate">{item.title}</span>
@@ -165,17 +353,18 @@ export function Sidebar({ className }: { className?: string }) {
             )
             })}
         </nav>
+      </div>
 
-        {/* Chat History Section */}
-        <div className="mt-6">
-            <div className="mb-1.5 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+      {/* Chat History Section - scrollable */}
+      <div className="flex-1 overflow-y-auto no-scrollbar px-3 mt-4">
+            <Link href="/chat" prefetch={false} className="block mb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
                 History
-            </div>
+            </Link>
             <div className="space-y-0.5">
                 <Link href="/dashboard" prefetch={false}>
-                    <button className="flex w-full items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200">
-                            <MessageSquare className="h-3 w-3 text-slate-500" />
+                    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
+                        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200">
+                            <MessageSquare className="h-2.5 w-2.5 text-slate-500" />
                         </div>
                         New Chat
                     </button>
@@ -183,43 +372,34 @@ export function Sidebar({ className }: { className?: string }) {
                 {chatHistory.map((chat) => {
                     const isActive = pathname === `/chat/${chat.id}`
                     return (
-                        <Link
-                            key={chat.id}
-                            href={`/chat/${chat.id}`}
-                            prefetch={false}
-                            className={cn(
-                                "group flex items-center rounded-xl px-4 py-1.5 text-sm font-medium transition-all",
-                                isActive
-                                    ? "bg-white text-primary shadow-sm"
-                                    : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
-                            )}
-                        >
-                            <span className="truncate" title={chat.title}>{chat.title || "New Chat"}</span>
-                        </Link>
+                        <ChatHistoryItem key={chat.id} chat={chat} isActive={isActive} />
                     )
                 })}
             </div>
             {chatHistory.length < totalChats && (
-                <p className="text-xs text-center text-muted-foreground mt-2">
+                <Link
+                    href="/chat"
+                    prefetch={false}
+                    className="block text-xs text-center text-muted-foreground mt-2 hover:text-foreground hover:underline transition-all py-1 cursor-pointer"
+                >
                     Showing {chatHistory.length} of {totalChats} chats
-                </p>
+                </Link>
             )}
-        </div>
       </div>
 
       {/* Footer Section */}
-      <div className="mt-auto p-4 pt-2">
+      <div className="mt-auto p-3 pt-2">
         <div className="flex items-center gap-2">
             <Link
                 href="/dashboard/settings"
                 prefetch={false}
-                className="flex-1 flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm transition-all hover:shadow-md"
+                className="flex-1 flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm transition-all hover:shadow-md"
             >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                    <Settings className="h-4 w-4" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                    <Settings className="h-3.5 w-3.5" />
                 </div>
                 <div className="flex-1 overflow-hidden">
-                    <p className="truncate text-sm font-medium text-slate-700">Settings</p>
+                    <p className="truncate text-[13px] font-medium text-slate-700">Settings</p>
                 </div>
             </Link>
         </div>

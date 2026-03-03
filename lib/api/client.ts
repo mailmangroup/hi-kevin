@@ -324,6 +324,55 @@ export const aiService = {
   },
 
   /**
+   * Update conversation favorite status
+   */
+  async updateConversationFavorite(conversationId: string, isFavorite: boolean): Promise<Conversation> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return { 
+            id: conversationId, 
+            title: 'Mock Conversation', 
+            updated_at: new Date().toISOString(), 
+            message_count: 5, 
+            is_favorite: isFavorite 
+        }
+    }
+    return directApiCall(`agent/conversations/${conversationId}/favorite`, {
+        method: 'POST',
+        body: JSON.stringify({ favorite: isFavorite })
+    })
+  },
+
+  /**
+   * Update conversation title
+   */
+  async updateConversationTitle(conversationId: string, title: string): Promise<{ success: boolean, conversation_id: string, title: string }> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return { 
+            success: true, 
+            conversation_id: conversationId, 
+            title: title 
+        }
+    }
+    return directApiCall(`agent/conversations/${conversationId}/update-title`, {
+        method: 'POST',
+        body: JSON.stringify({ title })
+    })
+  },
+
+  /**
+   * Delete a conversation
+   */
+  async deleteConversation(conversationId: string, hard: boolean = false): Promise<{ message: string, conversation_id: string }> {
+    if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
+        return { message: "Deleted successfully", conversation_id: conversationId }
+    }
+    const query = hard ? '?hard=true' : ''
+    return directApiCall(`agent/conversations/${conversationId}${query}`, {
+        method: 'DELETE'
+    })
+  },
+
+  /**
    * Stream chat response
    */
   async *chatStream(

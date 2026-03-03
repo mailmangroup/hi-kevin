@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, MoreHorizontal, Pencil, Star, Trash2 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
 import { streamRegistry } from "@/lib/streaming/stream-registry"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useUserStore } from "@/lib/store/user-store"
 import { ArtifactProvider, useArtifact, ArtifactData } from "@/components/chat/artifact-context"
@@ -21,6 +21,24 @@ import { MessageActions } from "@/components/chat/message-actions"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
 import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/toast"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Types
 export interface ContentPart {
@@ -128,12 +146,18 @@ export function ChatInterface({ initialMessage, chatId, projectId }: ChatInterfa
 
 function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
   const { openArtifact, updateArtifactContent, isPanelOpen, reportNavigation, selectedArtifact } = useArtifact()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const router = useRouter()
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isThinking, setIsThinking] = React.useState(false)
   const [conversationId, setConversationId] = React.useState<string | undefined>(chatId)
   const [project, setProject] = React.useState<{ id: string, name: string } | null>(null)
   const [conversationTitle, setConversationTitle] = React.useState<string>("")
+  const [isFavorite, setIsFavorite] = React.useState(false)
+  const [isRenameOpen, setIsRenameOpen] = React.useState(false)
+  const [newTitle, setNewTitle] = React.useState("")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const [userScrolled, setUserScrolled] = React.useState(false)
@@ -288,6 +312,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               document.title = `${conversation.title} - Kevin`
               // Notify sidebar to refresh chat history (title may have been generated)
               window.dispatchEvent(new Event('chat-title-updated'))
+          }
+
+          if (conversation) {
+              setIsFavorite(conversation.is_favorite || false)
           }
 
           // Handle project context
@@ -455,6 +483,85 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       }
     }
     setIsThinking(false)
+  }
+
+  const handleRename = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!conversationId) return
+    if (!newTitle.trim()) {
+        toast({
+            title: "Title cannot be empty",
+            type: "error"
+        })
+        return
+    }
+
+    if (newTitle === conversationTitle) {
+        setIsRenameOpen(false)
+        return
+    }
+    
+    try {
+        await aiService.updateConversationTitle(conversationId, newTitle)
+        setConversationTitle(newTitle)
+        document.title = `${newTitle} - Kevin`
+        queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        window.dispatchEvent(new Event('chat-title-updated'))
+        toast({
+            title: "Title updated",
+            type: "success"
+        })
+        setIsRenameOpen(false)
+    } catch (error) {
+        toast({
+            title: "Failed to update title",
+            type: "error"
+        })
+    }
+  }
+
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!conversationId) return
+    try {
+      await aiService.updateConversationFavorite(conversationId, !isFavorite)
+      setIsFavorite(!isFavorite)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast({
+        title: isFavorite ? "Removed from favorites" : "Added to favorites",
+        type: "success"
+      })
+    } catch (error) {
+      toast({
+        title: "Failed to update favorite status",
+        type: "error"
+      })
+    }
+  }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!conversationId) return
+    
+    // Use window.confirm for now, could upgrade to a custom dialog later if needed
+    if (!confirm("Are you sure you want to permanently delete this chat? This action cannot be undone.")) return
+    
+    try {
+      await aiService.deleteConversation(conversationId, true)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast({
+        title: "Conversation deleted",
+        type: "success"
+      })
+      router.push('/chat/new')
+    } catch (error) {
+      toast({
+        title: "Failed to delete conversation",
+        type: "error"
+      })
+    }
   }
 
   const handleSend = async (text: string = input, images: UploadedImage[] = selectedImages, documents: UploadedDocument[] = selectedDocuments) => {
@@ -1029,20 +1136,59 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         isReportOpen ? "w-[450px] flex-shrink-0 border-r border-border" : "flex-1"
       )}>
         {/* Project Breadcrumb */}
-        <div className="flex items-center gap-2 border-b border-border/50 bg-transparent px-6 py-3 text-sm sticky top-0 z-10">
-          {project && (
-            <>
-              <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-                <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
-                  {project.name}
-                </Link>
-              </div>
-              <span className="text-muted-foreground/40">/</span>
-            </>
+        <div className="flex items-center justify-between border-b border-border/50 bg-transparent px-6 py-3 text-sm sticky top-0 z-10">
+          <div className="flex items-center gap-2 overflow-hidden">
+            {project && (
+              <>
+                <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                  <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
+                    {project.name}
+                  </Link>
+                </div>
+                <span className="text-muted-foreground/40 flex-shrink-0">/</span>
+              </>
+            )}
+            <div className="flex items-center gap-2 min-w-0">
+                <span className="font-medium text-foreground truncate">
+                    {conversationTitle || "Chat"}
+                </span>
+                {isFavorite && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-yellow-100 text-[9px] text-yellow-600 flex-shrink-0">★</span>
+                )}
+            </div>
+          </div>
+
+          {conversationId && (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7 rounded-full hover:bg-slate-200/50 flex-shrink-0 ml-2"
+                  >
+                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => {
+                      setNewTitle(conversationTitle || "New Conversation")
+                      setIsRenameOpen(true)
+                  }}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFavorite}>
+                    <Star className={cn("mr-2 h-3.5 w-3.5", isFavorite ? "fill-yellow-500 text-yellow-500" : "")} />
+                    {isFavorite ? "Unfavorite" : "Favorite"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          <span className="font-medium text-foreground truncate max-w-[300px]">
-              {conversationTitle || "Chat"}
-          </span>
         </div>
 
         {/* Messages Area */}
@@ -1308,6 +1454,36 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
       {/* Artifact Panel */}
       <ArtifactPanel />
+
+      <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Rename Chat</DialogTitle>
+                <DialogDescription>
+                    Enter a new title for this conversation.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRename}>
+                <div className="grid gap-4 py-4">
+                    <Input
+                        id="title"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        placeholder="Conversation title"
+                        autoFocus
+                    />
+                </div>
+                <div className="flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => setIsRenameOpen(false)}>
+                        Cancel
+                    </Button>
+                    <Button type="submit">
+                        Save Changes
+                    </Button>
+                </div>
+            </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -10,7 +10,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen overflow-hidden bg-transparent relative">
-      <Suspense fallback={<div className="hidden md:block w-[280px] bg-background border-r" />}>
+      <Suspense fallback={<div className="hidden md:block w-60 bg-background border-r" />}>
         <div className="hidden md:block z-20">
           <Sidebar />
         </div>

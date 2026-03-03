@@ -16,6 +16,7 @@ export function parseSubContentList(subContentList: any[] = []): {
   let lastToolCall: ToolCall | null = null
   let textContent = ""
   let deepResearchData: DeepResearchData | null = null
+  let deepResearchInsertIndex: number | null = null
 
   if (!Array.isArray(subContentList)) {
     return { toolCalls, content: textContent, images, documents, contentParts }
@@ -84,6 +85,7 @@ export function parseSubContentList(subContentList: any[] = []): {
     } else if (item.type === 'research_task') {
       if (!deepResearchData) {
         deepResearchData = { tasks: {}, taskOrder: [], isComplete: true }
+        deepResearchInsertIndex = contentParts.length
       }
       const task: ResearchTask = {
         id: item.task_id,
@@ -100,7 +102,8 @@ export function parseSubContentList(subContentList: any[] = []): {
   }
 
   if (deepResearchData) {
-    contentParts.push({ type: 'deep_research', deepResearch: deepResearchData })
+    const insertAt = deepResearchInsertIndex ?? contentParts.length
+    contentParts.splice(insertAt, 0, { type: 'deep_research', deepResearch: deepResearchData })
   }
 
   return { toolCalls, content: textContent, images, documents, contentParts }

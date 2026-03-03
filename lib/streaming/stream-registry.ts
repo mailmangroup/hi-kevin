@@ -20,7 +20,7 @@ import type { Message } from "@/components/chat/chat-interface"
 export interface StreamArtifact {
   id: string
   type: string
-  title: string
+  title?: string
   data: any
   toolName?: string
   session?: any
