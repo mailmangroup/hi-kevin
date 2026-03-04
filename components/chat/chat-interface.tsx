@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, MoreHorizontal, Pencil, Star, Trash2, Sparkles, Bot, User } from "lucide-react"
+import { FileText, CheckCircle2, AlertCircle, Loader2 as LoaderIcon, MoreHorizontal, Pencil, Star, Trash2, Bot, User } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils/cn"
 import { aiService, Message as ApiMessage } from "@/lib/api/client"
@@ -1209,9 +1209,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               {/* Assistant Avatar */}
               {message.role !== "user" && (
                 <div className="flex-shrink-0 mt-1">
-                   <div className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center shadow-sm">
-                     <Sparkles className="w-4 h-4 text-primary" />
-                   </div>
+                   <Image 
+                     src="/kevin-icon.svg" 
+                     alt="Kevin" 
+                     width={32} 
+                     height={32} 
+                     className="w-8 h-8 rounded-full shadow-sm"
+                     unoptimized
+                   />
                 </div>
               )}
 
@@ -1391,14 +1396,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
               </div>
 
-              {/* User Avatar */}
-              {message.role === "user" && (
-                <div className="flex-shrink-0 mt-1 ml-3">
-                   <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                     <User className="w-4 h-4 text-muted-foreground" />
-                   </div>
-                </div>
-              )}
+              {/* User Avatar - Removed */}
             </div>
           ))}
 

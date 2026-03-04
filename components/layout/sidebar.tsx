@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect,
   useState
@@ -309,11 +310,16 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <div className={cn("relative flex h-full w-60 flex-col bg-transparent", className)}>
       {/* Header */}
-      <div className="flex h-14 items-center gap-2 px-4 mb-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-white font-bold text-sm">
-          K
-        </div>
-        <span className="text-lg font-bold text-slate-900">Kevin</span>
+      <div className="flex h-14 items-center gap-3 px-6 mb-6 pt-4">
+        <Image
+          src="/kevin-icon.svg"
+          alt="Kevin"
+          width={32}
+          height={32}
+          className="h-8 w-8 rounded-lg shadow-sm"
+          unoptimized
+        />
+        <span className="text-lg font-bold text-slate-900 tracking-tight">Kevin</span>
       </div>
 
       {/* Navigation - fixed, no scroll */}

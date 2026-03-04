@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles, MessageSquare, BarChart3, Mail, CheckCircle2, User } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRef } from "react"
 
 const containerVariants = {
@@ -157,9 +158,14 @@ export function HeroSection() {
                   transition={{ delay: 0.8 }}
                   className="flex gap-4"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center shrink-0 border border-primary/40 shadow-lg shadow-primary/20">
-                    <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                  </div>
+                  <Image
+                    src="/kevin-icon.svg"
+                    alt="Kevin"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full shrink-0 shadow-lg shadow-primary/20"
+                    unoptimized
+                  />
                   <div className="space-y-4 max-w-[90%]">
                     <div className="bg-primary/5 backdrop-blur-sm rounded-2xl rounded-tr-none p-4 border border-primary/10 shadow-xl">
                       <p className="text-slate-200 text-sm mb-3 leading-relaxed">I&apos;m on it. I&apos;ve analyzed our competitor&apos;s recent moves and drafted the following assets for your approval:</p>

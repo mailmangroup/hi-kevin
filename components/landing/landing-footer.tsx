@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 
@@ -30,9 +31,16 @@ export function LandingFooter() {
 
         <div className="grid md:grid-cols-4 gap-8 pt-12 border-t border-slate-800 text-sm text-slate-400">
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">K</div>
-              <span className="font-bold text-lg text-white">Kevin</span>
+            <div className="flex items-center gap-3 mb-6">
+              <Image
+                src="/kevin-icon.svg"
+                alt="Kevin"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-lg shadow-sm"
+                unoptimized
+              />
+              <span className="font-bold text-lg text-white tracking-tight">Kevin</span>
             </div>
             <p className="max-w-xs">
               The Autonomous Marketing Operating System.
