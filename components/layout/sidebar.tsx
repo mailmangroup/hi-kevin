@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 
 interface NavItem {
   title: string
@@ -112,6 +113,7 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isRenameOpen, setIsRenameOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [newTitle, setNewTitle] = useState(chat.title || "New Chat")
 
   const handleRename = async (e: React.FormEvent) => {
@@ -163,13 +165,13 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
     }
   }
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    // Simple confirm for now
-    if (!confirm("Are you sure you want to permanently delete this chat? This action cannot be undone.")) return
-    
+    setIsDeleteOpen(true)
+  }
+
+  const doDelete = async () => {
     try {
       await aiService.deleteConversation(chat.id, true)
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -177,7 +179,6 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
         title: "Conversation deleted",
         type: "success"
       })
-      // If current chat is deleted, redirect to new chat
       if (isActive) {
         router.push('/dashboard')
       }
@@ -240,6 +241,16 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
             </DropdownMenu>
         </div>
     </div>
+
+    <ConfirmDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        title="Delete Chat"
+        description="Are you sure you want to permanently delete this chat? This action cannot be undone."
+        onConfirm={doDelete}
+        confirmText="Delete"
+        variant="destructive"
+      />
 
     <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
         <DialogContent>

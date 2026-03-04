@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 
@@ -37,6 +38,7 @@ export function ConversationListItem({ conversation }: ConversationListItemProps
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isRenameOpen, setIsRenameOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [newTitle, setNewTitle] = useState(conversation.title || "New Conversation")
 
   const handleRename = async (e: React.FormEvent) => {
@@ -88,12 +90,13 @@ export function ConversationListItem({ conversation }: ConversationListItemProps
     }
   }
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    if (!confirm("Are you sure you want to permanently delete this chat? This action cannot be undone.")) return
-    
+    setIsDeleteOpen(true)
+  }
+
+  const doDelete = async () => {
     try {
       await aiService.deleteConversation(conversation.id, true)
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -187,6 +190,16 @@ export function ConversationListItem({ conversation }: ConversationListItemProps
           </div>
         </div>
       </Link>
+
+      <ConfirmDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        title="Delete Chat"
+        description="Are you sure you want to permanently delete this chat? This action cannot be undone."
+        onConfirm={doDelete}
+        confirmText="Delete"
+        variant="destructive"
+      />
 
       <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
         <DialogContent>

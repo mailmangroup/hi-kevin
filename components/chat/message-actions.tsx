@@ -15,7 +15,7 @@ export function MessageActions({ message }: { message: Message }) {
   }
 
   return (
-    <div className="flex items-center gap-1 mt-2 -ml-2">
+    <div className="flex items-center gap-1 -ml-2">
       <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors" title="Like">
         <ThumbsUp className="h-3.5 w-3.5" />
       </button>

@@ -183,7 +183,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
 
   if (taskCount === 0) {
     return (
-      <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
+      <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden max-w-2xl">
         <div className="flex items-center gap-2 px-3 py-2">
           <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
           <span className="text-xs font-medium text-blue-700">Starting deep agent...</span>
@@ -193,7 +193,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 max-w-2xl">
       <div className="mb-1 text-[10px] text-gray-500 font-medium px-0.5">
         Research tasks: {completedCount}/{taskCount} completed
       </div>

@@ -38,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/toast"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useQueryClient } from "@tanstack/react-query"
 
 // Types
@@ -157,6 +158,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const [conversationTitle, setConversationTitle] = React.useState<string>("")
   const [isFavorite, setIsFavorite] = React.useState(false)
   const [isRenameOpen, setIsRenameOpen] = React.useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = React.useState(false)
   const [newTitle, setNewTitle] = React.useState("")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -462,7 +464,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
     // If we have content to send (text or files)
     // Check initialMessage !== undefined to allow empty string (for file-only messages)
-    if (initialQuery !== undefined || images.length > 0 || documents.length > 0) {
+    // Skip auto-send if chatId is present — this is an existing chat (e.g. page refresh)
+    if (!chatId && (initialQuery !== undefined || images.length > 0 || documents.length > 0)) {
         initialized.current = true
         
         if (initialQuery) {
@@ -540,14 +543,15 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     }
   }
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!conversationId) return
-    
-    // Use window.confirm for now, could upgrade to a custom dialog later if needed
-    if (!confirm("Are you sure you want to permanently delete this chat? This action cannot be undone.")) return
-    
+    setIsDeleteOpen(true)
+  }
+
+  const doDelete = async () => {
+    if (!conversationId) return
     try {
       await aiService.deleteConversation(conversationId, true)
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -1386,7 +1390,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 )}
                 
                 <div className="flex items-center gap-2 mt-1 px-1">
-                   <span className="text-[10px] text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <span className="text-[10px] text-muted-foreground/60">
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                    </span>
                    {message.role === "assistant" && !message.isStreaming && (
@@ -1455,6 +1459,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
       {/* Artifact Panel */}
       <ArtifactPanel />
+
+      <ConfirmDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        title="Delete Chat"
+        description="Are you sure you want to permanently delete this chat? This action cannot be undone."
+        onConfirm={doDelete}
+        confirmText="Delete"
+        variant="destructive"
+      />
 
       <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
         <DialogContent>
