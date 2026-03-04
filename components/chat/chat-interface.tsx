@@ -16,7 +16,7 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepResearchDisplay, DeepResearchData } from "@/components/chat/deep-research-display"
+import { DeepAgentDisplay, DeepAgentData } from "@/components/chat/deep-agent-display"
 import { MessageActions } from "@/components/chat/message-actions"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
@@ -42,10 +42,10 @@ import { useQueryClient } from "@tanstack/react-query"
 
 // Types
 export interface ContentPart {
-  type: "text" | "thinking" | "tool" | "deep_research"
+  type: "text" | "thinking" | "tool" | "deep_agent"
   content?: string
   tool?: ToolCall
-  deepResearch?: DeepResearchData
+  deepAgent?: DeepAgentData
 }
 
 export interface ToolCall {
@@ -222,8 +222,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     const param = searchParams?.get('search')
     return param === 'false' ? false : true
   })
-  const [deepResearch, setDeepResearch] = React.useState(() => {
-    const param = searchParams?.get('deepResearch')
+  const [deepAgent, setDeepAgent] = React.useState(() => {
+    const param = searchParams?.get('deepAgent')
     return param === 'true' ? true : false
   })
   const [sqlEnabled, setSqlEnabled] = React.useState(() => {
@@ -653,7 +653,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let lastPartWasThinking = false // Track if the last part was thinking
 
     // Deep research tracking
-    let deepResearchData: DeepResearchData | null = null
+    let deepAgentData: DeepAgentData | null = null
 
     // Artifact streaming accumulator (for create_artifact tool input streaming)
     const artifactStreamAccum: Record<number, { name: string; args: string }> = {}
@@ -696,7 +696,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         brandId: credentials.brandId,
         thinkingEnabled,
         includeWebSearch,
-        deepResearch,
+        deepAgent,
         sqlEnabled,
         model,
         images: validImages.map(img => img.key!), // Only send OSS keys
@@ -741,21 +741,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       }
       // --- end registry setup ---
 
-      // Helper to update deep research content part in message
-      const updateDeepResearchMessage = () => {
-        if (!deepResearchData) return
+      // Helper to update deep agent content part in message
+      const updateDeepAgentMessage = () => {
+        if (!deepAgentData) return
 
-        const snapshot: DeepResearchData = {
-          tasks: { ...deepResearchData.tasks },
-          taskOrder: [...deepResearchData.taskOrder],
-          isComplete: deepResearchData.isComplete,
+        const snapshot: DeepAgentData = {
+          tasks: { ...deepAgentData.tasks },
+          taskOrder: [...deepAgentData.taskOrder],
+          isComplete: deepAgentData.isComplete,
         }
 
-        const drPartIndex = contentParts.findIndex((p) => p.type === "deep_research")
+        const drPartIndex = contentParts.findIndex((p) => p.type === "deep_agent")
         if (drPartIndex >= 0) {
-          contentParts[drPartIndex] = { type: "deep_research", deepResearch: snapshot }
+          contentParts[drPartIndex] = { type: "deep_agent", deepAgent: snapshot }
         } else {
-          contentParts.push({ type: "deep_research", deepResearch: snapshot })
+          contentParts.push({ type: "deep_agent", deepAgent: snapshot })
         }
 
         lastPartWasText = false
@@ -1009,53 +1009,53 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               streamRegistry.update(currentSessionKey, s => { s.lastArtifact = reportArtifact })
           }
 
-          // Deep Research task lifecycle events
+          // Deep Agent task lifecycle events
 
           if (chunk.type === "task_started") {
               const taskId = chunk.task_id
               const description = chunk.description || taskId
-              if (!deepResearchData) {
-                deepResearchData = { tasks: {}, taskOrder: [], isComplete: false }
+              if (!deepAgentData) {
+                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
               }
-              deepResearchData.tasks[taskId] = { id: taskId, description, status: "in_progress" }
-              deepResearchData.taskOrder.push(taskId)
-              updateDeepResearchMessage()
+              deepAgentData.tasks[taskId] = { id: taskId, description, status: "in_progress" }
+              deepAgentData.taskOrder.push(taskId)
+              updateDeepAgentMessage()
           }
 
           if (chunk.type === "task_running") {
               const taskId = chunk.task_id
-              if (!deepResearchData) {
-                deepResearchData = { tasks: {}, taskOrder: [], isComplete: false }
+              if (!deepAgentData) {
+                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
               }
-              const existing = deepResearchData.tasks[taskId]
+              const existing = deepAgentData.tasks[taskId]
               if (existing) {
-                deepResearchData.tasks[taskId] = { ...existing, latestMessage: chunk.message }
+                deepAgentData.tasks[taskId] = { ...existing, latestMessage: chunk.message }
               }
-              updateDeepResearchMessage()
+              updateDeepAgentMessage()
           }
 
           if (chunk.type === "task_completed") {
               const taskId = chunk.task_id
-              if (deepResearchData?.tasks[taskId]) {
-                deepResearchData.tasks[taskId] = {
-                  ...deepResearchData.tasks[taskId],
+              if (deepAgentData?.tasks[taskId]) {
+                deepAgentData.tasks[taskId] = {
+                  ...deepAgentData.tasks[taskId],
                   status: "completed",
                   result: chunk.result,
                 }
               }
-              updateDeepResearchMessage()
+              updateDeepAgentMessage()
           }
 
           if (chunk.type === "task_failed" || chunk.type === "task_timed_out") {
               const taskId = chunk.task_id
-              if (deepResearchData?.tasks[taskId]) {
-                deepResearchData.tasks[taskId] = {
-                  ...deepResearchData.tasks[taskId],
+              if (deepAgentData?.tasks[taskId]) {
+                deepAgentData.tasks[taskId] = {
+                  ...deepAgentData.tasks[taskId],
                   status: chunk.type === "task_timed_out" ? "timed_out" : "failed",
                   error: chunk.error,
                 }
               }
-              updateDeepResearchMessage()
+              updateDeepAgentMessage()
           }
 
 
@@ -1329,9 +1329,9 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                 content={part.content || ""}
                                 isStreaming={message.isStreaming}
                               />
-                            ) : part.type === "deep_research" ? (
-                              <DeepResearchDisplay
-                                data={part.deepResearch!}
+                            ) : part.type === "deep_agent" ? (
+                              <DeepAgentDisplay
+                                data={part.deepAgent!}
                                 isStreaming={message.isStreaming || false}
                               />
                             ) : (
@@ -1428,8 +1428,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             setThinkingEnabled={setThinkingEnabled}
             includeWebSearch={includeWebSearch}
             setIncludeWebSearch={setIncludeWebSearch}
-            deepResearch={deepResearch}
-            setDeepResearch={setDeepResearch}
+            deepAgent={deepAgent}
+            setDeepAgent={setDeepAgent}
             sqlEnabled={sqlEnabled}
             setSqlEnabled={setSqlEnabled}
             model={model}

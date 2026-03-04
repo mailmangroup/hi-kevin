@@ -175,7 +175,7 @@ This section tracks the migration status of API endpoints from Mock Data to Real
 | **Chat** | `aiService.chatStream` | ✅ Integrated | `POST /agent/query` (Streaming SSE) |
 | | `aiService.getConversations` | ✅ Integrated | `GET /agent/conversations` |
 | | `aiService.getMessages` | ✅ Integrated | `GET /agent/conversations/{id}/messages` |
-| | Deep Research (within chat) | ✅ Integrated | Embedded in `/agent/query` stream |
+| | Deep Agent (within chat) | ✅ Integrated | Embedded in `/agent/query` stream |
 | | Artifacts (within chat) | ✅ Integrated | Embedded in `/agent/query` stream |
 | **Reports** | `aiService.getReport` | ✅ Integrated | `GET /agent/conversations/{id}/report/{reportId}` |
 | | `aiService.updateReportInsights` | ✅ Integrated | `PUT /agent/reports/{reportId}/pages/{page}/sections/{section}/insights` |
@@ -199,11 +199,11 @@ This section tracks the migration status of API endpoints from Mock Data to Real
 - **Backend Endpoint:** `/frost/...`
 - **Features:** Dashboard stats, new lead counts, and contact search are fully connected to the backend CRM integration.
 
-### Deep Research & Artifacts (Integrated via Chat Stream)
-- **Feature:** Both deep research plans and artifacts are embedded in chat streaming responses
+### Deep Agent & Artifacts (Integrated via Chat Stream)
+- **Feature:** Both deep agent plans and artifacts are embedded in chat streaming responses
 - **Backend Endpoint:** `POST /agent/query` (Streaming SSE)
 - **Components:**
-  - Deep Research: `deep-research-display.tsx`, `tool-call-display.tsx`
+  - Deep Agent: `deep-agent-display.tsx`, `tool-call-display.tsx`
   - Artifacts: `artifact-display.tsx`, `artifact-panel.tsx`, `artifact-renderers.tsx`
 - **How It Works:** Backend streams research progress and generates artifacts within the chat flow, frontend detects and renders them in real-time.
 

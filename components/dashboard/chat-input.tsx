@@ -27,7 +27,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
   const [input, setInput] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(true)
   const [includeWebSearch, setIncludeWebSearch] = useState(true)
-  const [deepResearch, setDeepResearch] = useState(false)
+  const [deepAgent, setDeepAgent] = useState(false)
   const [sqlEnabled, setSqlEnabled] = useState(false)
   const [model, setModel] = useState("qwen-max")
   const [selectedImages, setSelectedImages] = useState<UploadedImage[]>([])
@@ -93,7 +93,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
       q: input,
       thinking: thinkingEnabled.toString(),
       search: includeWebSearch.toString(),
-      deepResearch: deepResearch.toString(),
+      deepAgent: deepAgent.toString(),
       sql: sqlEnabled.toString(),
       model
     })
@@ -115,13 +115,13 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
   // Only one mode can be active at a time
   const activateFastPath = (path: string | null) => {
-    setDeepResearch(false)
+    setDeepAgent(false)
     setFastPath(path)
   }
 
-  const activateDeepResearch = (enabled: boolean) => {
+  const activateDeepAgent = (enabled: boolean) => {
     if (enabled) setFastPath(null)
-    setDeepResearch(enabled)
+    setDeepAgent(enabled)
   }
 
   const greeting = projectName
@@ -157,8 +157,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setThinkingEnabled={setThinkingEnabled}
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
-                deepResearch={deepResearch}
-                setDeepResearch={activateDeepResearch}
+                deepAgent={deepAgent}
+                setDeepAgent={activateDeepAgent}
                 sqlEnabled={sqlEnabled}
                 setSqlEnabled={setSqlEnabled}
                 model={model}
@@ -187,8 +187,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 setThinkingEnabled={setThinkingEnabled}
                 includeWebSearch={includeWebSearch}
                 setIncludeWebSearch={setIncludeWebSearch}
-                deepResearch={deepResearch}
-                setDeepResearch={activateDeepResearch}
+                deepAgent={deepAgent}
+                setDeepAgent={activateDeepAgent}
                 sqlEnabled={sqlEnabled}
                 setSqlEnabled={setSqlEnabled}
                 model={model}
@@ -234,9 +234,9 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                 <Button
                   variant="outline"
                   className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-emerald-500/10 hover:border-emerald-200 transition-all"
-                  onClick={() => activateDeepResearch(!deepResearch)}
+                  onClick={() => activateDeepAgent(!deepAgent)}
                 >
-                  Deep Research
+                  Deep Agent
                 </Button>
 
                 <Button

@@ -16,7 +16,7 @@ export interface ResearchTask {
   error?: string
 }
 
-export interface DeepResearchData {
+export interface DeepAgentData {
   tasks: Record<string, ResearchTask>  // keyed by task_id for O(1) updates
   taskOrder: string[]                   // insertion order for rendering
   isComplete: boolean
@@ -170,12 +170,12 @@ function ResearchTaskCard({
 
 // --- Main Component ---
 
-interface DeepResearchDisplayProps {
-  data: DeepResearchData
+interface DeepAgentDisplayProps {
+  data: DeepAgentData
   isStreaming: boolean
 }
 
-export function DeepResearchDisplay({ data, isStreaming }: DeepResearchDisplayProps) {
+export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
   const taskCount = data.taskOrder.length
   const completedCount = data.taskOrder.filter(
     (id) => data.tasks[id]?.status === "completed"
@@ -186,7 +186,7 @@ export function DeepResearchDisplay({ data, isStreaming }: DeepResearchDisplayPr
       <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2">
           <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-          <span className="text-xs font-medium text-blue-700">Starting deep research...</span>
+          <span className="text-xs font-medium text-blue-700">Starting deep agent...</span>
         </div>
       </div>
     )

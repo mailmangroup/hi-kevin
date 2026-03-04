@@ -395,7 +395,7 @@ export const aiService = {
             report_section_indexes?: number[]
         },
         fastPath?: string,
-        deepResearch?: boolean,
+        deepAgent?: boolean,
         maxResearchSteps?: number,
         sqlEnabled?: boolean
     }
@@ -427,12 +427,10 @@ export const aiService = {
         report_from_template: options.reportFromTemplate,
         report_context: options.reportContext,
         fast_path: options.fastPath,
-        deep_research: options.deepResearch ?? false,
+        deep_agent: options.deepAgent ?? false,
         max_research_steps: options.maxResearchSteps ?? 5,
         query_database: options.sqlEnabled ?? false
     }
-
-    const payloadString = JSON.stringify(payload)
 
     // Direct backend call for better streaming performance
     const config = getKawoConfig()
@@ -442,10 +440,34 @@ export const aiService = {
     }
 
     // Inject org_id and brand_id if not provided in options
-    if (!payload.org_id) payload.org_id = config.orgId
-    if (!payload.brand_id) payload.brand_id = config.brandId
+    const orgId = payload.org_id || config.orgId
+    const brandId = payload.brand_id || config.brandId
+    
+    // Ensure payload has these values
+    payload.org_id = orgId
+    payload.brand_id = brandId
 
-    const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
+    let targetUrl = `${config.apiUrl.replace(/\/$/, '')}/agent/query`
+    let finalPayload = payload
+    
+    // Switch to Deep Agent router if requested
+    if (options.deepAgent) {
+      targetUrl = `${config.apiUrl.replace(/\/$/, '')}/deep-agent/query`
+      
+      // Filter payload to only include DeepAgentRequest fields
+      finalPayload = {
+        query: message,
+        conversation_id: options.conversationId,
+        org_id: orgId,
+        brand_id: brandId,
+        project_id: options.projectId,
+        model: model,
+        max_research_steps: options.maxResearchSteps ?? 5,
+        include_web_search: options.includeWebSearch ?? true,
+      }
+    }
+
+    const payloadString = JSON.stringify(finalPayload)
 
     let response
     try {
