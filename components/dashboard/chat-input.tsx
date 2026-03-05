@@ -233,14 +233,6 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-emerald-500/10 hover:border-emerald-200 transition-all"
-                  onClick={() => activateDeepAgent(!deepAgent)}
-                >
-                  Deep Agent
-                </Button>
-
-                <Button
-                  variant="outline"
                   className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
                   onClick={handleGetHelp}
                 >
