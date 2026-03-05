@@ -21,7 +21,8 @@ import {
   MoreHorizontal,
   Star,
   Trash2,
-  Pencil
+  Pencil,
+  CheckSquare
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Conversation, aiService } from "@/lib/api/client"
@@ -209,29 +210,43 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
             </span>
         </Link>
         
-        <div className={cn(
-            "absolute right-1 opacity-0 transition-opacity", 
-            isActive ? "opacity-100" : "group-hover/item:opacity-100"
-        )}>
+        <div className="absolute right-1">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-slate-200">
-                        <MoreHorizontal className="h-3 w-3 text-slate-500" />
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={cn(
+                            "h-6 w-6 rounded-full transition-all",
+                            "text-slate-400 hover:text-slate-600 hover:bg-slate-200",
+                            isActive ? "opacity-100 bg-slate-200/50" : "opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                        )}
+                    >
+                        <MoreHorizontal className="h-3 w-3" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation()
                         setNewTitle(chat.title || "New Chat")
                         setIsRenameOpen(true)
                     }}>
                         <Pencil className="mr-2 h-4 w-4" />
-                        Change Title
+                        Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleFavorite}>
                         <Star className={cn("mr-2 h-4 w-4", chat.is_favorite ? "fill-yellow-500 text-yellow-500" : "")} />
                         {chat.is_favorite ? "Unfavorite" : "Favorite"}
                     </DropdownMenuItem>
+                    
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href="/chat?mode=select" className="cursor-pointer w-full flex items-center">
+                            <CheckSquare className="mr-2 h-4 w-4" />
+                            Select Multiple
+                        </Link>
+                    </DropdownMenuItem>
+                    
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
                         <Trash2 className="mr-2 h-4 w-4" />

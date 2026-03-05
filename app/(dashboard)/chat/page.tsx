@@ -1,9 +1,9 @@
-
 import { ConversationList } from "@/components/chat/conversation-list"
 import { Metadata } from "next"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Plus } from "lucide-react"
+import { Suspense } from "react"
 
 export const metadata: Metadata = {
   title: "Chat History",
@@ -23,7 +23,9 @@ export default function ChatHistoryPage() {
             </Button>
           </Link>
         </div>
-        <ConversationList />
+        <Suspense fallback={<div>Loading...</div>}>
+          <ConversationList />
+        </Suspense>
       </div>
     </div>
   )

@@ -16,7 +16,10 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepAgentDisplay, DeepAgentData } from "@/components/chat/deep-agent-display"
+import { DeepAgentDisplay } from "@/components/chat/deep-agent-display"
+import type { DeepAgentData } from "@/components/chat/deep-agent-display"
+import { useDeepAgentStream } from "@/lib/hooks/use-deep-agent-stream"
+import type { DeepAgentStreamState } from "@/lib/hooks/use-deep-agent-stream"
 import { MessageActions } from "@/components/chat/message-actions"
 import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
@@ -46,7 +49,7 @@ export interface ContentPart {
   type: "text" | "thinking" | "tool" | "deep_agent"
   content?: string
   tool?: ToolCall
-  deepAgent?: DeepAgentData
+  deepAgent?: DeepAgentData | DeepAgentStreamState
 }
 
 export interface ToolCall {
@@ -171,6 +174,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   }, [initialMessage, searchParams])
 
   const { profile, isLoading: isProfileLoading } = useUserStore()
+  const { processEvent: processDeepAgentEvent, updateTodos: updateDeepAgentTodos, reset: resetDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
 
   const credentials = React.useMemo(() => ({
     orgId: profile?.kawo_org_id || undefined,
@@ -247,6 +251,19 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
   // Report context (for chatting with reports)
   const [reportId, setReportId] = React.useState<string | undefined>()
+
+  const getStreamConversationId = (chunk: any): string | undefined => {
+    if (typeof chunk?.conversation_id === "string" && chunk.conversation_id) {
+      return chunk.conversation_id
+    }
+    if (typeof chunk?.new_conversation?.conversation_id === "string" && chunk.new_conversation.conversation_id) {
+      return chunk.new_conversation.conversation_id
+    }
+    if (typeof chunk?.conversation?.id === "string" && chunk.conversation.id) {
+      return chunk.conversation.id
+    }
+    return undefined
+  }
 
   React.useEffect(() => {
     if (chatId) {
@@ -465,7 +482,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     // If we have content to send (text or files)
     // Check initialMessage !== undefined to allow empty string (for file-only messages)
     // Skip auto-send if chatId is present — this is an existing chat (e.g. page refresh)
-    if (!chatId && (initialQuery !== undefined || images.length > 0 || documents.length > 0)) {
+    if (!conversationId && !chatId && (initialQuery !== undefined || images.length > 0 || documents.length > 0)) {
         initialized.current = true
         
         if (initialQuery) {
@@ -656,14 +673,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let currentThinkingContent = "" // Track current thinking segment
     let lastPartWasThinking = false // Track if the last part was thinking
 
-    // Deep research tracking
-    let deepAgentData: DeepAgentData | null = null
+    // Reset deep agent hook state for this new stream
+    resetDeepAgent()
 
     // Artifact streaming accumulator (for create_artifact tool input streaming)
     const artifactStreamAccum: Record<number, { name: string; args: string }> = {}
     let artifactPanelOpened = false
 
-    let activeConversationId = conversationId;
+    let activeConversationId = conversationId || chatId;
     // Hoisted so the finally block can reference it even if the try throws early
     let currentSessionKey = conversationId || "new"
 
@@ -745,21 +762,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       }
       // --- end registry setup ---
 
-      // Helper to update deep agent content part in message
-      const updateDeepAgentMessage = () => {
-        if (!deepAgentData) return
-
-        const snapshot: DeepAgentData = {
-          tasks: { ...deepAgentData.tasks },
-          taskOrder: [...deepAgentData.taskOrder],
-          isComplete: deepAgentData.isComplete,
-        }
-
+      // Helper to flush latest deep agent hook state into the message content parts
+      const updateDeepAgentMessage = (latestState: DeepAgentData | DeepAgentStreamState) => {
         const drPartIndex = contentParts.findIndex((p) => p.type === "deep_agent")
         if (drPartIndex >= 0) {
-          contentParts[drPartIndex] = { type: "deep_agent", deepAgent: snapshot }
+          contentParts[drPartIndex] = { type: "deep_agent", deepAgent: latestState }
         } else {
-          contentParts.push({ type: "deep_agent", deepAgent: snapshot })
+          contentParts.push({ type: "deep_agent", deepAgent: latestState })
         }
 
         lastPartWasText = false
@@ -779,20 +788,23 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       for await (const chunk of stream) {
           // Handle different event types
           if (chunk.new_conversation) {
-              newConversationId = chunk.conversation_id
-              justCreatedConversationId.current = newConversationId || null
-              setConversationId(newConversationId)
-              // Update URL without reloading
-              window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
+              newConversationId = getStreamConversationId(chunk)
 
-              // Notify sidebar to refresh chat history
-              window.dispatchEvent(new Event('chat-created'))
+              if (newConversationId) {
+                justCreatedConversationId.current = newConversationId
+                setConversationId(newConversationId)
+                // Update URL without reloading
+                window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
 
-              // Move the registry session from "new" to the real conversation ID
-              // so that navigating back to /chat/{id} can reconnect to it
-              if (newConversationId && currentSessionKey !== newConversationId) {
-                streamRegistry.renameKey(currentSessionKey, newConversationId)
-                currentSessionKey = newConversationId
+                // Notify sidebar to refresh chat history
+                window.dispatchEvent(new Event('chat-created'))
+
+                // Move the registry session from "new" to the real conversation ID
+                // so that navigating back to /chat/{id} can reconnect to it
+                if (currentSessionKey !== newConversationId) {
+                  streamRegistry.renameKey(currentSessionKey, newConversationId)
+                  currentSessionKey = newConversationId
+                }
               }
           }
 
@@ -851,6 +863,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
           if (chunk.follow_up_questions) {
               followUpQuestions = chunk.follow_up_questions
+              // Content is done — enable send button immediately without waiting for stream to close
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, isStreaming: false, followUpQuestions }
+                      : msg
+              ))
           }
 
           if (chunk.tool_start) {
@@ -1013,56 +1032,36 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               streamRegistry.update(currentSessionKey, s => { s.lastArtifact = reportArtifact })
           }
 
-          // Deep Agent task lifecycle events
-
-          if (chunk.type === "task_started") {
-              const taskId = chunk.task_id
-              const description = chunk.description || taskId
-              if (!deepAgentData) {
-                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
+          // Deep Agent task lifecycle events — delegated to useDeepAgentStream hook
+          if (chunk.type && (
+            chunk.type === "task_started" || chunk.type === "task_running" ||
+            chunk.type === "task_completed" || chunk.type === "task_failed" ||
+            chunk.type === "task_timed_out" || chunk.type.startsWith("subagent_")
+          )) {
+              const handled = processDeepAgentEvent(chunk)
+              if (handled) {
+                updateDeepAgentMessage(getDeepAgentState())
               }
-              deepAgentData.tasks[taskId] = { id: taskId, description, status: "in_progress" }
-              deepAgentData.taskOrder.push(taskId)
-              updateDeepAgentMessage()
           }
 
-          if (chunk.type === "task_running") {
-              const taskId = chunk.task_id
-              if (!deepAgentData) {
-                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
-              }
-              const existing = deepAgentData.tasks[taskId]
-              if (existing) {
-                deepAgentData.tasks[taskId] = { ...existing, latestMessage: chunk.message }
-              }
-              updateDeepAgentMessage()
+          // TodoListMiddleware: write_todos emits {"todos": [...]} (no type field)
+          if (Array.isArray(chunk.todos)) {
+              // Merge explicitly — don't rely on stateRef being flushed synchronously
+              const todosState = { ...getDeepAgentState(), todos: chunk.todos }
+              updateDeepAgentTodos(chunk.todos)
+              updateDeepAgentMessage(todosState)
           }
 
-          if (chunk.type === "task_completed") {
-              const taskId = chunk.task_id
-              if (deepAgentData?.tasks[taskId]) {
-                deepAgentData.tasks[taskId] = {
-                  ...deepAgentData.tasks[taskId],
-                  status: "completed",
-                  result: chunk.result,
-                }
-              }
-              updateDeepAgentMessage()
+          // Backend sends {"done": true} as the final chunk — re-enable send button
+          // immediately. This covers deep agent mode where follow_up_questions is skipped.
+          if (chunk.done) {
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, isStreaming: false }
+                      : msg
+              ))
           }
-
-          if (chunk.type === "task_failed" || chunk.type === "task_timed_out") {
-              const taskId = chunk.task_id
-              if (deepAgentData?.tasks[taskId]) {
-                deepAgentData.tasks[taskId] = {
-                  ...deepAgentData.tasks[taskId],
-                  status: chunk.type === "task_timed_out" ? "timed_out" : "failed",
-                  error: chunk.error,
-                }
-              }
-              updateDeepAgentMessage()
-          }
-
-
 
           if (chunk.error) {
               fullContent += `\n[Error: ${chunk.error}]`
@@ -1502,4 +1501,3 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     </div>
   )
 }
-

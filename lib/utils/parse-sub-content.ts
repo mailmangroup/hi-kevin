@@ -75,7 +75,7 @@ export function parseSubContentList(subContentList: any[] = []): {
       if (item.url) images.push(item.url)
     } else if (item.type === 'user_image') {
       if (item.image_url) images.push(item.image_url)
-    } else if (item.type === 'document') {
+    } else if (item.type === 'document' || item.type === 'user_document') {
       documents.push(item)
     } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
       textContent += item.text || item.content || ""
