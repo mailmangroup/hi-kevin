@@ -16,7 +16,7 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepAgentDisplay } from "@/components/chat/deep-agent-display"
+import { DeepAgentDisplay, TodoList } from "@/components/chat/deep-agent-display"
 import type { DeepAgentData } from "@/components/chat/deep-agent-display"
 import { useDeepAgentStream } from "@/lib/hooks/use-deep-agent-stream"
 import type { DeepAgentStreamState } from "@/lib/hooks/use-deep-agent-stream"
@@ -174,7 +174,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   }, [initialMessage, searchParams])
 
   const { profile, isLoading: isProfileLoading } = useUserStore()
-  const { processEvent: processDeepAgentEvent, updateTodos: updateDeepAgentTodos, reset: resetDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
+  const { state: deepAgentState, processEvent: processDeepAgentEvent, updateTodos: updateDeepAgentTodos, reset: resetDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
 
   const credentials = React.useMemo(() => ({
     orgId: profile?.kawo_org_id || undefined,
@@ -685,31 +685,6 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let currentSessionKey = conversationId || "new"
 
     try {
-      // Ensure conversation exists and documents are attached
-      // We attach even if processing, so the backend knows about them
-      const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus !== 'failed')
-      
-      if (validDocuments.length > 0) {
-          if (!activeConversationId) {
-              // Create new conversation explicitly to attach documents
-              const resp = await aiService.createConversation(credentials.orgId, credentials.brandId);
-              activeConversationId = resp.conversation_id;
-              setConversationId(activeConversationId);
-              
-              // Update URL without reloading
-              window.history.replaceState(window.history.state, '', `/chat/${activeConversationId}`);
-              
-              // Notify sidebar
-              window.dispatchEvent(new Event('chat-created'));
-          }
-          
-          // Attach documents
-          await aiService.attachDocuments(
-              activeConversationId,
-              validDocuments.map(doc => doc.documentId!)
-          );
-      }
-
       const stream = aiService.chatStream(text, {
         conversationId: activeConversationId,
         projectId: projectId,
@@ -791,20 +766,22 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               newConversationId = getStreamConversationId(chunk)
 
               if (newConversationId) {
-                justCreatedConversationId.current = newConversationId
-                setConversationId(newConversationId)
-                // Update URL without reloading
-                window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
-
-                // Notify sidebar to refresh chat history
-                window.dispatchEvent(new Event('chat-created'))
-
                 // Move the registry session from "new" to the real conversation ID
                 // so that navigating back to /chat/{id} can reconnect to it
                 if (currentSessionKey !== newConversationId) {
                   streamRegistry.renameKey(currentSessionKey, newConversationId)
                   currentSessionKey = newConversationId
                 }
+
+                justCreatedConversationId.current = newConversationId
+                setConversationId(newConversationId)
+
+                // Keep Next.js route state in sync with the URL so remounts or
+                // refreshes don't replay the /chat/new auto-send path.
+                router.replace(`/chat/${newConversationId}`, { scroll: false })
+
+                // Notify sidebar to refresh chat history
+                window.dispatchEvent(new Event('chat-created'))
               }
           }
 
@@ -1045,10 +1022,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           }
 
           // TodoListMiddleware: write_todos emits {"todos": [...]} (no type field)
+          // Backend Todo schema uses `content` field; frontend TodoItem uses `description`.
           if (Array.isArray(chunk.todos)) {
+              const normalizedTodos = chunk.todos.map((t: any, i: number) => ({
+                id: t.id ?? `todo-${i}`,
+                description: t.description ?? t.content ?? "",
+                status: t.status ?? "pending",
+              }))
               // Merge explicitly — don't rely on stateRef being flushed synchronously
-              const todosState = { ...getDeepAgentState(), todos: chunk.todos }
-              updateDeepAgentTodos(chunk.todos)
+              const todosState = { ...getDeepAgentState(), todos: normalizedTodos }
+              updateDeepAgentTodos(normalizedTodos)
               updateDeepAgentMessage(todosState)
           }
 
@@ -1200,7 +1183,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           onScroll={handleScroll}
           className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-6"
         >
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="mx-auto w-full max-w-3xl space-y-6">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -1409,10 +1392,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
       {/* Input Area */}
       <div className="flex-shrink-0 p-4 z-20 pointer-events-none">
-        <div className="mx-auto max-w-3xl pointer-events-auto">
+        <div className="mx-auto w-full max-w-3xl pointer-events-auto">
           {messages.length === 0 && (
             <div className="mb-8 text-center">
                <h2 className="text-2xl font-semibold text-foreground">How can I help you?</h2>
+            </div>
+          )}
+
+          {deepAgentState.todos.length > 0 && (
+            <div className="mb-3">
+              <TodoList todos={deepAgentState.todos} />
             </div>
           )}
 

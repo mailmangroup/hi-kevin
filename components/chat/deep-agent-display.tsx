@@ -78,9 +78,9 @@ function ToolCallRow({ tc }: { tc: SubagentToolCall }) {
   )
 }
 
-// --- Todo List ---
+// --- Todo List (exported for sticky rendering in chat-interface) ---
 
-function TodoList({ todos }: { todos: TodoItem[] }) {
+export function TodoList({ todos }: { todos: TodoItem[] }) {
   const activeItem = todos.find(t => t.status === "in_progress")
 
   return (
@@ -284,9 +284,10 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
   const todos = (data as DeepAgentStreamState).todos ?? (data as DeepAgentData).todos ?? []
 
   if (taskCount === 0) {
+    // Only show "Starting deep agent..." while actually streaming; hide once complete.
+    if (!isStreaming) return null
     return (
       <div className="space-y-1 max-w-2xl">
-        {todos.length > 0 && <TodoList todos={todos} />}
         <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2">
             <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
@@ -299,7 +300,6 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
 
   return (
     <div className="space-y-1 max-w-2xl">
-      {todos.length > 0 && <TodoList todos={todos} />}
       <div className="mb-1 text-[10px] text-gray-500 font-medium px-0.5">
         Research tasks: {completedCount}/{taskCount} completed
       </div>

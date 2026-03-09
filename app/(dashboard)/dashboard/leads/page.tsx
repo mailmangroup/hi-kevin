@@ -4,7 +4,7 @@ import { useState, useEffect, Fragment, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { LoadingState } from "@/components/ui/loading"
 import { Download, Calendar, ChevronDown, ChevronRight, UserPlus } from "lucide-react"
-import ExcelJS from 'exceljs'
+// ExcelJS is dynamically imported in download functions to reduce bundle size
 import { 
   DndContext, 
   useSensor, 
@@ -111,6 +111,7 @@ export default function LeadsPage() {
   const downloadExcel = async (type: 'summary' | 'details') => {
     if (!dashboardData) return
 
+    const ExcelJS = (await import('exceljs')).default
     const workbook = new ExcelJS.Workbook()
 
     if (type === 'summary') {

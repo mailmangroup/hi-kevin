@@ -313,15 +313,7 @@ export const aiService = {
     })
   },
 
-  /**
-   * Create a new conversation
-   */
-  async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {
-      return directApiCall('agent/conversations', {
-          method: 'POST',
-          body: JSON.stringify({ org_id: orgId, brand_id: brandId })
-      })
-  },
+
 
   /**
    * Update conversation favorite status
@@ -727,18 +719,6 @@ export const aiService = {
     })
   },
 
-  /**
-   * Attach documents to a conversation
-   */
-  async attachDocuments(conversationId: string, documentIds: string[]): Promise<{
-      success: boolean,
-      attached_count: number
-  }> {
-      return directApiCall(`conversations/${conversationId}/documents/attach`, {
-          method: 'POST',
-          body: JSON.stringify({ document_ids: documentIds })
-      })
-  },
 
   /**
    * List documents in a conversation
