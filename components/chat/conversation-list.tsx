@@ -6,7 +6,7 @@ import { ConversationListItem } from "./conversation-list-item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronLeft, ChevronRight, Search, Trash2, Star, X, CheckSquare } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, Trash2, Star, X } from "lucide-react"
 import { aiService } from "@/lib/api/client"
 import { useToast } from "@/components/ui/toast"
 import { useQueryClient } from "@tanstack/react-query"
@@ -17,6 +17,7 @@ import { useSearchParams } from "next/navigation"
 export function ConversationList() {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
+  const [showFavouritesOnly, setShowFavouritesOnly] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
@@ -47,9 +48,11 @@ export function ConversationList() {
     if (page < totalPages) setPage(page + 1)
   }
 
-  const filteredConversations = data?.conversations.filter(conversation => 
-    conversation.title?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || []
+  const filteredConversations = data?.conversations.filter(conversation => {
+    const matchesSearch = conversation.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesFavourites = !showFavouritesOnly || conversation.is_favorite
+    return matchesSearch && matchesFavourites
+  }) || []
 
   const toggleSelection = (id: string) => {
     const newSelected = new Set(selectedIds)
@@ -180,16 +183,32 @@ export function ConversationList() {
             </div>
           </div>
         ) : (
-          /* Search Input */
-          <div className="relative group flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 bg-white/40 backdrop-blur-sm border-white/40 hover:bg-white/60 focus:bg-white transition-all shadow-sm"
-            />
-          </div>
+          /* Search Input + Favourites Toggle */
+          <>
+            <div className="relative group flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 bg-white/40 backdrop-blur-sm border-white/40 hover:bg-white/60 focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFavouritesOnly(!showFavouritesOnly)}
+              title={showFavouritesOnly ? "Show all chats" : "Show favourites only"}
+              className={cn(
+                "h-9 w-9 p-0 flex-shrink-0 transition-all",
+                showFavouritesOnly
+                  ? "bg-yellow-50 border-yellow-300 text-yellow-600 hover:bg-yellow-100"
+                  : "bg-white/40 border-white/40 text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50 hover:border-yellow-300"
+              )}
+            >
+              <Star className={cn("h-4 w-4", showFavouritesOnly && "fill-yellow-400")} />
+            </Button>
+          </>
         )}
       </div>
 
@@ -212,7 +231,9 @@ export function ConversationList() {
       ) : filteredConversations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <p className="text-muted-foreground">
-            No conversations found matching "{searchQuery}"
+            {showFavouritesOnly
+              ? "No favourite conversations yet"
+              : `No conversations found matching "${searchQuery}"`}
           </p>
         </div>
       ) : (

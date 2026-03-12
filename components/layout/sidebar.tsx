@@ -66,7 +66,7 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
     title: "Projects",
     href: "/projects",
     icon: FolderKanban,
-    isBeta: true,
+    isBeta: false,
   },
   {
     title: "Content",
