@@ -64,30 +64,43 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
 }
 
+const EXT_DISPLAY_NAMES: Record<string, string> = {
+  pdf: 'PDF',
+  docx: 'Word',
+  doc: 'Word',
+  pptx: 'PowerPoint',
+  xlsx: 'Excel',
+  xls: 'Excel',
+  txt: 'Text',
+  md: 'Markdown',
+  markdown: 'Markdown',
+  html: 'HTML',
+  htm: 'HTML',
+  csv: 'CSV',
+  json: 'JSON',
+  xml: 'XML',
+}
+
 /**
- * Get file type display name
+ * Get file type display name from a filename
  */
 export function getFileTypeDisplay(filename: string): string {
   const ext = getFileExtension(filename)
+  return EXT_DISPLAY_NAMES[ext] || ext.toUpperCase()
+}
 
-  const displayNames: Record<string, string> = {
-    pdf: 'PDF',
-    docx: 'Word',
-    doc: 'Word',
-    pptx: 'PowerPoint',
-    xlsx: 'Excel',
-    xls: 'Excel',
-    txt: 'Text',
-    md: 'Markdown',
-    markdown: 'Markdown',
-    html: 'HTML',
-    htm: 'HTML',
-    csv: 'CSV',
-    json: 'JSON',
-    xml: 'XML',
+/**
+ * Get file type display name from a MIME type string (e.g. "application/pdf")
+ */
+export function getMimeTypeDisplay(mimeType: string): string {
+  for (const [ext, mimeTypes] of Object.entries(SUPPORTED_DOCUMENT_TYPES)) {
+    if ((mimeTypes as string[]).includes(mimeType)) {
+      return EXT_DISPLAY_NAMES[ext] || ext.toUpperCase()
+    }
   }
-
-  return displayNames[ext] || ext.toUpperCase()
+  // Fallback: use the subtype part (e.g. "pdf" from "application/pdf")
+  const subtype = mimeType.split('/')[1] || mimeType
+  return subtype.toUpperCase()
 }
 
 /**

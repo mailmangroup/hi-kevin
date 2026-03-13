@@ -21,7 +21,7 @@ import type { DeepAgentData } from "@/components/chat/deep-agent-display"
 import { useDeepAgentStream } from "@/lib/hooks/use-deep-agent-stream"
 import type { DeepAgentStreamState } from "@/lib/hooks/use-deep-agent-stream"
 import { MessageActions } from "@/components/chat/message-actions"
-import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
+import { formatFileSize, getFileTypeDisplay, getMimeTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
 import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
 import {
@@ -67,7 +67,7 @@ export interface Message {
   content: string
   timestamp: Date
   toolCalls?: ToolCall[]
-  images?: string[]
+  images?: Array<{ image_url: string; filename?: string; file_type?: string }>
   documents?: any[]
   contentParts?: ContentPart[]
   thinking?: string
@@ -633,7 +633,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       role: "user",
       content: text,
       timestamp: new Date(),
-      images: validImages.length > 0 ? validImages.map(img => img.url) : undefined,
+      images: validImages.length > 0 ? validImages.map(img => ({ image_url: img.url, filename: img.filename, file_type: img.fileType })) : undefined,
       documents: validDocuments.length > 0 ? validDocuments.map(doc => ({
         id: doc.documentId!,
         filename: doc.filename,
@@ -695,7 +695,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         deepAgent,
         sqlEnabled,
         model,
-        images: validImages.map(img => img.key!), // Only send OSS keys
+        images: validImages.map(img => ({ image_url: img.key!, filename: img.filename, file_type: img.fileType })),
         documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
         reportContext: reportId ? {
             report_id: reportId,
@@ -1225,7 +1225,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                     {message.images && message.images.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2 justify-end">
                         {message.images.map((img, i) => (
-                          <Image key={i} src={img} alt="Uploaded" width={300} height={200} className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-border bg-muted" style={{ width: 'auto', height: 'auto' }} unoptimized />
+                          <Image key={i} src={img.image_url} alt={img.filename ?? "Uploaded"} width={300} height={200} className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-border bg-muted" style={{ width: 'auto', height: 'auto' }} unoptimized />
                         ))}
                       </div>
                     )}
@@ -1262,7 +1262,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                   {truncateFilename(doc.filename, 25)}
                                 </div>
                                 <div className="text-[10px] opacity-70">
-                                  {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
+                                  {doc.file_type ? getMimeTypeDisplay(doc.file_type) : getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
                                   {doc.chunk_strategy && (
                                     <span className="ml-1">
                                       • {doc.chunk_strategy === 'full_text' ? 'Full text' : 'Vectorized'}

@@ -378,7 +378,7 @@ export const aiService = {
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
         toolSelectionEnabled?: boolean,
-        images?: string[],
+        images?: Array<{ image_url: string; filename?: string; file_type?: string }>,
         documentIds?: string[],
         reportFromTemplate?: ReportFromTemplate,
         reportContext?: {

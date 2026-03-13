@@ -28,6 +28,8 @@ export interface UploadedImage {
   id: string
   url: string // Preview URL (blob:...) or remote URL
   key?: string // OSS Key
+  filename?: string
+  fileType?: string
   file?: File
   uploading: boolean
   error?: boolean
@@ -159,8 +161,8 @@ export function ChatInputArea({
           }
 
           // 3. Update state
-          setSelectedImages(prev => prev.map(p => 
-              p.id === img.id ? { ...p, uploading: false, key: objectKey } : p
+          setSelectedImages(prev => prev.map(p =>
+              p.id === img.id ? { ...p, uploading: false, key: objectKey, filename: img.file?.name, fileType: img.file?.type } : p
           ))
       } catch (e) {
           if (process.env.NODE_ENV === 'development') console.error('Upload failed:', e)

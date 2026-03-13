@@ -6,6 +6,8 @@ export const ROUTES = {
   leads: '/dashboard/leads',
   leadDetail: (id: string) => `/dashboard/leads/${id}`,
   analytics: '/dashboard/analytics',
+  analyticsPostPerformance: '/dashboard/analytics/post-performance',
+  analyticsCommentAnalysis: '/dashboard/analytics/comment-analysis',
   analyticsReports: '/dashboard/analytics/reports',
   research: '/dashboard/research',
   researchKols: '/dashboard/research/kols',

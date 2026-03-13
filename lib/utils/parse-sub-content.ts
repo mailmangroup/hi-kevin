@@ -4,12 +4,12 @@ import type { DeepAgentData, ResearchTask } from "@/components/chat/deep-agent-d
 export function parseSubContentList(subContentList: any[] = []): {
   toolCalls: ToolCall[],
   content: string,
-  images: string[],
+  images: Array<{ image_url: string; filename?: string; file_type?: string }>,
   documents: any[],
   contentParts: ContentPart[]
 } {
   const toolCalls: ToolCall[] = []
-  const images: string[] = []
+  const images: Array<{ image_url: string; filename?: string; file_type?: string }> = []
   const documents: any[] = []
   const contentParts: ContentPart[] = []
   const incompleteToolCalls = new Map<string, ToolCall>()
@@ -72,9 +72,9 @@ export function parseSubContentList(subContentList: any[] = []): {
            if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
        }
     } else if (item.type === 'image') {
-      if (item.url) images.push(item.url)
+      if (item.url) images.push({ image_url: item.url })
     } else if (item.type === 'user_image') {
-      if (item.image_url) images.push(item.image_url)
+      if (item.image_url) images.push({ image_url: item.image_url, filename: item.filename, file_type: item.file_type })
     } else if (item.type === 'document' || item.type === 'user_document') {
       documents.push(item)
     } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
