@@ -277,24 +277,31 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       // navigated away and came back mid-stream), subscribe to the registry
       // and sync state from the buffered snapshot instead of loading history.
       const session = streamRegistry.getSession(chatId)
-      if (session?.isStreaming) {
+      
+      // Always restore from session if available (even if finished) to avoid
+      // race conditions where backend hasn't indexed the new messages yet.
+      if (session) {
         setConversationId(chatId)
         setMessages([...session.messages])
-        setIsThinking(true)
         if (session.lastArtifact) {
           openArtifact(session.lastArtifact as ArtifactData)
         }
-        const unsubscribe = streamRegistry.subscribe(chatId, () => {
-          const s = streamRegistry.getSession(chatId)
-          if (!s) return
-          setMessages([...s.messages])
-          setIsThinking(s.isStreaming)
-          if (!s.isStreaming) {
-            // Stream finished while we were away — load the authoritative title
-            loadConversationTitle(chatId)
-          }
-        })
-        return unsubscribe
+        
+        // If still streaming, subscribe to updates
+        if (session.isStreaming) {
+          setIsThinking(true)
+          const unsubscribe = streamRegistry.subscribe(chatId, () => {
+            const s = streamRegistry.getSession(chatId)
+            if (!s) return
+            setMessages([...s.messages])
+            setIsThinking(s.isStreaming)
+            if (!s.isStreaming) {
+              // Stream finished while we were away — load the authoritative title
+              loadConversationTitle(chatId)
+            }
+          })
+          return unsubscribe
+        }
       }
 
       setConversationId(chatId)
@@ -776,9 +783,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 justCreatedConversationId.current = newConversationId
                 setConversationId(newConversationId)
 
-                // Keep Next.js route state in sync with the URL so remounts or
-                // refreshes don't replay the /chat/new auto-send path.
-                router.replace(`/chat/${newConversationId}`, { scroll: false })
+                // Update the browser URL without triggering a Next.js navigation.
+                // router.replace() would unmount/remount ChatInterface because
+                // /chat/new and /chat/[id] are different route segments, causing
+                // a visible flash. window.history.replaceState avoids this.
+                window.history.replaceState(null, '', `/chat/${newConversationId}`)
 
                 // Notify sidebar to refresh chat history
                 window.dispatchEvent(new Event('chat-created'))
@@ -885,31 +894,26 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               const toolOutput = chunk.tool_end.output
               const toolArtifact = chunk.tool_end.artifact
 
-              // Update both toolCalls array and the tool in contentParts
+              // Update the local contentParts closure immediately (synchronously) so that
+              // any subsequent setMessages calls (e.g. from content chunks) use the updated
+              // state instead of overwriting it with the stale 'running' tool state.
+              contentParts = contentParts.map((part): ContentPart => {
+                  if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
+                      return {
+                          ...part,
+                          tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
+                      }
+                  }
+                  return part
+              })
+
+              const completedToolCalls = contentParts
+                  .filter(p => p.type === "tool" && p.tool)
+                  .map(p => p.tool!)
+
               setMessages((prev) => prev.map(msg => {
                   if (msg.id !== assistantMsgId) return msg
-
-                  const updatedToolCalls = (msg.toolCalls || []).map(tc =>
-                      tc.name === toolName && tc.state === 'running'
-                          ? { ...tc, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
-                          : tc
-                  )
-
-                  // Also update the tool in contentParts (they share the same reference)
-                  const updatedContentParts = (msg.contentParts || []).map((part): ContentPart => {
-                      if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
-                          return {
-                              ...part,
-                              tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
-                          }
-                      }
-                      return part
-                  })
-
-                  // Update our local contentParts reference too
-                  contentParts = updatedContentParts
-
-                  return { ...msg, toolCalls: updatedToolCalls, contentParts: updatedContentParts }
+                  return { ...msg, toolCalls: completedToolCalls, contentParts: [...contentParts] }
               }))
 
               pushToRegistry()

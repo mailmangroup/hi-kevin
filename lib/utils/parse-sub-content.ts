@@ -71,6 +71,50 @@ export function parseSubContentList(subContentList: any[] = []): {
            }
            if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
        }
+    } else if (item.type === 'ai_message') {
+      if (item.content) {
+        textContent += item.content
+        // Merge consecutive text parts so markdown parses with full context
+        const lastPart = contentParts[contentParts.length - 1]
+        if (lastPart && lastPart.type === 'text') {
+          lastPart.content = (lastPart.content || '') + item.content
+        } else {
+          contentParts.push({ type: 'text', content: item.content })
+        }
+      }
+      if (item.tool_calls && Array.isArray(item.tool_calls)) {
+        for (const tc of item.tool_calls) {
+          const toolCall: ToolCall = {
+            id: tc.id || Date.now().toString(),
+            name: tc.name,
+            input: tc.args || {},
+            state: 'running'
+          }
+          toolCalls.push(toolCall)
+          contentParts.push({ type: 'tool', tool: toolCall })
+          incompleteToolCalls.set(toolCall.id, toolCall)
+          lastToolCall = toolCall
+        }
+      }
+    } else if (item.type === 'tool_message') {
+       let toolCall: ToolCall | undefined
+       if (item.tool_call_id) {
+           toolCall = incompleteToolCalls.get(item.tool_call_id)
+       }
+       
+       // Fallback for missing ID if sequential
+       if (!toolCall && lastToolCall && lastToolCall.name === item.name) {
+           toolCall = lastToolCall
+       }
+
+       if (toolCall) {
+           toolCall.output = item.content
+           toolCall.state = 'completed'
+           if (item.artifact) {
+               toolCall.artifact = item.artifact
+           }
+           if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
+       }
     } else if (item.type === 'image') {
       if (item.url) images.push({ image_url: item.url })
     } else if (item.type === 'user_image') {
@@ -78,8 +122,15 @@ export function parseSubContentList(subContentList: any[] = []): {
     } else if (item.type === 'document' || item.type === 'user_document') {
       documents.push(item)
     } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
-      textContent += item.text || item.content || ""
-      contentParts.push({ type: 'text', content: item.text || item.content })
+      const textVal = item.text || item.content || ""
+      textContent += textVal
+      // Merge consecutive text parts so markdown parses with full context
+      const lastPart = contentParts[contentParts.length - 1]
+      if (lastPart && lastPart.type === 'text') {
+        lastPart.content = (lastPart.content || '') + textVal
+      } else {
+        contentParts.push({ type: 'text', content: textVal })
+      }
     } else if (item.type === 'thinking') {
       contentParts.push({ type: 'thinking', content: item.thinking || item.content })
     } else if (item.type === 'research_task') {
