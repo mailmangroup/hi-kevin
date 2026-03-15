@@ -99,7 +99,10 @@ export function HeroSection() {
               className="flex flex-col sm:flex-row gap-4 items-start"
             >
               <Link href="/dashboard">
-                <Button size="lg" className="text-base lg:text-lg px-8 py-6 h-auto rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-1">
+                <Button
+                  size="lg"
+                  className="relative text-base lg:text-lg px-8 py-6 h-auto rounded-full overflow-hidden border-0 text-white font-semibold tracking-tight bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 shadow-[0_8px_30px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_40px_rgba(99,102,241,0.45)] hover:from-indigo-500 hover:via-violet-500 hover:to-indigo-600 transition-all duration-300 hover:-translate-y-1 active:translate-y-0 active:shadow-[0_4px_20px_rgba(99,102,241,0.3)] before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/20 before:to-transparent before:pointer-events-none before:content-['']"
+                >
                   Hire Kevin
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
