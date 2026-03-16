@@ -33,12 +33,40 @@ function findColumn(headers: string[], keywords: string[]): string | undefined {
   return undefined
 }
 
+function parseCSVToRows(text: string): string[][] {
+  const rows: string[][] = []
+  const lines = text.split(/\r?\n/)
+  for (const line of lines) {
+    if (!line.trim()) continue
+    const cells: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        inQuotes = !inQuotes
+      } else if (ch === ',' && !inQuotes) {
+        cells.push(current)
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+    cells.push(current)
+    rows.push(cells)
+  }
+  return rows
+}
+
 export async function processFile(file: File): Promise<ProcessedComment[]> {
   const buffer = await file.arrayBuffer()
   const workbook = new ExcelJS.Workbook()
-  
+
   if (file.name.endsWith('.csv')) {
-    await workbook.csv.load(buffer)
+    const text = new TextDecoder().decode(buffer)
+    const rows = parseCSVToRows(text)
+    const worksheet = workbook.addWorksheet('Sheet1')
+    rows.forEach((row) => worksheet.addRow(row))
   } else {
     await workbook.xlsx.load(buffer)
   }
