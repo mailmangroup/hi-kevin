@@ -1,8 +1,7 @@
 
 "use client"
 
-import { Progress } from "@/components/ui/progress"
-import { Loader2, CheckCircle2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 interface AnalysisProgressProps {
   phase: number
@@ -32,7 +31,12 @@ export function AnalysisProgress({ phase, message }: AnalysisProgressProps) {
       </div>
 
       <div className="space-y-2">
-        <Progress value={progress} className="h-2 bg-slate-200" indicatorClassName="bg-gradient-to-r from-indigo-500 to-purple-500" />
+        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
         <div className="flex justify-between px-1">
           {steps.map((step, idx) => (
             <div 
