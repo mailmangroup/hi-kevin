@@ -201,6 +201,7 @@ export default function CommentAnalysisPage() {
       return
     }
 
+    const sourceId = selectedSourceId
     let isMounted = true
 
     async function loadReport() {
@@ -211,7 +212,7 @@ export default function CommentAnalysisPage() {
         setShowUploader(false)
 
         const response = await directApiCall<CommentAnalysisReport>(
-          `content-analysis/content-analysis?source_id=${encodeURIComponent(selectedSourceId)}`
+          `content-analysis/content-analysis?source_id=${encodeURIComponent(sourceId)}`
         )
 
         if (!isMounted) return
