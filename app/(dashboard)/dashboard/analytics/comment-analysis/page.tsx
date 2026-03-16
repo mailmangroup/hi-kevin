@@ -10,7 +10,10 @@ import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, T
 import { FileUploader } from "./file-uploader"
 import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
+import { DimensionAnalysis } from "./dimension-analysis"
+import { CommentList } from "./comment-list"
 import { analyzeContentStream, type AnalysisPhase } from "@/lib/api/content-analysis"
+import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
 
@@ -107,6 +110,12 @@ type Insights = {
   execution_matrix?: InsightExecution[]
 }
 
+type SchemaDimension = {
+  key: string
+  description: string
+  options: string[]
+}
+
 type CommentAnalysisReport = {
   filename?: string
   analysis_date?: string
@@ -117,6 +126,9 @@ type CommentAnalysisReport = {
   tag_statistics?: Record<string, number>
   golden_samples?: GoldenSample[]
   tagged_data?: any[]
+  schema_snapshot?: {
+    dimensions: SchemaDimension[]
+  }
 }
 
 const EXCLUDED_TAG_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None"])
@@ -132,13 +144,6 @@ function formatAnalysisDate(value?: string) {
   })
 }
 
-function normalizeSentimentClass(value?: string) {
-  if (!value) return "neutral"
-  const normalized = value.toLowerCase()
-  if (normalized.includes("pos")) return "positive"
-  if (normalized.includes("neg")) return "negative"
-  return "neutral"
-}
 
 function filterTags(tags: Record<string, string>) {
   return Object.entries(tags).filter(([, value]) => value && !EXCLUDED_TAG_VALUES.has(value))
@@ -225,7 +230,7 @@ export default function CommentAnalysisPage() {
     }
   }, [selectedSourceId])
 
-  const handleFileProcessed = async (comments: ProcessedComment[], filename: string) => {
+  const handleFileProcessed = async (comments: ProcessedComment[], filename: string, name: string, postContent: string) => {
     setIsAnalyzing(true)
     setAnalysisPhase(0)
     setAnalysisMessage("Starting analysis...")
@@ -244,7 +249,8 @@ export default function CommentAnalysisPage() {
       const stream = analyzeContentStream({
         items,
         filename,
-        name: filename.split('.')[0] || "Uploaded Analysis",
+        name: name || filename.split('.')[0] || "Uploaded Analysis",
+        post_content: postContent || undefined,
       })
 
       for await (const update of stream) {
@@ -683,23 +689,16 @@ export default function CommentAnalysisPage() {
               <div className="space-y-4">
                 {Object.entries(report.sentiment_distribution).map(([label, count]) => {
                   const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
-                  const sentimentClass = normalizeSentimentClass(label)
-                  const barColor =
-                    sentimentClass === "positive"
-                      ? "#10b981" // emerald-500
-                      : sentimentClass === "negative"
-                        ? "#f43f5e" // rose-500
-                        : "#94a3b8" // slate-400
 
                   return (
                     <div key={label} className="flex flex-wrap items-center gap-3">
-                      <div className="min-w-[110px] text-sm text-slate-500">{label}</div>
+                      <div className="min-w-[110px] text-sm text-slate-500">{sentimentLabel(label)}</div>
                       <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100">
                         <div
                           className="h-full rounded"
                           style={{
                             width: `${percent}%`,
-                            background: barColor,
+                            background: sentimentColor(label),
                           }}
                         />
                       </div>
@@ -787,12 +786,20 @@ export default function CommentAnalysisPage() {
           </section>
         )}
 
-        {/* 4. Topic Analysis (Weighted) */}
+        {/* 4. Dimension / Topic Analysis */}
         {report.tagged_data && report.sentiment_distribution && (
-          <TopicAnalysis 
-            taggedData={report.tagged_data} 
-            sentimentDistribution={report.sentiment_distribution} 
-          />
+          report.schema_snapshot?.dimensions?.length ? (
+            <DimensionAnalysis
+              taggedData={report.tagged_data}
+              sentimentDistribution={report.sentiment_distribution}
+              schemaSnapshot={report.schema_snapshot}
+            />
+          ) : (
+            <TopicAnalysis
+              taggedData={report.tagged_data}
+              sentimentDistribution={report.sentiment_distribution}
+            />
+          )
         )}
 
         {/* 5. Golden Samples */}
@@ -807,13 +814,7 @@ export default function CommentAnalysisPage() {
             </div>
             <div className="space-y-4">
               {report.golden_samples.map((sample, index) => {
-                const sentimentClass = normalizeSentimentClass(sample.sentiment_class || sample.sentiment)
-                const accentClass =
-                  sentimentClass === "positive"
-                    ? "bg-emerald-50 text-emerald-600"
-                    : sentimentClass === "negative"
-                      ? "bg-rose-50 text-rose-600"
-                      : "bg-slate-100 text-slate-500"
+                const accentClass = sentimentBadgeClass(sample.sentiment)
 
                 return (
                   <details
@@ -823,7 +824,7 @@ export default function CommentAnalysisPage() {
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                       <div className="flex flex-wrap items-center gap-3">
                         <span className={`rounded px-2 py-1 text-xs font-medium ${accentClass}`}>
-                          {sample.sentiment}
+                          {sentimentLabel(sample.sentiment)}
                         </span>
                         {sample.persona_name && (
                           <span className="text-xs text-slate-400">{sample.persona_name}</span>
@@ -856,6 +857,11 @@ export default function CommentAnalysisPage() {
               })}
             </div>
           </section>
+        )}
+
+        {/* 6. All Comments */}
+        {!!report.tagged_data?.length && (
+          <CommentList taggedData={report.tagged_data} personas={report.personas ?? []} />
         )}
 
         <footer className="border-t border-indigo-100 py-10 text-center text-xs text-slate-400">

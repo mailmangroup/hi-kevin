@@ -6,6 +6,7 @@ import { Search, ChevronRight, ChevronDown, SlidersHorizontal } from "lucide-rea
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils/cn"
+import { sentimentLabel, sentimentColor, sentimentInt } from "@/lib/utils/sentiment"
 
 interface TopicAnalysisProps {
   taggedData: any[]
@@ -39,7 +40,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
 
     taggedData.forEach((item) => {
       // Filter by sentiment if selected
-      if (selectedSentiment && item.sentiment !== selectedSentiment) return
+      if (selectedSentiment && sentimentInt(item.sentiment) !== sentimentInt(selectedSentiment)) return
 
       const topic = item.topic || "Uncategorized"
       
@@ -61,7 +62,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       stats[topic].score += itemScore
 
       // Sentiment breakdown
-      const sent = item.sentiment || "Neutral"
+      const sent = sentimentLabel(item.sentiment)
       stats[topic].sentimentBreakdown[sent] = (stats[topic].sentimentBreakdown[sent] || 0) + 1
     })
 
@@ -74,13 +75,6 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       .sort((a, b) => sortMode === "score" ? b.score - a.score : b.count - a.count)
   }, [taggedData, selectedSentiment, weights, sortMode])
 
-  // Helper to normalize sentiment for colors
-  const getSentimentColor = (sent: string) => {
-    const s = sent.toLowerCase()
-    if (s.includes("pos")) return "#10b981" // emerald-500
-    if (s.includes("neg")) return "#f43f5e" // rose-500
-    return "#94a3b8" // slate-400
-  }
 
   return (
     <div className="space-y-6">
@@ -161,7 +155,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
             !selectedSentiment ? "bg-slate-900 text-white border-slate-900" : "text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-900"
           )}
         >
-          全部
+          All
         </Button>
         {Object.keys(sentimentDistribution).map(sent => (
           <Button
@@ -171,13 +165,13 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
             onClick={() => setSelectedSentiment(sent)}
             className={cn(
               "rounded-full text-xs px-3 border",
-              selectedSentiment === sent 
-                ? "bg-slate-900 text-white border-slate-900" 
+              selectedSentiment === sent
+                ? "bg-slate-900 text-white border-slate-900"
                 : "text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-900"
             )}
           >
-            <span className="w-2 h-2 rounded-full mr-2" style={{ background: getSentimentColor(sent) }} />
-            {sent}
+            <span className="w-2 h-2 rounded-full mr-2" style={{ background: sentimentColor(sent) }} />
+            {sentimentLabel(sent)}
           </Button>
         ))}
       </div>
@@ -200,12 +194,12 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
                   <h3 className="text-sm font-medium text-slate-900 truncate">{topic.topic}</h3>
                   <div className="flex h-1.5 w-24 rounded-full bg-slate-100 overflow-hidden">
                     {Object.entries(topic.sentimentBreakdown).map(([sent, count]) => (
-                      <div 
+                      <div
                         key={sent}
-                        style={{ 
+                        style={{
                           width: `${(count / topic.count) * 100}%`,
-                          background: getSentimentColor(sent)
-                        }} 
+                          background: sentimentColor(sent)
+                        }}
                       />
                     ))}
                   </div>
@@ -246,9 +240,9 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
                         <div className="flex items-center gap-2">
                           <span 
                             className="px-1.5 py-0.5 rounded text-[10px] uppercase font-medium bg-slate-100"
-                            style={{ color: getSentimentColor(comment.sentiment) }}
+                            style={{ color: sentimentColor(comment.sentiment) }}
                           >
-                            {comment.sentiment}
+                            {sentimentLabel(comment.sentiment)}
                           </span>
                           {comment.persona_name && (
                             <span className="text-xs text-slate-500">{comment.persona_name}</span>
