@@ -82,7 +82,11 @@ export default function SettingsPage() {
 
           setStoreProfile({
             full_name: data.full_name,
-            email: data.email || user.email || null
+            email: data.email || user.email || null,
+            kawo_token: data.kawo_token,
+            kawo_org_id: data.kawo_org_id,
+            kawo_brand_id: data.kawo_brand_id,
+            kawo_api_url: data.kawo_api_url,
           })
         } else {
           setProfile({
@@ -152,7 +156,11 @@ export default function SettingsPage() {
 
       setStoreProfile({
         full_name: profile.full_name,
-        email: profile.email || null
+        email: profile.email || null,
+        kawo_token: profile.kawo_token,
+        kawo_org_id: profile.kawo_org_id,
+        kawo_brand_id: profile.kawo_brand_id,
+        kawo_api_url: profile.kawo_api_url,
       })
     } catch (e: any) {
       if (process.env.NODE_ENV === 'development') console.error('Save error:', e)

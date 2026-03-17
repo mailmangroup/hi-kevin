@@ -6,8 +6,8 @@ import { Plus } from "lucide-react"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
-  title: "Deep Agent History",
-  description: "View your deep-agent conversations with Kevin.",
+  title: "Lobster Mode History",
+  description: "View your Lobster Mode conversations with Kevin.",
 }
 
 export default function DeepAgentChatHistoryPage() {
@@ -15,11 +15,11 @@ export default function DeepAgentChatHistoryPage() {
     <div className="flex-1 space-y-4 p-8 pt-6 h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Deep Agent History</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Lobster Mode History</h2>
           <Link href="/chat/deep-agent/new" prefetch={false}>
             <Button className="gap-2 shadow-sm hover:shadow-md transition-all">
               <Plus className="h-4 w-4" />
-              New Deep Agent Chat
+              New Lobster Mode Chat
             </Button>
           </Link>
         </div>

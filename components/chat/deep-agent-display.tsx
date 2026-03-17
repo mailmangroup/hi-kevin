@@ -255,7 +255,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
         <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2">
             <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-            <span className="text-xs font-medium text-blue-700">Starting deep agent...</span>
+            <span className="text-xs font-medium text-blue-700">Starting Lobster Mode...</span>
           </div>
         </div>
       </div>

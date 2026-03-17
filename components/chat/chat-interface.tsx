@@ -828,50 +828,31 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               }
           }
 
-          const chunkThinking = chunk?.type === "coordinator_thinking" ? chunk.content : chunk.thinking
-          const chunkContent = chunk?.type === "coordinator_token" ? chunk.content : chunk.content
+          const chunkThinking = chunk?.type === "coordinator_thinking" ? chunk.content : (!chunk?.type ? chunk.thinking : undefined)
+          const chunkContent = chunk?.type === "coordinator_token" ? chunk.content : (!chunk?.type ? chunk.content : undefined)
 
-          // Handle thinking chunks; deep-agent thinking is split into dedicated lane.
+          // Handle thinking chunks — always in contentParts to maintain correct
+          // sequence with tool calls (thinking → tool → thinking → text).
           if (chunkThinking !== undefined && chunkThinking !== null) {
               thinkingContent += chunkThinking || ""
               currentThinkingContent += chunkThinking || ""
 
-              if (effectiveDeepAgent) {
-                  if (lastPartWasThinking && deepStreamParts.length > 0) {
-                      const lastPart = deepStreamParts[deepStreamParts.length - 1]
-                      if (lastPart.type === "thinking") {
-                          deepStreamParts[deepStreamParts.length - 1] = { ...lastPart, content: currentThinkingContent }
-                      }
-                  } else {
-                      deepStreamParts.push({ type: "thinking", content: currentThinkingContent })
-                      lastPartWasThinking = true
-                      lastPartWasText = false
+              if (lastPartWasThinking && contentParts.length > 0) {
+                  const lastPart = contentParts[contentParts.length - 1]
+                  if (lastPart.type === "thinking") {
+                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
                   }
-
-                  setMessages((prev) => prev.map(msg =>
-                      msg.id === assistantMsgId
-                          ? { ...msg, thinking: thinkingContent, deepStreamParts: [...deepStreamParts] }
-                          : msg
-                  ))
               } else {
-                  // Preserve legacy behavior for regular agent streams.
-                  if (lastPartWasThinking && contentParts.length > 0) {
-                      const lastPart = contentParts[contentParts.length - 1]
-                      if (lastPart.type === "thinking") {
-                          contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
-                      }
-                  } else {
-                      contentParts.push({ type: "thinking", content: currentThinkingContent })
-                      lastPartWasThinking = true
-                      lastPartWasText = false
-                  }
-
-                  setMessages((prev) => prev.map(msg =>
-                      msg.id === assistantMsgId
-                          ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
-                          : msg
-                  ))
+                  contentParts.push({ type: "thinking", content: currentThinkingContent })
+                  lastPartWasThinking = true
+                  lastPartWasText = false
               }
+
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+                      : msg
+              ))
               pushToRegistry()
           }
 

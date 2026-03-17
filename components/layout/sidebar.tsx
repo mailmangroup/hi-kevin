@@ -7,6 +7,7 @@ import { useEffect,
   useState
 } from "react"
 import { cn } from "@/lib/utils/cn"
+import { LobsterIcon } from "@/components/ui/lobster-icon"
 import {
   LayoutDashboard,
   FileText,
@@ -17,6 +18,7 @@ import {
   Shield,
   Settings,
   MessageSquare,
+  // BrainCircuit removed — using LobsterIcon
   FolderKanban,
   MoreHorizontal,
   Star,
@@ -393,14 +395,21 @@ export function Sidebar({ className }: { className?: string }) {
                 History
             </Link>
             <div className="space-y-0.5">
-                <Link href="/chat/agent/new" prefetch={false}>
-                    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
-                        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200">
-                            <MessageSquare className="h-2.5 w-2.5 text-slate-500" />
-                        </div>
-                        New Chat
-                    </button>
-                </Link>
+                <div className="flex items-center gap-1">
+                    <Link href="/chat/agent/new" prefetch={false} className="flex-1">
+                        <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
+                            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200">
+                                <MessageSquare className="h-2.5 w-2.5 text-slate-500" />
+                            </div>
+                            New Chat
+                        </button>
+                    </Link>
+                    <Link href="/chat/deep-agent/new" prefetch={false} title="New Lobster Mode Chat">
+                        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-700">
+                            <LobsterIcon className="h-3.5 w-3.5" />
+                        </button>
+                    </Link>
+                </div>
                 {chatHistory.map((chat) => {
                     const chatPath = chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`
                     const isActive = pathname === chatPath

@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Microscope, Database } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Database } from "lucide-react"
+import { LobsterIcon } from "@/components/ui/lobster-icon"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -475,15 +476,15 @@ export function ChatInputArea({
             {deepAgent && (
               <div
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors",
-                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-emerald-100"
+                  "inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-700 transition-colors",
+                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-red-100"
                 )}
                 onClick={() => {
                   if (!deepAgentLocked) setDeepAgent(false)
                 }}
               >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                Deep Agent Mode
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                Lobster Mode
                 {!deepAgentLocked && <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />}
               </div>
             )}
@@ -580,70 +581,70 @@ export function ChatInputArea({
       </div>
 
       {/* Bottom Actions Row */}
-      <div className="flex items-center justify-between px-3 pb-3">
+      <div className="flex items-center justify-between gap-2 px-3 pb-3">
         {/* Left Actions: Think, Search, Model */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <Button
                 variant={thinkingEnabled ? "secondary" : "ghost"}
                 onClick={() => setThinkingEnabled(!thinkingEnabled)}
                 className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
                 thinkingEnabled
                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
             >
-                <Brain className="h-3.5 w-3.5 mr-1.5" />
-                Thinking
+                <Brain className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Thinking</span>
             </Button>
             <Button
                 variant={includeWebSearch ? "secondary" : "ghost"}
                 onClick={() => setIncludeWebSearch(!includeWebSearch)}
                 className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
                 includeWebSearch
                     ? "bg-blue-50 text-blue-600 border-blue-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
             >
-                <Globe className="h-3.5 w-3.5 mr-1.5" />
-                Search
+                <Globe className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Search</span>
             </Button>
             <Button
                 variant={sqlEnabled ? "secondary" : "ghost"}
                 onClick={() => setSqlEnabled?.(!sqlEnabled)}
                 className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
                 sqlEnabled
                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled}
             >
-                <Database className="h-3.5 w-3.5 mr-1.5" />
-                SQL
+                <Database className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">SQL</span>
             </Button>
             <Button
                 variant={deepAgent ? "secondary" : "ghost"}
                 onClick={() => setDeepAgent(!deepAgent)}
                 className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
                 deepAgent
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                    ? "bg-red-50 text-red-600 border-red-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 disabled={disabled || deepAgentLocked}
             >
-                <Microscope className="h-3.5 w-3.5 mr-1.5" />
-                Deep Agent
+                <LobsterIcon className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Lobster Mode</span>
             </Button>
 
             {/* Model Selection */}
             <Select value={model} onValueChange={setModel} disabled={disabled}>
                 <SelectTrigger className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium border-0 bg-transparent hover:bg-muted/50 transition-all w-auto gap-1.5 text-muted-foreground"
+                "h-8 px-2.5 rounded-full text-xs font-medium border-0 bg-transparent hover:bg-muted/50 transition-all w-auto gap-1 text-muted-foreground"
                 )}>
                 <SelectValue />
                 </SelectTrigger>
@@ -658,7 +659,7 @@ export function ChatInputArea({
         </div>
 
         {/* Right Actions: Upload & Send */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* File Inputs (Hidden) */}
             <input
                 type="file"
