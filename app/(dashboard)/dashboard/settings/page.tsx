@@ -180,7 +180,7 @@ export default function SettingsPage() {
     setConnectionStatus(null)
 
     try {
-      await directApiCall('users/current')
+      await directApiCall('me')
 
       setConnectionStatus('success')
       toast({
