@@ -150,6 +150,7 @@ export interface Conversation {
   message_count: number
   last_message?: string
   is_favorite: boolean
+  conversation_mode?: "agent" | "deep_agent"
   has_report?: boolean
   project_id?: string
 }
@@ -243,7 +244,11 @@ export const aiService = {
   /**
    * Get list of conversations
    */
-  async getConversations(limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number }> {
+  async getConversations(
+    limit = 20,
+    skip = 0,
+    conversationMode?: "agent" | "deep_agent"
+  ): Promise<{ conversations: Conversation[], total: number }> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
         return {
             conversations: [
@@ -253,7 +258,14 @@ export const aiService = {
             total: 2
         }
     }
-    return directApiCall(`agent/conversations?limit=${limit}&skip=${skip}`)
+    const params = new URLSearchParams({
+      limit: String(limit),
+      skip: String(skip),
+    })
+    if (conversationMode) {
+      params.set("conversation_mode", conversationMode)
+    }
+    return directApiCall(`agent/conversations?${params.toString()}`)
   },
 
   /**
@@ -419,8 +431,6 @@ export const aiService = {
         report_from_template: options.reportFromTemplate,
         report_context: options.reportContext,
         fast_path: options.fastPath,
-        deep_agent: options.deepAgent ?? false,
-        max_research_steps: options.maxResearchSteps ?? 5,
         query_database: options.sqlEnabled ?? false
     }
 

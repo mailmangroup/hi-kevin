@@ -109,7 +109,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     }
 
     setIsNavigating(true)
-    router.push(`/chat/new?${params.toString()}`)
+    const basePath = deepAgent ? "/chat/deep-agent/new" : "/chat/agent/new"
+    router.push(`${basePath}?${params.toString()}`)
   }
 
 

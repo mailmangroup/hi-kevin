@@ -211,7 +211,7 @@ export function ReportParametersDialog({
 
   const handleViewReport = () => {
     if (generatedConversationId) {
-      router.push(`/chat/${generatedConversationId}`)
+      router.push(`/chat/agent/${generatedConversationId}`)
       onOpenChange(false)
     } else {
       // Fallback: if we don't have the ID for some reason, try to go to the latest chat

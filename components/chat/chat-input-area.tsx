@@ -59,6 +59,7 @@ export interface ChatInputAreaProps {
   setIncludeWebSearch: (enabled: boolean) => void
   deepAgent: boolean
   setDeepAgent: (enabled: boolean) => void
+  deepAgentLocked?: boolean
   model: string
   setModel: (model: string) => void
   selectedImages: UploadedImage[]
@@ -91,6 +92,7 @@ export function ChatInputArea({
   setIncludeWebSearch,
   deepAgent,
   setDeepAgent,
+  deepAgentLocked = false,
   model,
   setModel,
   selectedImages,
@@ -472,12 +474,17 @@ export function ChatInputArea({
             )}
             {deepAgent && (
               <div
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 cursor-pointer hover:bg-emerald-100 transition-colors"
-                onClick={() => setDeepAgent(false)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors",
+                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-emerald-100"
+                )}
+                onClick={() => {
+                  if (!deepAgentLocked) setDeepAgent(false)
+                }}
               >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                 Deep Agent Mode
-                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
+                {!deepAgentLocked && <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />}
               </div>
             )}
           </div>
@@ -627,7 +634,7 @@ export function ChatInputArea({
                     ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                     : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
-                disabled={disabled}
+                disabled={disabled || deepAgentLocked}
             >
                 <Microscope className="h-3.5 w-3.5 mr-1.5" />
                 Deep Agent

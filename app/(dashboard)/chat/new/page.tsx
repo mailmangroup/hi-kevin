@@ -1,18 +1,14 @@
-import { Suspense } from "react"
-import { ChatInterface } from "@/components/chat/chat-interface"
-import { LoadingState } from "@/components/ui/loading"
+import { redirect } from "next/navigation"
 
 export default function NewChatPage({
   searchParams,
 }: {
-  searchParams: { q?: string; projectId?: string }
+  searchParams: { [key: string]: string | undefined }
 }) {
-  return (
-    <Suspense fallback={<LoadingState />}>
-      <ChatInterface
-        initialMessage={searchParams.q}
-        projectId={searchParams.projectId}
-      />
-    </Suspense>
-  )
+  const query = new URLSearchParams()
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (value !== undefined) query.set(key, value)
+  })
+  const suffix = query.toString() ? `?${query.toString()}` : ""
+  redirect(`/chat/agent/new${suffix}`)
 }

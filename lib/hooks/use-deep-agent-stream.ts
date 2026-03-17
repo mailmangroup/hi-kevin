@@ -2,56 +2,68 @@
 
 import { useCallback, useRef, useState } from "react"
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export interface TodoItem {
   id: string
-  description: string
+  content: string
   status: "pending" | "in_progress" | "completed"
 }
 
-export interface SubagentToolCall {
-  tool: string
-  input: any
-  output?: string
-  status: "running" | "completed"
+export interface SubagentMessage {
+  role: "assistant"
+  content: string
 }
 
-export interface SubagentState {
+export interface SubagentToolCall {
   id: string
   name: string
-  description: string
-  status: "in_progress" | "completed" | "failed"
-  content: string
-  thinkingContent: string
-  toolCalls: SubagentToolCall[]
-  result?: string
-  error?: string
+  args: {
+    description: string
+    subagent_type: string
+    [key: string]: unknown
+  }
+}
+
+export interface SubagentStreamInterface {
+  id: string
+  status: "pending" | "running" | "complete" | "error"
+  messages: SubagentMessage[]
+  thinking: string
+  result: string | undefined
+  error: string | undefined
+  toolCall: SubagentToolCall
+  startedAt: number | undefined
+  completedAt: number | undefined
+  parentMessageId: string
+  activeTools: Array<{
+    tool: string
+    input: any
+    output?: string
+    status: "running" | "completed"
+  }>
 }
 
 export interface DeepAgentStreamState {
-  tasks: Record<string, SubagentState>
-  taskOrder: string[]
+  subagents: Map<string, SubagentStreamInterface>
+  subagentOrder: string[]
+  messageOrder: string[]
+  subagentsByMessage: Record<string, string[]>
+  values: {
+    todos: TodoItem[]
+  }
   isComplete: boolean
-  todos: TodoItem[]
 }
 
 const EMPTY_STATE: DeepAgentStreamState = {
-  tasks: {},
-  taskOrder: [],
+  subagents: new Map(),
+  subagentOrder: [],
+  messageOrder: [],
+  subagentsByMessage: {},
+  values: { todos: [] },
   isComplete: false,
-  todos: [],
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 export function useDeepAgentStream() {
   const [state, setState] = useState<DeepAgentStreamState>(EMPTY_STATE)
-  // Keep a ref in sync for reads inside the stream loop (avoids stale closures)
   const stateRef = useRef<DeepAgentStreamState>(EMPTY_STATE)
 
   const setAndSync = useCallback((updater: (prev: DeepAgentStreamState) => DeepAgentStreamState) => {
@@ -62,245 +74,164 @@ export function useDeepAgentStream() {
     })
   }, [])
 
-  /**
-   * Process a single SSE chunk. Returns true if this chunk was handled as a
-   * deep-agent event (caller should skip normal handling).
-   */
   const processEvent = useCallback((chunk: any): boolean => {
-    const type: string = chunk.type
+    const type = chunk?.type
+    if (!type) return false
 
-    switch (type) {
-      // --- New event format ---
-
-      case "subagent_started": {
-        const { task_id, subagent_name, description } = chunk
-        setAndSync(prev => ({
-          ...prev,
-          tasks: {
-            ...prev.tasks,
-            [task_id]: {
-              id: task_id,
-              name: subagent_name ?? "",
-              description: description ?? task_id,
-              status: "in_progress",
-              content: "",
-              thinkingContent: "",
-              toolCalls: [],
-            },
-          },
-          taskOrder: prev.taskOrder.includes(task_id)
-            ? prev.taskOrder
-            : [...prev.taskOrder, task_id],
-        }))
-        return true
-      }
-
-      case "subagent_token": {
-        const { task_id, content } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: { ...prev.tasks, [task_id]: { ...task, content: task.content + content } },
-          }
-        })
-        return true
-      }
-
-      case "subagent_thinking": {
-        const { task_id, content } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: { ...task, thinkingContent: task.thinkingContent + content },
-            },
-          }
-        })
-        return true
-      }
-
-      case "subagent_tool_start": {
-        const { task_id, tool, tool_input } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: {
-                ...task,
-                toolCalls: [...task.toolCalls, { tool, input: tool_input ?? {}, status: "running" }],
-              },
-            },
-          }
-        })
-        return true
-      }
-
-      case "subagent_tool_end": {
-        const { task_id, tool, output } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          // Update the last running tool call matching the tool name
-          const toolCalls = [...task.toolCalls]
-          const idx = toolCalls.findLastIndex(tc => tc.tool === tool && tc.status === "running")
-          if (idx >= 0) {
-            toolCalls[idx] = { ...toolCalls[idx], output: output ?? "", status: "completed" }
-          }
-          return {
-            ...prev,
-            tasks: { ...prev.tasks, [task_id]: { ...task, toolCalls } },
-          }
-        })
-        return true
-      }
-
-      case "subagent_completed": {
-        const { task_id, result } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: { ...task, status: "completed", result: result ?? "" },
-            },
-          }
-        })
-        return true
-      }
-
-      case "subagent_error": {
-        const { task_id, error } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: { ...task, status: "failed", error: error ?? "Unknown error" },
-            },
-          }
-        })
-        return true
-      }
-
-      // --- Backward compat: old task_* events ---
-
-      case "task_started": {
-        const { task_id, description } = chunk
-        setAndSync(prev => ({
-          ...prev,
-          tasks: {
-            ...prev.tasks,
-            [task_id]: {
-              id: task_id,
-              name: chunk.subagent_type ?? "",
-              description: description ?? task_id,
-              status: "in_progress",
-              content: "",
-              thinkingContent: "",
-              toolCalls: [],
-            },
-          },
-          taskOrder: prev.taskOrder.includes(task_id)
-            ? prev.taskOrder
-            : [...prev.taskOrder, task_id],
-        }))
-        return true
-      }
-
-      case "task_running": {
-        const { task_id, message } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          // Extract content / tool calls from legacy message format
-          const content = message?.content ?? ""
-          const toolCalls: SubagentToolCall[] = (message?.tool_calls ?? []).map((tc: any) => ({
-            tool: tc.name,
-            input: tc.args ?? {},
-            status: "running" as const,
-          }))
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: {
-                ...task,
-                content: task.content + content,
-                toolCalls: toolCalls.length ? toolCalls : task.toolCalls,
-              },
-            },
-          }
-        })
-        return true
-      }
-
-      case "task_completed": {
-        const { task_id, result } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: { ...prev.tasks, [task_id]: { ...task, status: "completed", result: result ?? "" } },
-          }
-        })
-        return true
-      }
-
-      case "task_failed":
-      case "task_timed_out": {
-        const { task_id, error } = chunk
-        setAndSync(prev => {
-          const task = prev.tasks[task_id]
-          if (!task) return prev
-          return {
-            ...prev,
-            tasks: {
-              ...prev.tasks,
-              [task_id]: {
-                ...task,
-                status: "failed",
-                error: error ?? (type === "task_timed_out" ? "Task timed out." : "Task failed."),
-              },
-            },
-          }
-        })
-        return true
-      }
-
-      default:
-        return false
+    if (type === "todo_update") {
+      const todos = Array.isArray(chunk.todos) ? chunk.todos : []
+      setAndSync(prev => ({
+        ...prev,
+        values: {
+          ...prev.values,
+          todos: todos.map((todo: any, index: number) => ({
+            id: String(todo?.id ?? `todo-${index}`),
+            content: String(todo?.content ?? todo?.description ?? ""),
+            status: todo?.status ?? "pending",
+          })),
+        },
+      }))
+      return true
     }
-  }, [setAndSync])
 
-  const updateTodos = useCallback((todos: TodoItem[]) => {
-    setAndSync(prev => ({ ...prev, todos }))
+    if (type === "subagent_started") {
+      const subagentId = String(chunk.subagent_id ?? "")
+      if (!subagentId) return true
+      const parentMessageId = String(chunk.parent_message_id ?? "coordinator")
+      const args = (chunk.tool_call?.args ?? {}) as Record<string, unknown>
+      const nextSubagent: SubagentStreamInterface = {
+        id: subagentId,
+        status: "running",
+        messages: [],
+        thinking: "",
+        result: undefined,
+        error: undefined,
+        toolCall: {
+          id: String(chunk.tool_call?.id ?? subagentId),
+          name: String(chunk.tool_call?.name ?? "task"),
+          args: {
+            description: String(args.description ?? ""),
+            subagent_type: String(args.subagent_type ?? "specialist"),
+            ...args,
+          },
+        },
+        startedAt: chunk.started_at,
+        completedAt: undefined,
+        parentMessageId,
+        activeTools: [],
+      }
+
+      setAndSync(prev => {
+        const subagents = new Map(prev.subagents)
+        subagents.set(subagentId, nextSubagent)
+        const subagentsByMessage = { ...prev.subagentsByMessage }
+        const linked = subagentsByMessage[parentMessageId] ?? []
+        subagentsByMessage[parentMessageId] = linked.includes(subagentId)
+          ? linked
+          : [...linked, subagentId]
+
+        return {
+          ...prev,
+          subagents,
+          subagentOrder: prev.subagentOrder.includes(subagentId)
+            ? prev.subagentOrder
+            : [...prev.subagentOrder, subagentId],
+          messageOrder: prev.messageOrder.includes(parentMessageId)
+            ? prev.messageOrder
+            : [...prev.messageOrder, parentMessageId],
+          subagentsByMessage,
+        }
+      })
+      return true
+    }
+
+    if (type === "subagent_token" || type === "subagent_thinking" || type === "subagent_tool_start" || type === "subagent_tool_end" || type === "subagent_completed" || type === "subagent_error") {
+      const subagentId = String(chunk.subagent_id ?? "")
+      if (!subagentId) return true
+      setAndSync(prev => {
+        const existing = prev.subagents.get(subagentId)
+        if (!existing) return prev
+        const subagents = new Map(prev.subagents)
+        const next: SubagentStreamInterface = { ...existing }
+
+        if (type === "subagent_token") {
+          const text = String(chunk.content ?? "")
+          const last = next.messages[next.messages.length - 1]
+          if (last?.role === "assistant") {
+            next.messages = [
+              ...next.messages.slice(0, -1),
+              { ...last, content: `${last.content}${text}` },
+            ]
+          } else {
+            next.messages = [...next.messages, { role: "assistant", content: text }]
+          }
+        } else if (type === "subagent_thinking") {
+          next.thinking = `${next.thinking}${String(chunk.content ?? "")}`
+        } else if (type === "subagent_tool_start") {
+          next.activeTools = [
+            ...next.activeTools,
+            {
+              tool: String(chunk.tool ?? "tool"),
+              input: chunk.tool_input ?? {},
+              status: "running",
+            },
+          ]
+        } else if (type === "subagent_tool_end") {
+          const tool = String(chunk.tool ?? "tool")
+          const tools = [...next.activeTools]
+          const index = tools.findLastIndex(t => t.tool === tool && t.status === "running")
+          if (index >= 0) {
+            tools[index] = {
+              ...tools[index],
+              output: String(chunk.output ?? ""),
+              status: "completed",
+            }
+          }
+          next.activeTools = tools
+        } else if (type === "subagent_completed") {
+          next.status = "complete"
+          next.result = String(chunk.result ?? "")
+          next.completedAt = chunk.completed_at
+        } else if (type === "subagent_error") {
+          next.status = "error"
+          next.error = String(chunk.error ?? "Unknown subagent error")
+          next.completedAt = chunk.completed_at
+        }
+
+        subagents.set(subagentId, next)
+        return { ...prev, subagents }
+      })
+      return true
+    }
+
+    if (type === "done") {
+      setAndSync(prev => ({ ...prev, isComplete: true }))
+      return true
+    }
+
+    return false
   }, [setAndSync])
 
   const reset = useCallback(() => {
-    const empty = { ...EMPTY_STATE, tasks: {}, taskOrder: [], todos: [] }
+    const empty: DeepAgentStreamState = {
+      subagents: new Map(),
+      subagentOrder: [],
+      messageOrder: [],
+      subagentsByMessage: {},
+      values: { todos: [] },
+      isComplete: false,
+    }
     stateRef.current = empty
     setState(empty)
   }, [])
 
-  const markComplete = useCallback(() => {
-    setAndSync(prev => ({ ...prev, isComplete: true }))
-  }, [setAndSync])
-
-  /** Read the current state without triggering re-renders (safe inside async loops). */
   const getState = useCallback((): DeepAgentStreamState => stateRef.current, [])
 
-  return { state, processEvent, updateTodos, reset, markComplete, getState }
+  const getSubagentsByMessage = useCallback((messageId: string): SubagentStreamInterface[] => {
+    const current = stateRef.current
+    const ids = current.subagentsByMessage[messageId] ?? []
+    return ids.map(id => current.subagents.get(id)).filter(Boolean) as SubagentStreamInterface[]
+  }, [])
+
+  return { state, processEvent, reset, getState, getSubagentsByMessage }
 }

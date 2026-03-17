@@ -132,11 +132,14 @@ export function ConversationListItem({
   }
 
   const lastMessageIsTimestamp = conversation.last_message && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(conversation.last_message)
+  const conversationPath = conversation.conversation_mode === "deep_agent"
+    ? `/chat/deep-agent/${conversation.id}`
+    : `/chat/agent/${conversation.id}`
 
   return (
     <>
       <Link 
-        href={`/chat/${conversation.id}`} 
+        href={conversationPath}
         className="block group relative"
         onClick={handleItemClick}
       >

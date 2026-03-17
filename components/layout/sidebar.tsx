@@ -195,7 +195,7 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
     <>
     <div className="group/item relative flex items-center">
         <Link
-            href={`/chat/${chat.id}`}
+            href={chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`}
             prefetch={false}
             className={cn(
                 "flex-1 flex items-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all pr-8", 
@@ -241,7 +241,7 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
                     
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                        <Link href="/chat?mode=select" className="cursor-pointer w-full flex items-center">
+                        <Link href="/chat/agent?mode=select" className="cursor-pointer w-full flex items-center">
                             <CheckSquare className="mr-2 h-4 w-4" />
                             Select Multiple
                         </Link>
@@ -304,7 +304,7 @@ export function Sidebar({ className }: { className?: string }) {
 
   // Use TanStack Query for data fetching (replaces manual cache)
   const { data: leadsData } = useNewLeadsCount()
-  const { data: conversationsData } = useConversations()
+  const { data: conversationsData } = useConversations(20, 0, "agent")
 
   const leadsCount = leadsData?.count ?? null
   const chatHistory = conversationsData?.conversations ?? []
@@ -389,11 +389,11 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Chat History Section - scrollable */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-3 mt-4">
-            <Link href="/chat" prefetch={false} className="block mb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
+            <Link href="/chat/agent" prefetch={false} className="block mb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
                 History
             </Link>
             <div className="space-y-0.5">
-                <Link href="/dashboard" prefetch={false}>
+                <Link href="/chat/agent/new" prefetch={false}>
                     <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
                         <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200">
                             <MessageSquare className="h-2.5 w-2.5 text-slate-500" />
@@ -402,7 +402,8 @@ export function Sidebar({ className }: { className?: string }) {
                     </button>
                 </Link>
                 {chatHistory.map((chat) => {
-                    const isActive = pathname === `/chat/${chat.id}`
+                    const chatPath = chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`
+                    const isActive = pathname === chatPath
                     return (
                         <ChatHistoryItem key={chat.id} chat={chat} isActive={isActive} />
                     )
@@ -410,7 +411,7 @@ export function Sidebar({ className }: { className?: string }) {
             </div>
             {chatHistory.length < totalChats && (
                 <Link
-                    href="/chat"
+                    href="/chat/agent"
                     prefetch={false}
                     className="block text-xs text-center text-muted-foreground mt-2 hover:text-foreground hover:underline transition-all py-1 cursor-pointer"
                 >

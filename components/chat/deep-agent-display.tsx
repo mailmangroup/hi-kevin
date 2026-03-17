@@ -4,45 +4,19 @@ import * as React from "react"
 import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
-import type { SubagentToolCall, DeepAgentStreamState, TodoItem } from "@/lib/hooks/use-deep-agent-stream"
-
-// --- Types ---
-
-export interface ResearchTask {
-  id: string
-  description: string
-  status: "in_progress" | "completed" | "failed" | "timed_out"
-  // Streaming fields (optional for backward compat with parse-sub-content)
-  name?: string
-  content?: string
-  thinkingContent?: string
-  toolCalls?: SubagentToolCall[]
-  // Legacy field from old task_running events
-  latestMessage?: { content?: string; tool_calls?: Array<{ name: string; args?: Record<string, unknown> }> }
-  result?: string
-  error?: string
-}
-
-export interface DeepAgentData {
-  tasks: Record<string, ResearchTask>
-  taskOrder: string[]
-  isComplete: boolean
-  todos?: TodoItem[]
-}
-
-// Allow the hook's state to be used directly where DeepAgentData is expected
-export type DeepAgentDisplayData = DeepAgentData | DeepAgentStreamState
+import type { DeepAgentStreamState, TodoItem, SubagentStreamInterface } from "@/lib/hooks/use-deep-agent-stream"
 
 // --- Task Status Icon ---
 
-function TaskStatusIcon({ status }: { status: ResearchTask["status"] }) {
+function TaskStatusIcon({ status }: { status: SubagentStreamInterface["status"] }) {
   switch (status) {
-    case "completed":
+    case "complete":
       return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-    case "failed":
-    case "timed_out":
+    case "error":
       return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
-    case "in_progress":
+    case "pending":
+      return <Circle className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+    case "running":
     default:
       return <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin flex-shrink-0" />
   }
@@ -64,7 +38,7 @@ function formatToolCall(name: string, args?: Record<string, unknown>): string {
 
 // --- Tool Call Row ---
 
-function ToolCallRow({ tc }: { tc: SubagentToolCall }) {
+function ToolCallRow({ tc }: { tc: SubagentStreamInterface["activeTools"][number] }) {
   const label = formatToolCall(tc.tool, tc.input)
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-gray-600 py-0.5">
@@ -104,7 +78,7 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
                 active && "text-gray-800 font-medium",
                 !done && !active && "text-gray-500",
               )}>
-                {todo.description}
+                {todo.content}
               </span>
             </li>
           )
@@ -113,7 +87,7 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
       {activeItem && (
         <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-gray-50">
           <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin flex-shrink-0" />
-          <span className="text-xs text-gray-500 truncate">{activeItem.description}</span>
+          <span className="text-xs text-gray-500 truncate">{activeItem.content}</span>
         </div>
       )}
     </div>
@@ -123,47 +97,41 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
 // --- Research Task Card ---
 
 function ResearchTaskCard({
-  task,
+  subagent,
   isStreaming,
 }: {
-  task: ResearchTask
+  subagent: SubagentStreamInterface
   isStreaming: boolean
 }) {
-  const [isExpanded, setIsExpanded] = React.useState(task.status === "in_progress")
+  const [isExpanded, setIsExpanded] = React.useState(subagent.status === "running")
   const [userToggled, setUserToggled] = React.useState(false)
-  const prevStatusRef = React.useRef(task.status)
+  const prevStatusRef = React.useRef(subagent.status)
 
   // Auto-collapse on completion (unless user toggled)
   React.useEffect(() => {
-    if (prevStatusRef.current === "in_progress" && task.status !== "in_progress" && !userToggled) {
+    if (prevStatusRef.current === "running" && subagent.status !== "running" && !userToggled) {
       setIsExpanded(false)
     }
-    prevStatusRef.current = task.status
-  }, [task.status, userToggled])
+    prevStatusRef.current = subagent.status
+  }, [subagent.status, userToggled])
 
   const handleToggle = () => {
     setUserToggled(true)
     setIsExpanded(!isExpanded)
   }
 
-  const isRunning = task.status === "in_progress"
-  const isFailed = task.status === "failed" || task.status === "timed_out"
+  const isRunning = subagent.status === "running"
+  const isFailed = subagent.status === "error"
 
   // Determine live activity label for collapsed header
-  const toolCalls = task.toolCalls ?? []
+  const toolCalls = subagent.activeTools ?? []
   const latestRunningTool = [...toolCalls].reverse().find(tc => tc.status === "running")
   const latestCompletedTool = [...toolCalls].reverse().find(tc => tc.status === "completed")
   const latestTool = latestRunningTool ?? latestCompletedTool
 
-  // Legacy support: fall back to latestMessage if toolCalls not present
-  const legacyToolCall = task.latestMessage?.tool_calls?.[task.latestMessage.tool_calls.length - 1]
-  const activityLabel = latestTool
-    ? formatToolCall(latestTool.tool, latestTool.input)
-    : legacyToolCall
-      ? formatToolCall(legacyToolCall.name, legacyToolCall.args)
-      : null
-
-  const hasLiveContent = (task.content ?? "").length > 0
+  const activityLabel = latestTool ? formatToolCall(latestTool.tool, latestTool.input) : null
+  const latestMessage = subagent.messages[subagent.messages.length - 1]
+  const hasLiveContent = (latestMessage?.content ?? "").length > 0
   const hasToolCalls = toolCalls.length > 0
 
   return (
@@ -181,21 +149,21 @@ function ResearchTaskCard({
         onClick={handleToggle}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-black/5 transition-colors"
       >
-        <TaskStatusIcon status={task.status} />
+        <TaskStatusIcon status={subagent.status} />
         <span
           className={cn(
             "text-xs font-medium flex-1 truncate",
             isRunning ? "text-blue-700" : isFailed ? "text-red-700" : "text-green-700"
           )}
         >
-          {task.description}
+          {subagent.toolCall.args.description || "Subagent task"}
         </span>
-        {task.name && (
+        {subagent.toolCall.args.subagent_type && (
           <span className={cn(
             "text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium",
             isRunning ? "bg-blue-100 text-blue-600" : isFailed ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
           )}>
-            {task.name}
+            {subagent.toolCall.args.subagent_type}
           </span>
         )}
         {!isExpanded && isRunning && activityLabel && (
@@ -226,42 +194,40 @@ function ResearchTaskCard({
           {/* Live streaming content from subagent LLM */}
           {isRunning && hasLiveContent && (
             <div className="text-xs text-gray-600 leading-relaxed">
-              <MessageContent content={task.content!} className="prose-xs" />
+              <MessageContent content={latestMessage?.content || ""} className="prose-xs" />
               {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
             </div>
           )}
 
-          {/* Fallback: legacy latestMessage content when no toolCalls */}
-          {isRunning && !hasLiveContent && !hasToolCalls && task.latestMessage?.content && (
-            <div className="text-xs text-gray-600 leading-relaxed">
-              <MessageContent content={task.latestMessage.content} className="prose-xs" />
-              {isStreaming && <span className="animate-pulse ml-1">▊</span>}
+          {isRunning && subagent.thinking && (
+            <div className="text-xs text-slate-500 leading-relaxed italic">
+              <MessageContent content={subagent.thinking} className="prose-xs" />
             </div>
           )}
 
           {/* Idle state */}
-          {isRunning && !hasLiveContent && !hasToolCalls && !task.latestMessage?.content && (
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Researching...</span>
+          {isRunning && !hasLiveContent && !hasToolCalls && !subagent.thinking && (
+            <div className="text-xs text-gray-600 leading-relaxed">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Researching...</span>
+              </div>
             </div>
           )}
 
           {/* Completed result */}
-          {!isRunning && !isFailed && task.result && (
+          {!isRunning && !isFailed && subagent.result && (
             <div className="text-xs text-gray-700 leading-relaxed">
-              <MessageContent content={task.result} className="prose-xs" />
+              <MessageContent content={subagent.result || ""} className="prose-xs" />
             </div>
           )}
 
           {/* Error */}
-          {isFailed && task.error && (
-            <div className="text-xs text-red-600 leading-relaxed">{task.error}</div>
+          {isFailed && subagent.error && (
+            <div className="text-xs text-red-600 leading-relaxed">{subagent.error}</div>
           )}
-          {isFailed && !task.error && (
-            <div className="text-xs text-red-500">
-              {task.status === "timed_out" ? "Task timed out." : "Task failed."}
-            </div>
+          {isFailed && !subagent.error && (
+            <div className="text-xs text-red-500">Task failed.</div>
           )}
         </div>
       )}
@@ -272,16 +238,14 @@ function ResearchTaskCard({
 // --- Main Component ---
 
 interface DeepAgentDisplayProps {
-  data: DeepAgentDisplayData
+  data: DeepAgentStreamState
   isStreaming: boolean
 }
 
 export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
-  const taskCount = data.taskOrder.length
-  const completedCount = data.taskOrder.filter(
-    (id) => data.tasks[id]?.status === "completed"
-  ).length
-  const todos = (data as DeepAgentStreamState).todos ?? (data as DeepAgentData).todos ?? []
+  const taskCount = data.subagentOrder.length
+  const completedCount = data.subagentOrder.filter((id) => data.subagents.get(id)?.status === "complete").length
+  const messageOrder = data.messageOrder.length > 0 ? data.messageOrder : ["coordinator"]
 
   if (taskCount === 0) {
     // Only show "Starting deep agent..." while actually streaming; hide once complete.
@@ -303,12 +267,18 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
       <div className="mb-1 text-[10px] text-gray-500 font-medium px-0.5">
         Research tasks: {completedCount}/{taskCount} completed
       </div>
-      {data.taskOrder.map((taskId) => {
-        const raw = data.tasks[taskId]
-        if (!raw) return null
-        // Normalize SubagentState → ResearchTask (both shapes are compatible)
-        const task: ResearchTask = raw as ResearchTask
-        return <ResearchTaskCard key={taskId} task={task} isStreaming={isStreaming} />
+      {messageOrder.map((messageId) => {
+        const subagentIds = data.subagentsByMessage[messageId] ?? []
+        if (!subagentIds.length) return null
+        return (
+          <div key={messageId} className="space-y-2">
+            {subagentIds.map((subagentId) => {
+              const subagent = data.subagents.get(subagentId)
+              if (!subagent) return null
+              return <ResearchTaskCard key={subagent.id} subagent={subagent} isStreaming={isStreaming} />
+            })}
+          </div>
+        )
       })}
     </div>
   )

@@ -32,7 +32,11 @@ export function ProjectSidebar({ projectId, currentConversationId }: ProjectSide
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ delay: index * 0.05, duration: 0.2 }}
-                  onClick={() => router.push(`/chat/${conv.id}`)}
+                  onClick={() => router.push(
+                    conv.conversation_mode === "deep_agent"
+                      ? `/chat/deep-agent/${conv.id}`
+                      : `/chat/agent/${conv.id}`
+                  )}
                   className={cn(
                     "flex w-full flex-col gap-1 px-6 py-4 text-left transition-colors hover:bg-accent/50 cursor-pointer",
                     currentConversationId === conv.id && "bg-accent"

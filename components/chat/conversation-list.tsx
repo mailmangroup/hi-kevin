@@ -14,7 +14,11 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { cn } from "@/lib/utils/cn"
 import { useSearchParams } from "next/navigation"
 
-export function ConversationList() {
+interface ConversationListProps {
+  conversationMode?: "agent" | "deep_agent"
+}
+
+export function ConversationList({ conversationMode }: ConversationListProps) {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [showFavouritesOnly, setShowFavouritesOnly] = useState(false)
@@ -35,7 +39,7 @@ export function ConversationList() {
   const limit = 50 // Increased limit for better visibility
   const skip = (page - 1) * limit
   
-  const { data, isLoading } = useConversations(limit, skip)
+  const { data, isLoading } = useConversations(limit, skip, conversationMode)
   
   const total = data?.total || 0
   const totalPages = Math.ceil(total / limit)

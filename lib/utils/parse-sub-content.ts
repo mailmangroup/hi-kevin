@@ -1,5 +1,4 @@
-import type { ContentPart, ToolCall, Message } from "@/components/chat/chat-interface"
-import type { DeepAgentData, ResearchTask } from "@/components/chat/deep-agent-display"
+import type { ContentPart, ToolCall } from "@/components/chat/chat-interface"
 
 export function parseSubContentList(subContentList: any[] = []): {
   toolCalls: ToolCall[],
@@ -15,8 +14,6 @@ export function parseSubContentList(subContentList: any[] = []): {
   const incompleteToolCalls = new Map<string, ToolCall>()
   let lastToolCall: ToolCall | null = null
   let textContent = ""
-  let deepAgentData: DeepAgentData | null = null
-  let deepAgentInsertIndex: number | null = null
 
   if (!Array.isArray(subContentList)) {
     return { toolCalls, content: textContent, images, documents, contentParts }
@@ -133,28 +130,7 @@ export function parseSubContentList(subContentList: any[] = []): {
       }
     } else if (item.type === 'thinking') {
       contentParts.push({ type: 'thinking', content: item.thinking || item.content })
-    } else if (item.type === 'research_task') {
-      if (!deepAgentData) {
-        deepAgentData = { tasks: {}, taskOrder: [], isComplete: true }
-        deepAgentInsertIndex = contentParts.length
-      }
-      const task: ResearchTask = {
-        id: item.task_id,
-        description: item.description || item.task_id,
-        status: item.status || "completed",
-        result: item.result,
-        error: item.error,
-      }
-      deepAgentData.tasks[item.task_id] = task
-      if (!deepAgentData.taskOrder.includes(item.task_id)) {
-        deepAgentData.taskOrder.push(item.task_id)
-      }
     }
-  }
-
-  if (deepAgentData) {
-    const insertAt = deepAgentInsertIndex ?? contentParts.length
-    contentParts.splice(insertAt, 0, { type: 'deep_agent', deepAgent: deepAgentData })
   }
 
   return { toolCalls, content: textContent, images, documents, contentParts }

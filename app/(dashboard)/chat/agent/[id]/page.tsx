@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { AgentChatInterface } from "@/components/chat/agent-chat-interface"
 import { LoadingState } from "@/components/ui/loading"
 
-export default function ChatPage({
+export default function AgentChatPage({
   params,
   searchParams,
 }: {
@@ -11,7 +11,10 @@ export default function ChatPage({
 }) {
   return (
     <Suspense fallback={<LoadingState />}>
-      <AgentChatInterface chatId={params.id} initialMessage={searchParams.q} />
+      <AgentChatInterface
+        chatId={params.id}
+        initialMessage={searchParams.q}
+      />
     </Suspense>
   )
 }
