@@ -408,7 +408,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] bg-background border border-border/50 shadow-lg flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-xl", className)}>
+    <div className={cn("relative rounded-[1.5rem] glass-input flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-elevated", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">
@@ -583,15 +583,15 @@ export function ChatInputArea({
       {/* Bottom Actions Row */}
       <div className="flex items-center justify-between gap-2 px-3 pb-3">
         {/* Left Actions: Think, Search, Model */}
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
             <Button
                 variant={thinkingEnabled ? "secondary" : "ghost"}
                 onClick={() => setThinkingEnabled(!thinkingEnabled)}
                 className={cn(
-                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 thinkingEnabled
                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
                 )}
                 disabled={disabled}
             >
@@ -602,10 +602,10 @@ export function ChatInputArea({
                 variant={includeWebSearch ? "secondary" : "ghost"}
                 onClick={() => setIncludeWebSearch(!includeWebSearch)}
                 className={cn(
-                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 includeWebSearch
                     ? "bg-blue-50 text-blue-600 border-blue-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
                 )}
                 disabled={disabled}
             >
@@ -616,10 +616,10 @@ export function ChatInputArea({
                 variant={sqlEnabled ? "secondary" : "ghost"}
                 onClick={() => setSqlEnabled?.(!sqlEnabled)}
                 className={cn(
-                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 sqlEnabled
                     ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
                 )}
                 disabled={disabled}
             >
@@ -630,10 +630,10 @@ export function ChatInputArea({
                 variant={deepAgent ? "secondary" : "ghost"}
                 onClick={() => setDeepAgent(!deepAgent)}
                 className={cn(
-                "h-8 px-2.5 rounded-full text-xs font-medium transition-all border",
+                "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 deepAgent
                     ? "bg-red-50 text-red-600 border-red-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
                 )}
                 disabled={disabled || deepAgentLocked}
             >

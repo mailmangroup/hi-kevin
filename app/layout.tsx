@@ -7,7 +7,10 @@ import { ConfirmProvider } from "@/components/providers/confirm-provider"
 import QueryProvider from "@/components/providers/query-provider"
 import { UserStoreProvider } from "@/components/providers/user-store-provider"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+})
 
 export const metadata: Metadata = {
   title: "Kevin - AI Marketing Co-pilot",
@@ -21,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className} ${inter.variable}`}>
         <AuraBackground />
         <QueryProvider>
           <UserStoreProvider>

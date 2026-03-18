@@ -200,9 +200,9 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
             href={chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`}
             prefetch={false}
             className={cn(
-                "flex-1 flex items-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all pr-8", 
+                "flex-1 flex items-center rounded-lg px-3 py-2 leading-relaxed text-[13px] font-medium transition-all pr-8", 
                 isActive
-                    ? "bg-white text-primary shadow-sm"
+                    ? "bg-white/80 backdrop-blur-sm text-primary shadow-sm border border-white/60"
                     : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
             )}
         >
@@ -352,7 +352,7 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Navigation - fixed, no scroll */}
       <div className="flex-shrink-0 px-3">
-        <nav className="space-y-0.5">
+        <nav className="space-y-1">
             {navItems.map((item) => {
             const Icon = item.icon
             // Dashboard should only be active on exact match, not sub-routes
@@ -367,7 +367,7 @@ export function Sidebar({ className }: { className?: string }) {
                 className={cn(
                     "group flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all",
                     isActive
-                        ? "bg-white text-primary shadow-sm"
+                        ? "bg-white/80 backdrop-blur-sm text-primary shadow-sm border border-white/60"
                         : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
                 )}
                 >
@@ -376,9 +376,9 @@ export function Sidebar({ className }: { className?: string }) {
                 )} />
                 <span className="flex-1 truncate">{item.title}</span>
                 <div className="ml-auto flex items-center gap-2">
-                    {item.isBeta && <div className="h-1.5 w-1.5 rounded-full bg-orange-400" />}
+                    {item.isBeta && <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
                     {item.badge && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-500 px-1.5 text-[10px] font-semibold text-white">
                         {item.badge}
                     </span>
                     )}
@@ -391,10 +391,10 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Chat History Section - scrollable */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-3 mt-4">
-            <Link href="/chat/agent" prefetch={false} className="block mb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
+            <Link href="/chat/agent" prefetch={false} className="block mb-1 px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
                 History
             </Link>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
                 <div className="flex items-center gap-1">
                     <Link href="/chat/agent/new" prefetch={false} className="flex-1">
                         <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">

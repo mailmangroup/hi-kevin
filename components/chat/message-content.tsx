@@ -13,8 +13,103 @@ interface MessageContentProps {
   id?: string
 }
 
+const PreComponent = ({ children, ...props }: any) => {
+  const [copied, setCopied] = React.useState(false)
+  const ref = React.useRef<HTMLPreElement>(null)
+
+  const onCopy = () => {
+    if (ref.current) {
+      navigator.clipboard.writeText(ref.current.innerText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div className="relative group">
+      <pre ref={ref} className={cn(
+        "p-3 rounded-lg overflow-x-auto text-xs my-2 bg-muted border border-border"
+      )} {...props}>
+        {children}
+      </pre>
+      <button
+        onClick={onCopy}
+        className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background border border-border"
+        title="Copy code"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+      </button>
+    </div>
+  )
+}
+
+const TableComponent = ({ children, ...props }: any) => {
+  const [copied, setCopied] = React.useState(false)
+  const ref = React.useRef<HTMLTableElement>(null)
+
+  const onCopy = () => {
+    if (ref.current) {
+      navigator.clipboard.writeText(ref.current.innerText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const onDownloadCSV = () => {
+    if (ref.current) {
+      const rows = Array.from(ref.current.querySelectorAll('tr'))
+      const csvContent = rows.map(row => {
+        const cells = Array.from(row.querySelectorAll('th, td'))
+        return cells.map(cell => {
+          const text = (cell as HTMLElement).innerText.replace(/"/g, '""')
+          return `"${text}"`
+        }).join(',')
+      }).join('\n')
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'table_data.csv')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
+  return (
+    <div className="relative group my-2 border rounded-lg border-border overflow-hidden">
+      <div className="overflow-x-auto">
+        <table ref={ref} className="min-w-full text-xs border-collapse text-foreground" {...props}>
+          {children}
+        </table>
+      </div>
+      <div className="flex justify-end items-center gap-2 p-1 bg-muted/50 border-t border-border">
+        <button
+          onClick={onDownloadCSV}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+          title="Download as CSV"
+        >
+          <Download className="h-3 w-3" />
+          CSV
+        </button>
+        <div className="h-3 w-px bg-border" />
+        <button
+          onClick={onCopy}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+        >
+          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function MessageContent({ content, className, isUser = false, id }: MessageContentProps) {
-  if (!content) return null
+  // Use a stable id for memoization keying
+  const fallbackId = React.useId()
+  const stableId = id || fallbackId
 
   const components: Components = React.useMemo(() => ({
     // Headings
@@ -68,35 +163,7 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
         </code>
       )
     },
-    pre: ({ children }) => {
-      const [copied, setCopied] = React.useState(false)
-      const ref = React.useRef<HTMLPreElement>(null)
-
-      const onCopy = () => {
-        if (ref.current) {
-          navigator.clipboard.writeText(ref.current.innerText)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        }
-      }
-
-      return (
-        <div className="relative group">
-          <pre ref={ref} className={cn(
-            "p-3 rounded-lg overflow-x-auto text-xs my-2 bg-muted border border-border"
-          )}>
-            {children}
-          </pre>
-          <button
-            onClick={onCopy}
-            className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background border border-border"
-            title="Copy code"
-          >
-            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-          </button>
-        </div>
-      )
-    },
+    pre: PreComponent,
 
     // Links
     a: ({ href, children }) => (
@@ -111,68 +178,7 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
     ),
 
     // Tables
-    table: ({ children }) => {
-      const [copied, setCopied] = React.useState(false)
-      const ref = React.useRef<HTMLTableElement>(null)
-
-      const onCopy = () => {
-        if (ref.current) {
-          navigator.clipboard.writeText(ref.current.innerText)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2000)
-        }
-      }
-
-      const onDownloadCSV = () => {
-        if (ref.current) {
-          const rows = Array.from(ref.current.querySelectorAll('tr'))
-          const csvContent = rows.map(row => {
-            const cells = Array.from(row.querySelectorAll('th, td'))
-            return cells.map(cell => {
-              const text = (cell as HTMLElement).innerText.replace(/"/g, '""')
-              return `"${text}"`
-            }).join(',')
-          }).join('\n')
-
-          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.setAttribute('download', 'table_data.csv')
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-        }
-      }
-
-      return (
-        <div className="relative group my-2 border rounded-lg border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table ref={ref} className="min-w-full text-xs border-collapse text-foreground">
-              {children}
-            </table>
-          </div>
-          <div className="flex justify-end items-center gap-2 p-1 bg-muted/50 border-t border-border">
-            <button
-              onClick={onDownloadCSV}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-              title="Download as CSV"
-            >
-              <Download className="h-3 w-3" />
-              CSV
-            </button>
-            <div className="h-3 w-px bg-border" />
-            <button
-              onClick={onCopy}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-            >
-              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-        </div>
-      )
-    },
+    table: TableComponent,
     thead: ({ children }) => (
       <thead className="border-b border-border bg-muted/30">
         {children}
@@ -216,8 +222,7 @@ export function MessageContent({ content, className, isUser = false, id }: Messa
     ),
   }), [isUser])
 
-  // Use a stable id for memoization keying
-  const stableId = id || React.useId()
+  if (!content) return null
 
   return (
     <div className={cn("prose prose-sm max-w-none", className)}>

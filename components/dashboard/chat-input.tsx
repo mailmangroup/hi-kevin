@@ -177,7 +177,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
         ) : (
           // Dashboard layout
           <>
-            <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
+            <h1 className="text-4xl font-semibold tracking-[-0.02em] text-foreground text-center">{greeting}</h1>
 
             <div className="w-full max-w-3xl relative">
               <ChatInputArea
@@ -211,7 +211,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                      className="rounded-full bg-white/70 backdrop-blur-sm border border-white/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 text-foreground transition-all"
                     >
                       Analyze Media <ChevronDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -234,21 +234,21 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                  className="rounded-full bg-white/70 backdrop-blur-sm border border-white/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 text-foreground transition-all"
                   onClick={handleGetHelp}
                 >
                   Get Help
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                  className="rounded-full bg-white/70 backdrop-blur-sm border border-white/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 text-foreground transition-all"
                   onClick={handleCreateReport}
                 >
                   Create Report
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:border-indigo-200 transition-all"
+                  className="rounded-full bg-white/70 backdrop-blur-sm border border-white/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 text-foreground transition-all"
                   onClick={handleCommandCenter}
                 >
                   Command Center

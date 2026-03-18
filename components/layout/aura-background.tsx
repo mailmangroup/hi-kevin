@@ -15,32 +15,32 @@ export function AuraBackground() {
     <div className="fixed inset-0 z-[-1] pointer-events-none select-none overflow-hidden">
       {/* Primary Orb 1: Top Left (behind header/sidebar) - Violet */}
       <div
-        className="absolute top-[-15%] left-[-15%] w-[500px] h-[500px] rounded-full bg-violet-300 opacity-30 blur-[120px]"
+        className="absolute top-[-15%] left-[-15%] w-[500px] h-[500px] rounded-full bg-slate-300 opacity-[0.15] blur-[140px]"
       />
 
       {/* Primary Orb 2: Bottom Right - Indigo */}
       <div
-        className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full bg-indigo-300 opacity-25 blur-[120px]"
+        className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] rounded-full bg-slate-400 opacity-[0.12] blur-[140px]"
       />
 
       {/* Primary Orb 3: Top Right/Center - Purple */}
       <div
-        className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-purple-300 opacity-25 blur-[100px]"
+        className="absolute top-[15%] right-[10%] w-[400px] h-[400px] rounded-full bg-indigo-200 opacity-[0.10] blur-[120px]"
       />
 
       {/* Secondary Orb 4: Middle Left - Blue */}
       <div
-        className="absolute top-[40%] left-[5%] w-[350px] h-[350px] rounded-full bg-blue-200 opacity-20 blur-[80px]"
+        className="absolute top-[40%] left-[5%] w-[350px] h-[350px] rounded-full bg-slate-200 opacity-[0.10] blur-[100px]"
       />
 
       {/* Secondary Orb 5: Center - Soft Violet */}
       <div
-        className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full bg-violet-200 opacity-15 blur-[100px]"
+        className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full bg-indigo-100 opacity-[0.08] blur-[120px]"
       />
 
       {/* Accent Orb 6: Bottom Left - Indigo */}
       <div
-        className="absolute bottom-[20%] left-[15%] w-[300px] h-[300px] rounded-full bg-indigo-200 opacity-18 blur-[90px]"
+        className="absolute bottom-[20%] left-[15%] w-[300px] h-[300px] rounded-full bg-slate-300 opacity-[0.10] blur-[110px]"
       />
 
       {/* Noise Texture */}

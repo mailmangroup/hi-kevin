@@ -25,10 +25,10 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center text-center p-8 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 min-h-[300px]",
+      "flex flex-col items-center justify-center text-center p-8 rounded-2xl bg-white/50 backdrop-blur-sm border border-white/60 shadow-sm min-h-[300px]",
       className
     )}>
-      <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+      <div className="h-14 w-14 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center mb-4">
         <Icon className="h-6 w-6 text-slate-400" />
       </div>
       

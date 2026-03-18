@@ -3,8 +3,6 @@
  * Used by artifact-display, artifact-panel, and artifact-snippet.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 // Tool names that map to specific artifact types
 const BRAND_POST_TOOLS = new Set([
   'analyze_brand_content',

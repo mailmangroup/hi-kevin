@@ -1,4 +1,4 @@
-export default function ChatDetailLoading() {
+export default function DeepAgentChatDetailLoading() {
   return (
     <div className="flex h-full min-h-0 bg-transparent">
       <div className="flex flex-col h-full min-h-0 flex-1">
@@ -15,12 +15,9 @@ export default function ChatDetailLoading() {
         {/* Messages skeleton */}
         <div className="flex-1 min-h-0 overflow-hidden p-4 md:p-8 pb-6">
           <div className="mx-auto w-full max-w-3xl space-y-6">
-            {/* User message */}
             <div className="flex justify-end">
               <div className="h-10 w-64 rounded-2xl bg-muted animate-pulse" />
             </div>
-
-            {/* Assistant message */}
             <div className="flex gap-4">
               <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0 mt-1" />
               <div className="flex-1 space-y-2">
@@ -29,13 +26,9 @@ export default function ChatDetailLoading() {
                 <div className="h-4 w-4/6 rounded bg-muted animate-pulse" />
               </div>
             </div>
-
-            {/* User message */}
             <div className="flex justify-end">
               <div className="h-10 w-80 rounded-2xl bg-muted animate-pulse" />
             </div>
-
-            {/* Assistant message */}
             <div className="flex gap-4">
               <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0 mt-1" />
               <div className="flex-1 space-y-2">

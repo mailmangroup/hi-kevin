@@ -16,7 +16,9 @@ export default function DashboardPage() {
       <ChatInput />
 
       {/* Kevin's Suggestions */}
-      <SuggestionsList suggestions={[]} />
+      <div className="max-w-3xl mx-auto">
+        <SuggestionsList suggestions={[]} />
+      </div>
     </div>
   )
 }
