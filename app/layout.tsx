@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Onest } from "next/font/google"
 import "./globals.css"
 import { AuraBackground } from "@/components/layout/aura-background"
 import { ToastProvider } from "@/components/ui/toast"
@@ -7,9 +7,9 @@ import { ConfirmProvider } from "@/components/providers/confirm-provider"
 import QueryProvider from "@/components/providers/query-provider"
 import { UserStoreProvider } from "@/components/providers/user-store-provider"
 
-const inter = Inter({
+const onest = Onest({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-onest",
 })
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} ${inter.variable}`}>
+      <body className={`${onest.className} ${onest.variable}`}>
         <AuraBackground />
         <QueryProvider>
           <UserStoreProvider>

@@ -133,7 +133,7 @@ export const mockSensitiveDates: SensitiveDate[] = [
 export const mockBrandGuidelines: BrandGuidelines = {
   primaryColor: "#6366F1",
   secondaryColor: "#8B5CF6",
-  fonts: ["Inter", "PingFang SC"],
+  fonts: ["Onest", "PingFang SC"],
   toneOfVoice: [
     "专业但友好",
     "简洁明了",

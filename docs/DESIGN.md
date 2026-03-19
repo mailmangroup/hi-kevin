@@ -90,10 +90,10 @@ Info
 ### Font Stack
 
 ```css
-font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+font-family: "Onest", "PingFang SC", "Microsoft YaHei", sans-serif;
 ```
 
-Inter for English text, with PingFang SC and Microsoft YaHei fallbacks for Chinese characters.
+Onest for English text, with PingFang SC and Microsoft YaHei fallbacks for Chinese characters.
 
 ### Type Scale
 
