@@ -42,7 +42,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       // Filter by sentiment if selected
       if (selectedSentiment && sentimentInt(item.sentiment) !== sentimentInt(selectedSentiment)) return
 
-      const topic = item.topic || "Uncategorized"
+      const topic = item.topic ?? ""
       
       if (!stats[topic]) {
         stats[topic] = { count: 0, likes: 0, replies: 0, score: 0, comments: [], sentimentBreakdown: {} }
@@ -66,13 +66,19 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       stats[topic].sentimentBreakdown[sent] = (stats[topic].sentimentBreakdown[sent] || 0) + 1
     })
 
-    return Object.entries(stats)
+    const total = Object.values(stats).reduce((sum, d) => sum + d.count, 0)
+    const entries = Object.entries(stats)
       .map(([topic, data]) => ({
         topic,
         ...data,
-        avgScore: data.score / data.count
+        avgScore: data.score / data.count,
+        unassigned: topic === "",
+        unassignedPct: topic === "" ? Math.round((data.count / total) * 100) : 0,
       }))
-      .sort((a, b) => sortMode === "score" ? b.score - a.score : b.count - a.count)
+
+    const named = entries.filter(e => !e.unassigned).sort((a, b) => sortMode === "score" ? b.score - a.score : b.count - a.count)
+    const unassigned = entries.filter(e => e.unassigned)
+    return [...named, ...unassigned]
   }, [taggedData, selectedSentiment, weights, sortMode])
 
 
@@ -177,15 +183,21 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       </div>
 
       <div className="grid gap-4">
-        {topicStats.map((topic) => (
-          <div 
+        {topicStats.map((topic) => topic.unassigned ? (
+            <div key="__unassigned__" className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 flex items-center gap-3">
+              <span className="text-xs italic text-slate-400">
+                {topic.unassignedPct}% of comments ({topic.count}) were not assigned to any topic
+              </span>
+            </div>
+          ) : (
+          <div
             key={topic.topic}
             className={cn(
               "rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm overflow-hidden transition-all",
               expandedTopic === topic.topic ? "ring-2 ring-indigo-500/20 border-indigo-200" : "hover:border-indigo-200 hover:shadow-md"
             )}
           >
-            <div 
+            <div
               className="p-4 flex items-center gap-4 cursor-pointer"
               onClick={() => setExpandedTopic(expandedTopic === topic.topic ? null : topic.topic)}
             >
@@ -271,3 +283,4 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
     </div>
   )
 }
+
