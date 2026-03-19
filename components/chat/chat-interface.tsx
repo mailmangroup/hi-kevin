@@ -888,7 +888,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               setIsThinking(false)
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, isStreaming: false, followUpQuestions }
+                      ? { ...msg, followUpQuestions }
                       : msg
               ))
           }
@@ -1422,7 +1422,15 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                 
                 <div className="flex items-center gap-2 mt-1 px-1">
                    <span className="text-[10px] text-muted-foreground/60">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {message.isStreaming ? (
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="animate-pulse [animation-delay:-0.3s]">.</span>
+                          <span className="animate-pulse [animation-delay:-0.15s]">.</span>
+                          <span className="animate-pulse">.</span>
+                        </span>
+                      ) : (
+                        message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      )}
                    </span>
                    {message.role === "assistant" && !message.isStreaming && (
                       <MessageActions message={message} />

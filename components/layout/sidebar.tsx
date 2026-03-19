@@ -405,7 +405,7 @@ export function Sidebar({ className }: { className?: string }) {
                         </button>
                     </Link>
                     <Link href="/chat/deep-agent/new" prefetch={false} title="New Lobster Mode Chat">
-                        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-red-400 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300">
+                        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
                             <LobsterIcon className="h-3.5 w-3.5" />
                         </button>
                     </Link>

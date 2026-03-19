@@ -8,6 +8,12 @@ export type AnalysisPhase = {
 }
 
 export type ContentAnalysisRequest = {
+  model_schema?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
+  model_tagging?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
+  model_tagging_rerun?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
+  model_persona?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
+  model_topic?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
+  model_insights?: "flash" | "plus" | "flash-thinking" | "plus-thinking"
   items: {
     type: string
     content: string

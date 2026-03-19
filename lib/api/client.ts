@@ -10,6 +10,27 @@ import type { ContentItem } from '@/types'
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
 
+const SUPPORTED_PLATFORMS = ['xiaohongshu', 'douyin', 'weibo', 'wechat'] as const
+
+function batchToContentItem(batch: any): ContentItem {
+  const firstPlatform = batch.platforms?.[0]?.platform
+  const platform = SUPPORTED_PLATFORMS.includes(firstPlatform) ? firstPlatform : 'xiaohongshu'
+  return {
+    id: batch._id || batch.id,
+    platform: platform as ContentItem['platform'],
+    type: 'post',
+    status: 'draft',
+    title: batch.inspiration_card_title || batch.query || 'Untitled',
+    body: batch.query || '',
+    mediaUrls: [],
+    hashtags: [],
+    complianceStatus: 'pending',
+    createdAt: new Date(batch.created_at),
+    updatedAt: new Date(batch.created_at),
+    createdBy: batch.user_id || '',
+  }
+}
+
 /**
  * Helper function to get KAWO configuration
  * Checks NEXT_PUBLIC_* env vars first (works in browser)
@@ -608,7 +629,7 @@ export const aiService = {
   },
 
   /**
-   * Get a single content item by ID
+   * Get a single content item by ID (maps from /content/batches/{id})
    */
   async getContentItem(id: string): Promise<ContentItem | null> {
     if (USE_MOCK) {
@@ -617,14 +638,15 @@ export const aiService = {
     }
 
     try {
-      return await directApiCall<ContentItem>(`content/items/${id}`)
+      const response = await directApiCall<{ batch: any; posts_by_platform: Record<string, any[]> }>(`content/batches/${id}`)
+      return batchToContentItem(response.batch)
     } catch {
       return null
     }
   },
 
   /**
-   * Get list of content items with optional filters
+   * Get list of content items with optional filters (maps from /content/batches)
    */
   async getContentItems(filters?: { platform?: string; status?: string }): Promise<ContentItem[]> {
     if (USE_MOCK) {
@@ -632,11 +654,11 @@ export const aiService = {
       return getContentItems(filters)
     }
 
-    const params = new URLSearchParams()
-    if (filters?.platform) params.set('platform', filters.platform)
-    if (filters?.status) params.set('status', filters.status)
-    const query = params.toString()
-    return directApiCall<ContentItem[]>(`content/items${query ? `?${query}` : ''}`)
+    const response = await directApiCall<{ data: any[]; total: number }>('content/batches')
+    const items = (response.data || []).map(batchToContentItem)
+    if (filters?.platform) return items.filter(item => item.platform === filters.platform)
+    if (filters?.status) return items.filter(item => item.status === filters.status)
+    return items
   },
 
   /**

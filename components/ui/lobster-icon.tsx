@@ -5,7 +5,7 @@ export function LobsterIcon({ className }: { className?: string }) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 512 512"
-      fill="#ef4444"
+      fill="currentColor"
       className={className}
     >
       <path d="M382.833,208c56.005-7.824,98.865-61.326,98.865-107.689C481.698,12.539,431.542,0,431.542,0

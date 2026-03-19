@@ -476,14 +476,14 @@ export function ChatInputArea({
             {deepAgent && (
               <div
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-700 transition-colors",
-                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-red-100"
+                  "inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-700 dark:bg-rose-900/40 dark:border-rose-700 dark:text-rose-200 transition-colors",
+                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-red-100 dark:hover:bg-rose-900/60"
                 )}
                 onClick={() => {
                   if (!deepAgentLocked) setDeepAgent(false)
                 }}
               >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 dark:bg-rose-400"></span>
                 Lobster Mode
                 {!deepAgentLocked && <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />}
               </div>
@@ -632,7 +632,7 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 deepAgent
-                    ? "bg-red-50 dark:bg-red-600 text-red-600 dark:text-white border-red-200 dark:border-red-500"
+                    ? "bg-red-50 dark:bg-rose-800 text-red-600 dark:text-rose-100 border-red-200 dark:border-rose-600"
                     : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled || deepAgentLocked}

@@ -6,10 +6,45 @@ import { Upload, AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { processFile, type ProcessedComment } from "@/lib/utils/file-processor"
 
+type ModelMode = "flash" | "plus" | "flash-thinking" | "plus-thinking"
+
+export type AnalysisModelModes = {
+  model_schema: ModelMode
+  model_tagging: ModelMode
+  model_tagging_rerun: ModelMode
+  model_persona: ModelMode
+  model_topic: ModelMode
+  model_insights: ModelMode
+}
+
+const MODEL_MODE_OPTIONS: ModelMode[] = ["flash", "plus", "flash-thinking", "plus-thinking"]
+
+const DEFAULT_ANALYSIS_MODEL_MODES: AnalysisModelModes = {
+  model_schema: "plus-thinking",
+  model_tagging: "flash",
+  model_tagging_rerun: "plus",
+  model_persona: "plus",
+  model_topic: "plus",
+  model_insights: "plus-thinking",
+}
+
 interface FileUploaderProps {
-  onDataProcessed: (data: ProcessedComment[], filename: string, name: string, postContent: string) => void
+  onDataProcessed: (
+    data: ProcessedComment[],
+    filename: string,
+    name: string,
+    postContent: string,
+    modelModes: AnalysisModelModes
+  ) => void
   isProcessing?: boolean
 }
 
@@ -19,6 +54,7 @@ export function FileUploader({ onDataProcessed, isProcessing }: FileUploaderProp
   const [dragActive, setDragActive] = useState(false)
   const [name, setName] = useState("")
   const [postContent, setPostContent] = useState("")
+  const [modelModes, setModelModes] = useState<AnalysisModelModes>(DEFAULT_ANALYSIS_MODEL_MODES)
 
   const handleFile = useCallback(async (file: File) => {
     setError(null)
@@ -28,7 +64,7 @@ export function FileUploader({ onDataProcessed, isProcessing }: FileUploaderProp
       if (comments.length === 0) {
         setError("No valid comments found in file. Please check column names.")
       } else {
-        onDataProcessed(comments, file.name, name, postContent)
+        onDataProcessed(comments, file.name, name, postContent, modelModes)
       }
     } catch (err) {
       console.error(err)
@@ -36,7 +72,7 @@ export function FileUploader({ onDataProcessed, isProcessing }: FileUploaderProp
     } finally {
       setIsReading(false)
     }
-  }, [onDataProcessed, name, postContent])
+  }, [onDataProcessed, name, postContent, modelModes])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -91,6 +127,133 @@ export function FileUploader({ onDataProcessed, isProcessing }: FileUploaderProp
           disabled={isReading || isProcessing}
           className="bg-white/70 dark:bg-slate-800/70 resize-none text-sm"
         />
+      </div>
+
+      <div className="space-y-4">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Model mode by phase
+        </label>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Schema generation</label>
+            <Select
+              value={modelModes.model_schema}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_schema: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Initial batch tagging</label>
+            <Select
+              value={modelModes.model_tagging}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_tagging: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Low-confidence rerun</label>
+            <Select
+              value={modelModes.model_tagging_rerun}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_tagging_rerun: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Persona analysis</label>
+            <Select
+              value={modelModes.model_persona}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_persona: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Topic labeling</label>
+            <Select
+              value={modelModes.model_topic}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_topic: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Insights generation</label>
+            <Select
+              value={modelModes.model_insights}
+              onValueChange={(value: ModelMode) => setModelModes(prev => ({ ...prev, model_insights: value }))}
+              disabled={isReading || isProcessing}
+            >
+              <SelectTrigger className="bg-white/70 dark:bg-slate-800/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {/* File Upload Zone */}

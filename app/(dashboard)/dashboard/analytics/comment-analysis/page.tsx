@@ -6,7 +6,7 @@ import { directApiCall } from "@/lib/api/client"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { LoadingState } from "@/components/ui/loading"
 import { Button } from "@/components/ui/button"
-import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2 } from "lucide-react"
+import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download } from "lucide-react"
 import { FileUploader } from "./file-uploader"
 import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
@@ -16,6 +16,7 @@ import { analyzeContentStream, type AnalysisPhase } from "@/lib/api/content-anal
 import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
+import type { AnalysisModelModes } from "./file-uploader"
 
 type DataSource = {
   id: string
@@ -149,6 +150,547 @@ function filterTags(tags: Record<string, string>) {
   return Object.entries(tags).filter(([, value]) => value && !EXCLUDED_TAG_VALUES.has(value))
 }
 
+function downloadHTMLReport(report: CommentAnalysisReport) {
+  const taggedDataJson = JSON.stringify(report.tagged_data || [])
+  const personasJson = JSON.stringify(report.personas || [])
+  const totalSentiment = report.sentiment_distribution
+    ? Object.values(report.sentiment_distribution).reduce((sum, value) => sum + value, 0)
+    : 0
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${report.filename || "Comment Analysis Report"}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 2rem; font-weight: 600; margin-bottom: 8px; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 16px; }
+    h3 { font-size: 1.125rem; font-weight: 500; }
+    .subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 32px; }
+    .section { margin-bottom: 48px; }
+    .section-header { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 24px; }
+    .section-number { font-size: 2.5rem; font-weight: 300; color: #c7d2fe; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .stat-card { position: relative; overflow: hidden; padding: 20px; border-radius: 12px; background: white; border: 1px solid #e2e8f0; }
+    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; }
+    .stat-value { font-size: 2rem; font-weight: 600; margin-top: 8px; }
+    .stat-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+    .sentiment-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .sentiment-label { min-width: 100px; color: #64748b; font-size: 0.875rem; }
+    .sentiment-bar-bg { flex: 1; height: 24px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .sentiment-bar-fill { height: 100%; border-radius: 4px; }
+    .sentiment-count { min-width: 80px; text-align: right; font-family: monospace; font-size: 0.875rem; }
+    .persona-card { background: linear-gradient(135deg, #fff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; }
+    .persona-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .persona-name { font-size: 1.125rem; font-weight: 500; }
+    .persona-count { background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-family: monospace; }
+    .persona-desc { color: #64748b; font-size: 0.875rem; margin-bottom: 8px; }
+    .persona-meta { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; }
+    .tag { display: inline-block; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; margin: 2px; }
+    .topic-tag { display: inline-block; background: #eef2ff; border: 1px solid #c7d2fe; color: #4f46e5; padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; margin: 2px; }
+    .insight-item { border-left: 3px solid; padding-left: 16px; margin-bottom: 16px; }
+    .insight-strength { border-color: #34d399; }
+    .insight-pain { border-color: #fb7185; }
+    .insight-suggestion { border-color: #818cf8; }
+    .insight-point { font-weight: 500; font-size: 0.875rem; }
+    .insight-evidence { color: #64748b; font-size: 0.875rem; margin-top: 4px; }
+    .severity { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.625rem; font-weight: 500; text-transform: uppercase; }
+    .severity-high { background: #ffe4e6; color: #e11d48; }
+    .severity-medium { background: #fef3c7; color: #d97706; }
+    .priority { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.625rem; font-weight: 500; text-transform: uppercase; }
+    .priority-high { background: #eef2ff; color: #4f46e5; }
+    .priority-medium { background: #e0f2fe; color: #0284c7; }
+    .golden-sample { background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+    .golden-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .golden-body { padding: 0 20px 20px; font-size: 0.875rem; color: #475569; }
+    .sentiment-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; }
+    .info-score { background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-family: monospace; }
+    footer { border-top: 1px solid #e2e8f0; padding-top: 40px; text-align: center; font-size: 0.75rem; color: #94a3b8; }
+    .generated-by { font-family: serif; font-size: 1.125rem; color: #4f46e5; margin-bottom: 8px; }
+    .filter-bar { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .filter-row:last-child { margin-bottom: 0; }
+    .filter-label { font-size: 0.75rem; color: #64748b; min-width: 60px; }
+    .filter-btn { padding: 6px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: all 0.15s; }
+    .filter-btn:hover { background: #f1f5f9; }
+    .filter-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+    .filter-btn.sentiment-pos { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .filter-btn.sentiment-pos.active { background: #22c55e; color: white; border-color: #22c55e; }
+    .filter-btn.sentiment-neg { background: #ffe4e6; color: #e11d48; border-color: #fecdd3; }
+    .filter-btn.sentiment-neg.active { background: #ef4444; color: white; border-color: #ef4444; }
+    .filter-btn.sentiment-neu { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+    .filter-btn.sentiment-neu.active { background: #94a3b8; color: white; border-color: #94a3b8; }
+    .comments-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .comments-table th { padding: 12px 16px; text-align: left; font-weight: 500; color: #64748b; font-size: 0.75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; cursor: pointer; }
+    .comments-table th:hover { background: #f1f5f9; }
+    .comments-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
+    .comments-table tr:hover td { background: #fafafa; }
+    .sort-icon { margin-left: 4px; opacity: 0.5; }
+    .sort-icon.active { opacity: 1; }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 16px; }
+    .page-btn { padding: 6px 12px; border-radius: 6px; font-size: 0.875rem; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; }
+    .page-btn:hover { background: #f1f5f9; }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .results-count { font-size: 0.875rem; color: #64748b; margin-bottom: 12px; }
+    .topic-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: box-shadow 0.15s; }
+    .topic-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .topic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .topic-name { font-weight: 500; font-size: 0.9rem; }
+    .topic-stats { font-size: 0.75rem; color: #64748b; }
+    .topic-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #e2e8f0; display: flex; }
+    .topic-bar-segment { height: 100%; }
+    .topic-expand { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9; display: none; }
+    .topic-expand.show { display: block; }
+    .topic-comment { padding: 8px; background: #f8fafc; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; }
+    .topic-comment:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${report.filename || "Comment Analysis Report"}</h1>
+    <p class="subtitle">${report.summary.total_reviews} reviews · ${report.analysis_date ? formatAnalysisDate(report.analysis_date) : ""}</p>
+
+    <div class="section">
+      <div class="grid-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Reviews</div>
+          <div class="stat-value">${report.summary.total_reviews}<span style="font-size: 0.875rem; color: #94a3b8;"> items</span></div>
+          <div class="stat-accent" style="background: #38bdf8;"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tagged</div>
+          <div class="stat-value">${report.summary.tagged_reviews}<span style="font-size: 0.875rem; color: #94a3b8;"> items</span></div>
+          <div class="stat-accent" style="background: #34d399;"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Personas</div>
+          <div class="stat-value">${report.summary.persona_count}<span style="font-size: 0.875rem; color: #94a3b8;"> types</span></div>
+          <div class="stat-accent" style="background: #a78bfa;"></div>
+        </div>
+        ${report.summary.avg_rating && report.summary.avg_rating > 0 ? `
+        <div class="stat-card">
+          <div class="stat-label">Avg Rating</div>
+          <div class="stat-value">${report.summary.avg_rating}<span style="font-size: 0.875rem; color: #94a3b8;">/5</span></div>
+          <div class="stat-accent" style="background: #fbbf24;"></div>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+
+    ${report.insights && !report.insights.error ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">01</span>
+        <div>
+          <h2>Strategic Insights</h2>
+          <p class="subtitle">AI-generated comprehensive analysis</p>
+        </div>
+      </div>
+
+      ${report.insights.overview ? `<div class="card">${report.insights.overview}</div>` : ''}
+
+      ${report.insights.strengths && report.insights.strengths.length ? `
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">Strengths</h3>
+        ${report.insights.strengths.map(s => `
+          <div class="insight-item insight-strength">
+            <p class="insight-point">${s.point}</p>
+            <p class="insight-evidence" style="font-style: italic;">${s.evidence}</p>
+            ${s.keywords && s.keywords.length ? `<div style="margin-top: 8px;">${s.keywords.map(kw => `<span class="tag" style="background: #dcfce7; color: #166534; border-color: #bbf7d0;">${kw}</span>`).join('')}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      ${report.insights.pain_points && report.insights.pain_points.length ? `
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">Pain Points</h3>
+        ${report.insights.pain_points.map(p => `
+          <div class="insight-item insight-pain">
+            <p class="insight-point">${p.point} <span class="severity severity-${p.severity.toLowerCase()}">${p.severity}</span></p>
+            <p class="insight-evidence">${p.root_cause}</p>
+            <p class="insight-evidence" style="font-style: italic;">${p.evidence}</p>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      ${report.insights.suggestions && report.insights.suggestions.length ? `
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">Suggestions</h3>
+        ${report.insights.suggestions.map(s => `
+          <div class="insight-item insight-suggestion">
+            <p class="insight-point">${s.suggestion} <span class="priority priority-${s.priority.toLowerCase()}">${s.priority}</span></p>
+            <p class="insight-evidence">${s.expected_roi}</p>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+    </div>
+    ` : ''}
+
+    ${report.sentiment_distribution ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">02</span>
+        <div>
+          <h2>Sentiment Analysis</h2>
+          <p class="subtitle">Distribution of customer sentiment</p>
+        </div>
+      </div>
+      <div class="card">
+        ${Object.entries(report.sentiment_distribution).map(([label, count]) => {
+          const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
+          const colors: Record<string, string> = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' }
+          return `
+          <div class="sentiment-bar">
+            <span class="sentiment-label">${label}</span>
+            <div class="sentiment-bar-bg">
+              <div class="sentiment-bar-fill" style="width: ${percent}%; background: ${colors[label] || '#94a3b8'};"></div>
+            </div>
+            <span class="sentiment-count">${count} (${percent}%)</span>
+          </div>
+        `}).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    ${report.personas && report.personas.length ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">03</span>
+        <div>
+          <h2>User Personas</h2>
+          <p class="subtitle">Identified ${report.personas.length} key customer profiles</p>
+        </div>
+      </div>
+      <div class="grid-4">
+        ${report.personas.map(persona => `
+          <div class="persona-card">
+            <div class="persona-header">
+              <span class="persona-name">${persona.name}</span>
+              <span class="persona-count" style="color: ${persona.color || '#6366f1'};">${persona.count} users</span>
+            </div>
+            ${persona.description ? `<p class="persona-desc">${persona.description}</p>` : ''}
+            ${persona.scenario ? `<p class="persona-meta"><strong>Scenario:</strong> ${persona.scenario}</p>` : ''}
+            ${persona.core_need ? `<p class="persona-meta"><strong>Core Need:</strong> ${persona.core_need}</p>` : ''}
+            ${persona.analysis ? `<p class="persona-meta"><strong>Analysis:</strong> ${persona.analysis}</p>` : ''}
+            ${Object.keys(persona.tags).length ? `<div style="margin-top: 12px;">${Object.entries(persona.tags).filter(([, v]) => v && !EXCLUDED_TAG_VALUES.has(v)).map(([k, v]) => `<span class="tag">${k}: ${v}</span>`).join('')}</div>` : ''}
+            ${persona.topic_labels && persona.topic_labels.length ? `<div style="margin-top: 8px;">${persona.topic_labels.map(t => `<span class="topic-tag">${t}</span>`).join('')}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    ${report.golden_samples && report.golden_samples.length ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">05</span>
+        <div>
+          <h2>Golden Samples</h2>
+          <p class="subtitle">Deep dive into high-information comments</p>
+        </div>
+      </div>
+      ${report.golden_samples.map((sample) => {
+        const badgeColors: Record<string, string> = { positive: '#dcfce7 #166534', neutral: '#f1f5f9 #475569', negative: '#ffe4e6 #e11d48' }
+        const [bg, text] = (badgeColors[sample.sentiment] || badgeColors.neutral).split(' ')
+        return `
+        <div class="golden-sample">
+          <div class="golden-header">
+            <span class="sentiment-badge" style="background: ${bg}; color: ${text};">${sample.sentiment}</span>
+            ${sample.persona_name ? `<span style="font-size: 0.75rem; color: #94a3b8;">${sample.persona_name}</span>` : ''}
+            ${sample.info_score !== undefined ? `<span class="info-score">${sample.info_score}/10</span>` : ''}
+          </div>
+          <div class="golden-body">
+            <p style="margin-bottom: 12px;">${sample.body}</p>
+            ${sample.reason ? `<p style="color: #4f46e5; font-style: italic;">${sample.reason}</p>` : ''}
+            ${Object.keys(sample.tags).length ? `<div style="margin-top: 12px;">${Object.entries(sample.tags).filter(([, v]) => v && !EXCLUDED_TAG_VALUES.has(v)).map(([k, v]) => `<span class="tag" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">${k}: ${v}</span>`).join('')}</div>` : ''}
+          </div>
+        </div>
+      `}).join('')}
+    </div>
+    ` : ''}
+
+    ${report.tagged_data && report.tagged_data.length && report.sentiment_distribution ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">04</span>
+        <div>
+          <h2>Topic Analysis</h2>
+          <p class="subtitle">Topic clusters with sentiment breakdown</p>
+        </div>
+      </div>
+      <div id="topic-list"></div>
+    </div>
+    ` : ''}
+
+    ${report.tagged_data && report.tagged_data.length ? `
+    <div class="section">
+      <div class="section-header">
+        <span class="section-number">06</span>
+        <div>
+          <h2>All Comments</h2>
+          <p class="subtitle" id="comments-count">${report.tagged_data.length} comments</p>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-row">
+          <span class="filter-label">Sentiment</span>
+          <button class="filter-btn sentiment-pos active" data-filter="sentiment" data-value="all">All</button>
+          <button class="filter-btn sentiment-pos" data-filter="sentiment" data-value="positive">Positive</button>
+          <button class="filter-btn sentiment-neu" data-filter="sentiment" data-value="neutral">Neutral</button>
+          <button class="filter-btn sentiment-neg" data-filter="sentiment" data-value="negative">Negative</button>
+        </div>
+        <div class="filter-row" id="persona-filters">
+          <span class="filter-label">Persona</span>
+          <button class="filter-btn active" data-filter="persona" data-value="all">All</button>
+        </div>
+        <div class="filter-row" id="topic-filters">
+          <span class="filter-label">Topic</span>
+          <button class="filter-btn active" data-filter="topic" data-value="all">All</button>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">Sort by</span>
+          <button class="filter-btn active" data-sort="info_score" data-order="desc">Score ↓</button>
+          <button class="filter-btn" data-sort="likes" data-order="desc">Likes ↓</button>
+          <button class="filter-btn" data-sort="replies" data-order="desc">Replies ↓</button>
+        </div>
+      </div>
+
+      <p class="results-count" id="results-count"></p>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table class="comments-table">
+          <thead>
+            <tr>
+              <th data-sort="sentiment">Sentiment <span class="sort-icon">↕</span></th>
+              <th style="width: 40%;">Comment</th>
+              <th data-sort="persona_name">Persona <span class="sort-icon">↕</span></th>
+              <th data-sort="topic">Topic <span class="sort-icon">↕</span></th>
+              <th data-sort="info_score">Score <span class="sort-icon">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="comments-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+    ` : ''}
+
+    <footer>
+      <p class="generated-by">Generated by AI</p>
+      ${report.analysis_date ? `<p>${formatAnalysisDate(report.analysis_date)}</p>` : ''}
+    </footer>
+  </div>
+
+  <script>
+    const EXCLUDED_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None"]);
+    const data = ${taggedDataJson};
+    const personas = ${personasJson};
+    const PAGE_SIZE = 50;
+
+    let state = {
+      sentiment: 'all',
+      persona: 'all',
+      topic: 'all',
+      sortBy: 'info_score',
+      sortOrder: 'desc',
+      page: 1
+    };
+
+    function getSentimentClass(sent) {
+      if (sent === 'positive') return 'sentiment-pos';
+      if (sent === 'negative') return 'sentiment-neg';
+      return 'sentiment-neu';
+    }
+
+    function getSentimentBadge(sent) {
+      const colors = { positive: '#dcfce7', neutral: '#f1f5f9', negative: '#ffe4e6' };
+      const textColors = { positive: '#166534', neutral: '#475569', negative: '#e11d48' };
+      const bg = colors[sent] || colors.neutral;
+      const tc = textColors[sent] || textColors.neutral;
+      return '<span class="sentiment-badge" style="background:' + bg + ';color:' + tc + ';">' + (sent || 'unknown') + '</span>';
+    }
+
+    function getUniqueValues(field) {
+      const vals = new Set();
+      data.forEach(d => { if (d[field] && !EXCLUDED_VALUES.has(d[field])) vals.add(d[field]); });
+      return Array.from(vals).sort();
+    }
+
+    function initFilters() {
+      const personas = getUniqueValues('persona_name');
+      const topics = getUniqueValues('topic');
+      const pfRow = document.getElementById('persona-filters');
+      const tfRow = document.getElementById('topic-filters');
+      if (pfRow && personas.length) {
+        personas.forEach(p => {
+          const btn = document.createElement('button');
+          btn.className = 'filter-btn';
+          btn.dataset.filter = 'persona';
+          btn.dataset.value = p;
+          btn.textContent = p;
+          pfRow.appendChild(btn);
+        });
+      }
+      if (tfRow && topics.length) {
+        topics.forEach(t => {
+          const btn = document.createElement('button');
+          btn.className = 'filter-btn';
+          btn.dataset.filter = 'topic';
+          btn.dataset.value = t;
+          btn.textContent = t;
+          tfRow.appendChild(btn);
+        });
+      }
+    }
+
+    function getFiltered() {
+      return data.filter(d => {
+        if (state.sentiment !== 'all' && (d.sentiment || '').toLowerCase() !== state.sentiment) return false;
+        if (state.persona !== 'all' && d.persona_name !== state.persona) return false;
+        if (state.topic !== 'all' && d.topic !== state.topic) return false;
+        return true;
+      }).sort((a, b) => {
+        let va = a[state.sortBy], vb = b[state.sortBy];
+        if (va === undefined || va === null) va = 0;
+        if (vb === undefined || vb === null) vb = 0;
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return state.sortOrder === 'asc' ? -1 : 1;
+        if (va > vb) return state.sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    function renderComments() {
+      const filtered = getFiltered();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      if (state.page > totalPages) state.page = 1;
+      const start = (state.page - 1) * PAGE_SIZE;
+      const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+      document.getElementById('results-count').textContent = 'Showing ' + pageItems.length + ' of ' + filtered.length + ' results';
+      document.getElementById('comments-count').textContent = filtered.length + ' comments';
+
+      const tbody = document.getElementById('comments-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = pageItems.map(item => {
+        return '<tr>' +
+          '<td>' + getSentimentBadge(item.sentiment) + '</td>' +
+          '<td style="max-width:300px;"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (item.body || '') + '</span></td>' +
+          '<td>' + (item.persona_name || '-') + '</td>' +
+          '<td>' + (item.topic || '-') + '</td>' +
+          '<td style="text-align:right;font-family:monospace;">' + (item.info_score !== undefined ? item.info_score + '/10' : '-') + '</td>' +
+          '</tr>';
+      }).join('');
+
+      const pag = document.getElementById('pagination');
+      if (!pag) return;
+      pag.innerHTML = '<button class="page-btn" onclick="prevPage()" ' + (state.page <= 1 ? 'disabled' : '') + '>← Prev</button>' +
+        '<span style="font-size:0.875rem;color:#64748b;">Page ' + state.page + ' of ' + totalPages + '</span>' +
+        '<button class="page-btn" onclick="nextPage()" ' + (state.page >= totalPages ? 'disabled' : '') + '>Next →</button>';
+    }
+
+    function prevPage() { state.page--; renderComments(); }
+    function nextPage() { state.page++; renderComments(); }
+
+    function renderTopics() {
+      const stats = {};
+      data.forEach(item => {
+        const topic = item.topic || 'Uncategorized';
+        if (!stats[topic]) stats[topic] = { count: 0, likes: 0, replies: 0, comments: [], sentiment: {} };
+        stats[topic].count++;
+        stats[topic].likes += item.likes || 0;
+        stats[topic].replies += item.replies || 0;
+        stats[topic].comments.push(item);
+        const s = item.sentiment || 'neutral';
+        stats[topic].sentiment[s] = (stats[topic].sentiment[s] || 0) + 1;
+      });
+
+      const sorted = Object.entries(stats).map(([topic, d]) => ({ topic, ...d, score: d.count + d.likes * 0.3 + d.replies * 0.5 }))
+        .sort((a, b) => b.score - a.score).slice(0, 20);
+
+      const container = document.getElementById('topic-list');
+      if (!container) return;
+      container.innerHTML = sorted.map(t => {
+        const colors = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' };
+        const bars = Object.entries(t.sentiment).map(([s, c]) =>
+          '<div class="topic-bar-segment" style="width:' + ((c / t.count) * 100) + '%;background:' + (colors[s] || '#94a3b8') + ';"></div>'
+        ).join('');
+        const topComments = t.comments.slice(0, 3).map(c =>
+          '<div class="topic-comment">' + getSentimentBadge(c.sentiment) + ' ' + (c.body || '').substring(0, 150) + '</div>'
+        ).join('');
+        return '<div class="topic-card" onclick="toggleTopic(this)">' +
+          '<div class="topic-header">' +
+          '<div><div class="topic-name">' + t.topic + '</div><div class="topic-stats">' + t.count + ' comments · ' + t.likes + ' likes · ' + t.replies + ' replies</div></div>' +
+          '<div style="text-align:right;"><div style="font-size:0.625rem;color:#94a3b8;text-transform:uppercase;">Score</div><div style="font-family:monospace;font-size:1.25rem;color:#4f46e5;">' + Math.round(t.score) + '</div></div>' +
+          '</div><div class="topic-bar">' + bars + '</div>' +
+          '<div class="topic-expand">' + topComments + '</div></div>';
+      }).join('');
+    }
+
+    function toggleTopic(el) {
+      const expand = el.querySelector('.topic-expand');
+      expand.classList.toggle('show');
+    }
+
+    function init() {
+      initFilters();
+      renderComments();
+      renderTopics();
+
+      document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const filter = btn.dataset.filter;
+          const value = btn.dataset.value;
+          state[filter] = value;
+          state.page = 1;
+          document.querySelectorAll('.filter-btn[data-filter="' + filter + '"]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderComments();
+        });
+      });
+
+      document.querySelectorAll('.filter-btn[data-sort]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sort = btn.dataset.sort;
+          if (state.sortBy === sort) {
+            state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
+          } else {
+            state.sortBy = sort;
+            state.sortOrder = 'desc';
+          }
+          document.querySelectorAll('.filter-btn[data-sort]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          btn.textContent = btn.textContent.replace('↓', '').replace('↑', '') + (state.sortOrder === 'desc' ? ' ↓' : ' ↑');
+          renderComments();
+        });
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>`
+
+  const blob = new Blob([html], { type: "text/html" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${report.filename || "comment-analysis-report"}.html`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export default function CommentAnalysisPage() {
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
@@ -231,7 +773,13 @@ export default function CommentAnalysisPage() {
     }
   }, [selectedSourceId])
 
-  const handleFileProcessed = async (comments: ProcessedComment[], filename: string, name: string, postContent: string) => {
+  const handleFileProcessed = async (
+    comments: ProcessedComment[],
+    filename: string,
+    name: string,
+    postContent: string,
+    modelModes: AnalysisModelModes
+  ) => {
     setIsAnalyzing(true)
     setAnalysisPhase(0)
     setAnalysisMessage("Starting analysis...")
@@ -252,6 +800,12 @@ export default function CommentAnalysisPage() {
         filename,
         name: name || filename.split('.')[0] || "Uploaded Analysis",
         post_content: postContent || undefined,
+        model_schema: modelModes.model_schema,
+        model_tagging: modelModes.model_tagging,
+        model_tagging_rerun: modelModes.model_tagging_rerun,
+        model_persona: modelModes.model_persona,
+        model_topic: modelModes.model_topic,
+        model_insights: modelModes.model_insights,
       })
 
       for await (const update of stream) {
@@ -406,32 +960,45 @@ export default function CommentAnalysisPage() {
   // Header for other views
   const renderHeader = () => (
     <header className="border-b border-indigo-100 dark:border-indigo-800 pb-6 mb-8">
-      <div className="flex items-center gap-4">
-        {selectedSourceId && !isAnalyzing && !showUploader && (
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {selectedSourceId && !isAnalyzing && !showUploader && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedSourceId(null)
+                setReport(null)
+              }}
+              className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              {isAnalyzing ? "Analyzing Content..." : showUploader ? "New Analysis" : report?.filename || "Analysis Report"}
+            </h1>
+            {!isAnalyzing && !showUploader && report && (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                 <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {report.summary.total_reviews} reviews</span>
+                 <span>·</span>
+                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {report.analysis_date && formatAnalysisDate(report.analysis_date)}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {report && !isAnalyzing && !showUploader && (
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSelectedSourceId(null)
-              setReport(null)
-            }}
-            className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            variant="outline"
+            size="sm"
+            onClick={() => downloadHTMLReport(report)}
+            className="gap-2"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <Download className="h-4 w-4" />
+            Download HTML
           </Button>
         )}
-        <div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            {isAnalyzing ? "Analyzing Content..." : showUploader ? "New Analysis" : report?.filename || "Analysis Report"}
-          </h1>
-          {!isAnalyzing && !showUploader && report && (
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
-               <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {report.summary.total_reviews} reviews</span>
-               <span>·</span>
-               <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {report.analysis_date && formatAnalysisDate(report.analysis_date)}</span>
-            </p>
-          )}
-        </div>
       </div>
     </header>
   )
