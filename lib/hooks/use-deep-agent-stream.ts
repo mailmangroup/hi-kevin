@@ -38,6 +38,7 @@ export interface SubagentStreamInterface {
     tool: string
     input: any
     output?: string
+    artifact?: any
     status: "running" | "completed"
   }>
 }
@@ -184,6 +185,7 @@ export function useDeepAgentStream() {
             tools[index] = {
               ...tools[index],
               output: String(chunk.output ?? ""),
+              artifact: chunk.artifact ?? undefined,
               status: "completed",
             }
           }

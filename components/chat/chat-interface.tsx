@@ -1059,6 +1059,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               if (handled) {
                 updateDeepAgentMessage(getDeepAgentState())
               }
+
+              // Auto-open artifact panel for subagent artifacts
+              if (chunk.type === "subagent_tool_end" && chunk.artifact && typeof chunk.artifact === "object" && Object.keys(chunk.artifact).length > 0) {
+                const subArtifact = chunk.artifact
+                const artifactData: ArtifactData = {
+                  id: `${chunk.tool}-${Date.now()}`,
+                  type: determineArtifactType(subArtifact, chunk.tool),
+                  title: subArtifact.title || getToolDisplayName(chunk.tool),
+                  data: subArtifact.type === "artifact" ? subArtifact : (subArtifact.content ?? subArtifact.data ?? subArtifact),
+                  toolName: chunk.tool,
+                  isStreaming: false,
+                }
+                openArtifact(artifactData)
+                streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
+              }
           }
 
           // Backend sends {"done": true} as the final chunk — re-enable send button

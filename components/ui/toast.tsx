@@ -118,7 +118,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
     <div
       className={cn(
         "pointer-events-auto rounded-lg border-l-4 p-4 shadow-lg transition-all duration-200 ease-out",
-        "bg-white border-border",
+        "bg-card text-card-foreground border-border",
         isVisible
           ? "translate-x-0 opacity-100"
           : "translate-x-full opacity-0"
@@ -144,7 +144,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
         </div>
         <button
           onClick={handleDismiss}
-          className="flex h-5 w-5 items-center justify-center rounded hover:bg-gray-100 transition-colors"
+          className="flex h-5 w-5 items-center justify-center rounded hover:bg-accent transition-colors"
           aria-label="Close"
         >
           <X className="h-4 w-4 text-muted-foreground" />

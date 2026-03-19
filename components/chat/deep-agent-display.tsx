@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle } from "lucide-react"
+import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle, FileDown, Eye } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
+import { useArtifact, ArtifactData } from "./artifact-context"
+import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
 import type { DeepAgentStreamState, TodoItem, SubagentStreamInterface } from "@/lib/hooks/use-deep-agent-stream"
 
 // --- Task Status Icon ---
@@ -38,8 +40,9 @@ function formatToolCall(name: string, args?: Record<string, unknown>): string {
 
 // --- Tool Call Row ---
 
-function ToolCallRow({ tc }: { tc: SubagentStreamInterface["activeTools"][number] }) {
+function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["activeTools"][number]; onOpenArtifact?: (artifact: any, toolName: string) => void }) {
   const label = formatToolCall(tc.tool, tc.input)
+  const hasArtifact = tc.artifact && typeof tc.artifact === "object" && Object.keys(tc.artifact).length > 0
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400 py-0.5">
       {tc.status === "running" ? (
@@ -47,7 +50,16 @@ function ToolCallRow({ tc }: { tc: SubagentStreamInterface["activeTools"][number
       ) : (
         <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
       )}
-      <span className="truncate">{label}</span>
+      <span className="truncate flex-1">{label}</span>
+      {hasArtifact && onOpenArtifact && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+        >
+          {tc.artifact?.oss_key ? <FileDown className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
+          {tc.artifact?.filename || "View"}
+        </button>
+      )}
     </div>
   )
 }
@@ -99,9 +111,11 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
 function ResearchTaskCard({
   subagent,
   isStreaming,
+  onOpenArtifact,
 }: {
   subagent: SubagentStreamInterface
   isStreaming: boolean
+  onOpenArtifact?: (artifact: any, toolName: string) => void
 }) {
   const [isExpanded, setIsExpanded] = React.useState(subagent.status === "running")
   const [userToggled, setUserToggled] = React.useState(false)
@@ -186,7 +200,7 @@ function ResearchTaskCard({
           {hasToolCalls && (
             <div className="space-y-0.5">
               {toolCalls.map((tc, i) => (
-                <ToolCallRow key={i} tc={tc} />
+                <ToolCallRow key={i} tc={tc} onOpenArtifact={onOpenArtifact} />
               ))}
             </div>
           )}
@@ -243,9 +257,22 @@ interface DeepAgentDisplayProps {
 }
 
 export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
+  const { openArtifact } = useArtifact()
   const taskCount = data.subagentOrder.length
   const completedCount = data.subagentOrder.filter((id) => data.subagents.get(id)?.status === "complete").length
   const messageOrder = data.messageOrder.length > 0 ? data.messageOrder : ["coordinator"]
+
+  const handleOpenArtifact = React.useCallback((artifact: any, toolName: string) => {
+    const artifactData: ArtifactData = {
+      id: `${toolName}-${Date.now()}`,
+      type: determineArtifactType(artifact, toolName),
+      title: artifact.title || artifact.filename || getToolDisplayName(toolName),
+      data: artifact.type === "artifact" ? artifact : (artifact.content ?? artifact.data ?? artifact),
+      toolName,
+      isStreaming: false,
+    }
+    openArtifact(artifactData)
+  }, [openArtifact])
 
   if (taskCount === 0) {
     // Only show "Starting deep agent..." while actually streaming; hide once complete.
@@ -275,7 +302,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
             {subagentIds.map((subagentId) => {
               const subagent = data.subagents.get(subagentId)
               if (!subagent) return null
-              return <ResearchTaskCard key={subagent.id} subagent={subagent} isStreaming={isStreaming} />
+              return <ResearchTaskCard key={subagent.id} subagent={subagent} isStreaming={isStreaming} onOpenArtifact={handleOpenArtifact} />
             })}
           </div>
         )
