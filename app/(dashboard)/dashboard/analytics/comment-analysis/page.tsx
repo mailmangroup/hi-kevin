@@ -1579,25 +1579,29 @@ export default function CommentAnalysisPage() {
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Sentiment</h3>
-                <div className="space-y-4">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-6">Sentiment</h3>
+                <div className="space-y-5">
                   {Object.entries(report.sentiment_distribution).map(([label, count]) => {
                     const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
+                    const color = sentimentColor(label)
 
                     return (
-                      <div key={label} className="flex flex-wrap items-center gap-3">
-                        <div className="min-w-[110px] text-sm text-slate-500 dark:text-slate-400">{sentimentLabel(label)}</div>
-                        <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
-                          <div
-                            className="h-full rounded"
-                            style={{
-                              width: `${percent}%`,
-                              background: sentimentColor(label),
-                            }}
-                          />
+                      <div key={label} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                            <span className="text-sm text-slate-600 dark:text-slate-300">{sentimentLabel(label)}</span>
+                          </div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{count}</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500">({percent}%)</span>
+                          </div>
                         </div>
-                        <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
-                          {count} ({percent}%)
+                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${percent}%`, background: color }}
+                          />
                         </div>
                       </div>
                     )
@@ -1606,27 +1610,32 @@ export default function CommentAnalysisPage() {
               </div>
 
               <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Topics</h3>
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-6">Topics</h3>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                   {topicDistribution.length === 0 ? (
                     <p className="text-sm text-slate-500">No topics available</p>
                   ) : (
-                    topicDistribution.map(({ topic, count, percent }) => (
-                      <div key={topic} className="flex flex-wrap items-center gap-3">
-                        <div className="min-w-[110px] max-w-[150px] truncate text-sm text-slate-500 dark:text-slate-400" title={topic}>
-                          {topic}
+                    topicDistribution.map(({ topic, count, percent }, idx) => {
+                      const topicColors = ["#6366f1","#8b5cf6","#a78bfa","#818cf8","#7c3aed","#4f46e5","#6d28d9","#7e22ce"]
+                      const color = topicColors[idx % topicColors.length]
+                      return (
+                        <div key={topic} className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-slate-600 dark:text-slate-300 truncate max-w-[160px]" title={topic}>{topic}</span>
+                            <div className="flex items-baseline gap-1.5 shrink-0">
+                              <span className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{count}</span>
+                              <span className="text-xs text-slate-400 dark:text-slate-500">({percent}%)</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${percent}%`, background: color }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-6 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
-                          <div
-                            className="h-full rounded bg-indigo-500 dark:bg-indigo-400"
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                        <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
-                          {count} ({percent}%)
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>

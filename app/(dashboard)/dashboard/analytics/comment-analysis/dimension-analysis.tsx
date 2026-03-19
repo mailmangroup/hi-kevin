@@ -10,6 +10,19 @@ import { sentimentLabel, sentimentColor, sentimentInt } from "@/lib/utils/sentim
 
 const EXCLUDED_TAG_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None", "其他", "other", ""])
 
+const OPTION_COLORS = [
+  "#6366f1", // indigo-500
+  "#8b5cf6", // violet-500
+  "#ec4899", // pink-500
+  "#f43f5e", // rose-500
+  "#f97316", // orange-500
+  "#eab308", // yellow-500
+  "#22c55e", // green-500
+  "#14b8a6", // teal-500
+  "#0ea5e9", // cyan-500
+  "#3b82f6", // blue-500
+]
+
 type SchemaDimension = {
   key: string
   description: string
@@ -24,6 +37,16 @@ interface DimensionAnalysisProps {
   }
 }
 
+function StackedBar({ items, className }: { items: { color: string; value: number }[]; className?: string }) {
+  return (
+    <div className={cn("flex w-full rounded-full overflow-hidden", className)}>
+      {items.filter(i => i.value > 0).map((item, idx) => (
+        <div key={idx} style={{ flexGrow: item.value, backgroundColor: item.color }} className="h-full" />
+      ))}
+    </div>
+  )
+}
+
 type SortMode = "count" | "score"
 
 type DimensionSummary = {
@@ -32,6 +55,7 @@ type DimensionSummary = {
   options: string[]
   count: number
   sentimentBreakdown: Record<string, number>
+  optionCounts: Record<string, number>
 }
 
 type OptionStats = {
@@ -61,6 +85,7 @@ export function DimensionAnalysis({ taggedData, sentimentDistribution, schemaSna
     return schemaSnapshot.dimensions.map((dim) => {
       let count = 0
       const sentimentBreakdown: Record<string, number> = {}
+      const optionCounts: Record<string, number> = {}
 
       taggedData.forEach((item) => {
         const val = item.tags?.[dim.key]
@@ -68,6 +93,7 @@ export function DimensionAnalysis({ taggedData, sentimentDistribution, schemaSna
         count++
         const sent = sentimentLabel(item.sentiment)
         sentimentBreakdown[sent] = (sentimentBreakdown[sent] || 0) + 1
+        optionCounts[val] = (optionCounts[val] || 0) + 1
       })
 
       return {
@@ -76,6 +102,7 @@ export function DimensionAnalysis({ taggedData, sentimentDistribution, schemaSna
         options: dim.options,
         count,
         sentimentBreakdown,
+        optionCounts,
       }
     })
   }, [taggedData, schemaSnapshot])
@@ -157,35 +184,69 @@ export function DimensionAnalysis({ taggedData, sentimentDistribution, schemaSna
                   {dim.count} comments · {dim.options.length} options
                 </span>
                 {dim.count > 0 && (
-                  <div className="flex h-1.5 w-20 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
-                    {Object.entries(dim.sentimentBreakdown).map(([sent, count]) => (
-                      <div
-                        key={sent}
-                        style={{
-                          width: `${(count / dim.count) * 100}%`,
-                          background: sentimentColor(sent),
-                        }}
-                      />
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">Sentiment</span>
+                    <StackedBar
+                      className="h-1.5 w-16"
+                      items={Object.entries(dim.sentimentBreakdown).map(([k, v]) => ({ color: sentimentColor(k), value: v }))}
+                    />
                   </div>
                 )}
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {dim.options.slice(0, 5).map((opt) => (
-                  <span
-                    key={opt}
-                    className="rounded-full border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
-                  >
-                    {opt}
-                  </span>
-                ))}
-                {dim.options.length > 5 && (
-                  <span className="rounded-full border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 dark:text-slate-500">
-                    +{dim.options.length - 5}
-                  </span>
-                )}
-              </div>
+              {dim.count > 0 ? (
+                <div className="mt-4 space-y-2.5">
+                  <StackedBar
+                    className="h-2"
+                    items={dim.options
+                      .filter(opt => (dim.optionCounts[opt] || 0) > 0)
+                      .sort((a, b) => (dim.optionCounts[b] || 0) - (dim.optionCounts[a] || 0))
+                      .map((opt, idx) => ({ color: OPTION_COLORS[idx % OPTION_COLORS.length], value: dim.optionCounts[opt] || 0 }))}
+                  />
+                  <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                    {dim.options
+                      .filter(opt => (dim.optionCounts[opt] || 0) > 0)
+                      .sort((a, b) => (dim.optionCounts[b] || 0) - (dim.optionCounts[a] || 0))
+                      .slice(0, 4)
+                      .map((opt, idx) => (
+                        <div key={opt} className="flex items-center gap-1.5 text-[11px]">
+                          <span 
+                            className="w-1.5 h-1.5 rounded-full shrink-0" 
+                            style={{ background: OPTION_COLORS[idx % OPTION_COLORS.length] }} 
+                          />
+                          <span className="text-slate-600 dark:text-slate-300 truncate max-w-[100px]" title={opt}>
+                            {opt}
+                          </span>
+                          <span className="text-slate-400">
+                            {Math.round(((dim.optionCounts[opt] || 0) / dim.count) * 100)}%
+                          </span>
+                        </div>
+                      ))}
+                    {dim.options.filter(opt => (dim.optionCounts[opt] || 0) > 0).length > 4 && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-slate-200 dark:bg-white/20" />
+                        <span>Other ({dim.options.filter(opt => (dim.optionCounts[opt] || 0) > 0).length - 4})</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {dim.options.slice(0, 5).map((opt) => (
+                    <span
+                      key={opt}
+                      className="rounded-full border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
+                    >
+                      {opt}
+                    </span>
+                  ))}
+                  {dim.options.length > 5 && (
+                    <span className="rounded-full border border-slate-200 dark:border-white/15 bg-slate-50 dark:bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                      +{dim.options.length - 5}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -335,17 +396,10 @@ export function DimensionAnalysis({ taggedData, sentimentDistribution, schemaSna
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-1">
                   <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{opt.option}</h3>
-                  <div className="flex h-1.5 w-24 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
-                    {Object.entries(opt.sentimentBreakdown).map(([sent, count]) => (
-                      <div
-                        key={sent}
-                        style={{
-                          width: `${(count / opt.count) * 100}%`,
-                          background: sentimentColor(sent),
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <StackedBar
+                    className="h-1.5 w-24"
+                    items={Object.entries(opt.sentimentBreakdown).map(([k, v]) => ({ color: sentimentColor(k), value: v }))}
+                  />
                 </div>
                 <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                   <span>{opt.count} comments</span>
