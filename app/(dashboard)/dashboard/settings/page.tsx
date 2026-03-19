@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ComponentType } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from 'next-themes'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +24,8 @@ const SETTINGS_PAGES: { key: SettingsPageKey; label: string; icon: ComponentType
 
 export default function SettingsPage() {
   const { toast } = useToast()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [activePage, setActivePage] = useState<SettingsPageKey>('general')
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -38,6 +41,10 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { profile: storeProfile, setProfile: setStoreProfile } = useUserStore()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (storeProfile) {
@@ -299,6 +306,21 @@ export default function SettingsPage() {
                   <h2 className="text-xl font-semibold">Preferences</h2>
                 </div>
                 <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="theme" className="text-sm font-medium text-foreground">
+                      Appearance (Dark Mode)
+                    </label>
+                    <select
+                      id="theme"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={mounted ? theme : "system"}
+                      onChange={(e) => setTheme(e.target.value)}
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="system">Auto (System)</option>
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <label htmlFor="language" className="text-sm font-medium text-foreground">
                       Language

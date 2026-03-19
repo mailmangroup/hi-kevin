@@ -103,7 +103,7 @@ export function ComplianceChecker({
 
       <div className="space-y-4">
         <textarea
-          className="w-full min-h-[150px] p-3 rounded-md border border-border bg-white resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all break-words"
+          className="w-full min-h-[150px] p-3 rounded-md border border-border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all break-words"
           placeholder="Paste content to check for compliance risks..."
           value={text}
           onChange={(e) => {

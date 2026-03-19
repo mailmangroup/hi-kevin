@@ -408,7 +408,7 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] glass-input flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-elevated", className)}>
+    <div className={cn("relative rounded-[1.5rem] glass-input flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-elevated dark:bg-slate-900/70 dark:border-slate-700/60", className)}>
       {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">
@@ -590,8 +590,8 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 thinkingEnabled
-                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
+                    ? "bg-indigo-50 dark:bg-indigo-600 text-indigo-600 dark:text-white border-indigo-200 dark:border-indigo-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
@@ -604,8 +604,8 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 includeWebSearch
-                    ? "bg-blue-50 text-blue-600 border-blue-200"
-                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
+                    ? "bg-blue-50 dark:bg-blue-600 text-blue-600 dark:text-white border-blue-200 dark:border-blue-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
@@ -618,8 +618,8 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 sqlEnabled
-                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
+                    ? "bg-indigo-50 dark:bg-indigo-600 text-indigo-600 dark:text-white border-indigo-200 dark:border-indigo-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
@@ -632,8 +632,8 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 deepAgent
-                    ? "bg-red-50 text-red-600 border-red-200"
-                    : "border-transparent bg-white/60 text-muted-foreground hover:text-foreground hover:bg-white/80"
+                    ? "bg-red-50 dark:bg-red-600 text-red-600 dark:text-white border-red-200 dark:border-red-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled || deepAgentLocked}
             >

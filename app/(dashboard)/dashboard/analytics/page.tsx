@@ -34,7 +34,7 @@ export default function AnalyticsLandingPage() {
                     <CardTitle className="text-xl">{card.title}</CardTitle>
                     <CardDescription className="mt-2">{card.description}</CardDescription>
                   </div>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/40 text-primary shadow-[0_6px_18px_-10px_rgba(15,23,42,0.25)] transition-transform duration-300 group-hover:scale-105 group-hover:bg-white/55">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/60 dark:border-slate-700/60 bg-white/40 dark:bg-slate-800/40 text-primary shadow-[0_6px_18px_-10px_rgba(15,23,42,0.25)] dark:shadow-[0_6px_18px_-10px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-105 group-hover:bg-white/55 dark:group-hover:bg-slate-700/55">
                     →
                   </span>
                 </div>

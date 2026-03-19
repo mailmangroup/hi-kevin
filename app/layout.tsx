@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/toast"
 import { ConfirmProvider } from "@/components/providers/confirm-provider"
 import QueryProvider from "@/components/providers/query-provider"
 import { UserStoreProvider } from "@/components/providers/user-store-provider"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const onest = Onest({
   subsets: ["latin"],
@@ -25,16 +26,23 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${onest.className} ${onest.variable}`}>
-        <AuraBackground />
-        <QueryProvider>
-          <UserStoreProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                {children}
-              </ConfirmProvider>
-            </ToastProvider>
-          </UserStoreProvider>
-        </QueryProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuraBackground />
+          <QueryProvider>
+            <UserStoreProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  {children}
+                </ConfirmProvider>
+              </ToastProvider>
+            </UserStoreProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -310,14 +310,14 @@ export default function CommentAnalysisPage() {
     }
 
     return (
-      <div className="min-h-screen text-slate-900">
+      <div className="min-h-screen text-slate-900 dark:text-slate-100">
         <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-          <header className="flex items-center justify-between pb-6 border-b border-indigo-100">
+          <header className="flex items-center justify-between pb-6 border-b border-indigo-100 dark:border-indigo-800">
             <div>
-              <h1 className="font-serif text-3xl font-semibold tracking-tight text-slate-900">
+              <h1 className="font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Comment Analysis
               </h1>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 AI-powered insights from your customer feedback
               </p>
             </div>
@@ -335,14 +335,14 @@ export default function CommentAnalysisPage() {
             {/* Create New Card */}
             <div 
               onClick={() => setShowUploader(true)}
-              className="group relative flex h-64 cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-indigo-200 bg-white/50 p-6 text-center transition-all hover:border-indigo-400 hover:bg-white hover:shadow-md"
+              className="group relative flex h-64 cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-indigo-200 dark:border-indigo-700 bg-white/50 dark:bg-slate-800/50 p-6 text-center transition-all hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-white dark:hover:bg-slate-800 hover:shadow-md"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 transition-colors group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/70">
                 <Plus className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-medium text-slate-900">New Analysis</h3>
-                <p className="mt-1 text-sm text-slate-500">Upload CSV/Excel file</p>
+                <h3 className="font-medium text-slate-900 dark:text-slate-100">New Analysis</h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload CSV/Excel file</p>
               </div>
             </div>
 
@@ -351,16 +351,16 @@ export default function CommentAnalysisPage() {
               <div
                 key={source.id}
                 onClick={() => setSelectedSourceId(source.id)}
-                className="group relative flex h-64 cursor-pointer flex-col justify-between rounded-xl border border-white/50 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+                className="group relative flex h-64 cursor-pointer flex-col justify-between rounded-xl border border-white/50 dark:border-slate-700/50 bg-white dark:bg-slate-800 p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
               >
                 <div className="space-y-4">
                   <div className="flex items-start justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
                       <BarChart3 className="h-5 w-5" />
                     </div>
                     <div className="flex items-center gap-3">
                       {source.updated_at && (
-                        <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
                           <Clock className="h-3 w-3" />
                           {formatAnalysisDate(source.updated_at)}
                         </span>
@@ -368,7 +368,7 @@ export default function CommentAnalysisPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-slate-300 hover:bg-rose-50 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-8 w-8 text-slate-300 dark:text-slate-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => handleDeleteSource(e, source.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -377,11 +377,11 @@ export default function CommentAnalysisPage() {
                   </div>
                   
                   <div>
-                    <h3 className="line-clamp-2 font-serif text-lg font-medium text-slate-900 group-hover:text-indigo-600">
+                    <h3 className="line-clamp-2 font-serif text-lg font-medium text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                       {source.name}
                     </h3>
                     {source.filename && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
                         <FileText className="h-3 w-3" />
                         {source.filename}
                       </p>
@@ -389,9 +389,9 @@ export default function CommentAnalysisPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500">
+                <div className="flex items-center gap-4 border-t border-slate-100 dark:border-slate-700 pt-4 text-sm text-slate-500 dark:text-slate-400">
                   <div className="flex items-center gap-1.5">
-                    <MessageSquare className="h-4 w-4 text-slate-400" />
+                    <MessageSquare className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <span>{source.comment_count || 0} reviews</span>
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export default function CommentAnalysisPage() {
 
   // Header for other views
   const renderHeader = () => (
-    <header className="border-b border-indigo-100 pb-6 mb-8">
+    <header className="border-b border-indigo-100 dark:border-indigo-800 pb-6 mb-8">
       <div className="flex items-center gap-4">
         {selectedSourceId && !isAnalyzing && !showUploader && (
           <Button
@@ -415,17 +415,17 @@ export default function CommentAnalysisPage() {
               setSelectedSourceId(null)
               setReport(null)
             }}
-            className="h-8 w-8 text-slate-500 hover:text-slate-900"
+            className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
         )}
         <div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             {isAnalyzing ? "Analyzing Content..." : showUploader ? "New Analysis" : report?.filename || "Analysis Report"}
           </h1>
           {!isAnalyzing && !showUploader && report && (
-            <p className="mt-1 text-sm text-slate-500 flex items-center gap-2">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
                <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {report.summary.total_reviews} reviews</span>
                <span>·</span>
                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {report.analysis_date && formatAnalysisDate(report.analysis_date)}</span>
@@ -442,7 +442,7 @@ export default function CommentAnalysisPage() {
 
   if (isAnalyzing) {
     return (
-      <div className="relative min-h-screen text-slate-900">
+      <div className="relative min-h-screen text-slate-900 dark:text-slate-100">
         <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
           {renderHeader()}
           <AnalysisProgress phase={analysisPhase} message={analysisMessage} />
@@ -453,19 +453,19 @@ export default function CommentAnalysisPage() {
 
   if (showUploader) {
     return (
-      <div className="relative min-h-screen text-slate-900">
+      <div className="relative min-h-screen text-slate-900 dark:text-slate-100">
         <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
-          <header className="border-b border-indigo-100 pb-6 mb-8">
+          <header className="border-b border-indigo-100 dark:border-indigo-800 pb-6 mb-8">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowUploader(false)}
-                className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900">
+              <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 New Analysis
               </h1>
             </div>
@@ -508,41 +508,41 @@ export default function CommentAnalysisPage() {
   const summary = report.summary
 
   return (
-    <div className="relative min-h-screen text-slate-900">
+    <div className="relative min-h-screen text-slate-900 dark:text-slate-100">
       <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
         {renderHeader()}
 
         <section className="grid gap-4 md:grid-cols-4">
-          <div className="relative overflow-hidden rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500">Total Reviews</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900">
+          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Total Reviews</div>
+            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {summary.total_reviews}
-              <span className="ml-1 text-sm text-slate-400">items</span>
+              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
             </div>
             <div className="absolute inset-y-0 left-0 w-1 bg-sky-400" />
           </div>
-          <div className="relative overflow-hidden rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500">Tagged</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900">
+          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Tagged</div>
+            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {summary.tagged_reviews}
-              <span className="ml-1 text-sm text-slate-400">items</span>
+              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
             </div>
             <div className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
           </div>
-          <div className="relative overflow-hidden rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500">Personas</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900">
+          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Personas</div>
+            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {summary.persona_count}
-              <span className="ml-1 text-sm text-slate-400">types</span>
+              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">types</span>
             </div>
             <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
           </div>
           {summary.avg_rating !== undefined && summary.avg_rating > 0 ? (
-            <div className="relative overflow-hidden rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-5">
-              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500">Avg Rating</div>
-              <div className="mt-3 font-mono text-3xl font-semibold text-slate-900">
+            <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Avg Rating</div>
+              <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
                 {summary.avg_rating}
-                <span className="ml-1 text-sm text-slate-400">/5</span>
+                <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">/5</span>
               </div>
               <div className="absolute inset-y-0 left-0 w-1 bg-amber-400" />
             </div>
@@ -554,34 +554,34 @@ export default function CommentAnalysisPage() {
         {/* 1. Insights */}
         {report.insights && !report.insights.error && (
           <section className="space-y-6">
-            <div className="flex items-baseline gap-4 border-b border-indigo-100 pb-4">
-              <span className="font-serif text-4xl font-light text-indigo-200">01</span>
+            <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
+              <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">01</span>
               <div>
-                <h2 className="font-serif text-2xl text-slate-900">Strategic Insights</h2>
-                <p className="text-sm text-slate-500">AI-generated comprehensive analysis</p>
+                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Strategic Insights</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">AI-generated comprehensive analysis</p>
               </div>
             </div>
 
             {/* Overview */}
             {report.insights.overview && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6 text-sm leading-7 text-slate-600">
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6 text-sm leading-7 text-slate-600 dark:text-slate-300">
                 {report.insights.overview}
               </div>
             )}
 
             {/* Strengths */}
             {!!report.insights.strengths?.length && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 mb-4">Strengths</h3>
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Strengths</h3>
                 <div className="space-y-4">
                   {report.insights.strengths.map((s, i) => (
                     <div key={i} className="border-l-2 border-emerald-400 pl-4">
-                      <p className="text-sm font-medium text-slate-900">{s.point}</p>
-                      <p className="mt-1 text-sm text-slate-500 italic">{s.evidence}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{s.point}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 italic">{s.evidence}</p>
                       {s.keywords?.length && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {s.keywords.map((kw, j) => (
-                            <span key={j} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-600">{kw}</span>
+                            <span key={j} className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">{kw}</span>
                           ))}
                         </div>
                       )}
@@ -593,20 +593,20 @@ export default function CommentAnalysisPage() {
 
             {/* Pain Points */}
             {!!report.insights.pain_points?.length && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 mb-4">Pain Points</h3>
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Pain Points</h3>
                 <div className="space-y-4">
                   {report.insights.pain_points.map((p, i) => (
                     <div key={i} className="border-l-2 border-rose-400 pl-4">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-900">{p.point}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{p.point}</p>
                         <span className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                          p.severity === "High" ? "bg-rose-50 text-rose-600" : p.severity === "Medium" ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500"
+                          p.severity === "High" ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400" : p.severity === "Medium" ? "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                         )}>{p.severity}</span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">{p.root_cause}</p>
-                      <p className="mt-1 text-sm text-slate-400 italic">{p.evidence}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{p.root_cause}</p>
+                      <p className="mt-1 text-sm text-slate-400 dark:text-slate-500 italic">{p.evidence}</p>
                     </div>
                   ))}
                 </div>
@@ -615,19 +615,19 @@ export default function CommentAnalysisPage() {
 
             {/* Suggestions */}
             {!!report.insights.suggestions?.length && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 mb-4">Suggestions</h3>
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Suggestions</h3>
                 <div className="space-y-4">
                   {report.insights.suggestions.map((s, i) => (
                     <div key={i} className="border-l-2 border-indigo-400 pl-4">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-900">{s.suggestion}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{s.suggestion}</p>
                         <span className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                          s.priority === "High" ? "bg-indigo-50 text-indigo-600" : s.priority === "Medium" ? "bg-sky-50 text-sky-600" : "bg-slate-100 text-slate-500"
+                          s.priority === "High" ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400" : s.priority === "Medium" ? "bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                         )}>{s.priority}</span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">{s.expected_roi}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{s.expected_roi}</p>
                     </div>
                   ))}
                 </div>
@@ -636,16 +636,16 @@ export default function CommentAnalysisPage() {
 
             {/* Opportunities */}
             {!!report.insights.opportunities?.length && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 mb-4">Opportunities</h3>
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Opportunities</h3>
                 <div className="space-y-4">
                   {report.insights.opportunities.map((o, i) => (
                     <div key={i} className="border-l-2 border-amber-400 pl-4">
                       <div className="flex items-center gap-2">
-                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">{o.type}</span>
+                        <span className="rounded bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">{o.type}</span>
                       </div>
-                      <p className="mt-1 text-sm font-medium text-slate-900">{o.description}</p>
-                      <p className="mt-1 text-sm text-slate-400 italic">{o.evidence}</p>
+                      <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{o.description}</p>
+                      <p className="mt-1 text-sm text-slate-400 dark:text-slate-500 italic">{o.evidence}</p>
                     </div>
                   ))}
                 </div>
@@ -654,19 +654,19 @@ export default function CommentAnalysisPage() {
 
             {/* Execution Matrix */}
             {!!report.insights.execution_matrix?.length && (
-              <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
-                <h3 className="font-serif text-lg text-slate-900 mb-4">Execution Matrix</h3>
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Execution Matrix</h3>
                 <div className="space-y-3">
                   {report.insights.execution_matrix.map((e, i) => (
-                    <div key={i} className="flex items-start gap-4 rounded-lg bg-slate-50 p-4">
+                    <div key={i} className="flex items-start gap-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 p-4">
                       <span className={cn(
                         "shrink-0 rounded px-2 py-1 text-xs font-medium",
-                        e.urgency === "Immediate" ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-500"
+                        e.urgency === "Immediate" ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400" : "bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-300"
                       )}>{e.urgency}</span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-900">{e.directive}</p>
-                        <p className="mt-1 text-sm text-slate-500">{e.details}</p>
-                        <p className="mt-1 text-xs text-indigo-500">ROI: {e.roi}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{e.directive}</p>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{e.details}</p>
+                        <p className="mt-1 text-xs text-indigo-500 dark:text-indigo-400">ROI: {e.roi}</p>
                       </div>
                     </div>
                   ))}
@@ -679,22 +679,22 @@ export default function CommentAnalysisPage() {
         {/* 2. Sentiment Distribution */}
         {!!report.sentiment_distribution && (
           <section className="space-y-6">
-            <div className="flex items-baseline gap-4 border-b border-indigo-100 pb-4">
-              <span className="font-serif text-4xl font-light text-indigo-200">02</span>
+            <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
+              <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">02</span>
               <div>
-                <h2 className="font-serif text-2xl text-slate-900">Sentiment Analysis</h2>
-                <p className="text-sm text-slate-500">Distribution of customer sentiment</p>
+                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Sentiment Analysis</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Distribution of customer sentiment</p>
               </div>
             </div>
-            <div className="rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm p-6">
+            <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
               <div className="space-y-4">
                 {Object.entries(report.sentiment_distribution).map(([label, count]) => {
                   const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
 
                   return (
                     <div key={label} className="flex flex-wrap items-center gap-3">
-                      <div className="min-w-[110px] text-sm text-slate-500">{sentimentLabel(label)}</div>
-                      <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100">
+                      <div className="min-w-[110px] text-sm text-slate-500 dark:text-slate-400">{sentimentLabel(label)}</div>
+                      <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
                         <div
                           className="h-full rounded"
                           style={{
@@ -703,7 +703,7 @@ export default function CommentAnalysisPage() {
                           }}
                         />
                       </div>
-                      <div className="min-w-[90px] text-right font-mono text-sm text-slate-600">
+                      <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
                         {count} ({percent}%)
                       </div>
                     </div>
@@ -717,11 +717,11 @@ export default function CommentAnalysisPage() {
         {/* 3. Personas */}
         {!!report.personas?.length && (
           <section className="space-y-6">
-            <div className="flex items-baseline gap-4 border-b border-indigo-100 pb-4">
-              <span className="font-serif text-4xl font-light text-indigo-200">03</span>
+            <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
+              <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">03</span>
               <div>
-                <h2 className="font-serif text-2xl text-slate-900">User Personas</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">User Personas</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Identified {report.personas.length} key customer profiles
                 </p>
               </div>
@@ -730,7 +730,7 @@ export default function CommentAnalysisPage() {
               {report.personas?.map((persona, index) => (
                 <div
                   key={`${persona.name}-${index}`}
-                  className="relative overflow-hidden rounded-xl border border-white/50 bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm p-6"
+                  className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-gradient-to-br from-white/90 to-white/70 dark:from-slate-800/90 dark:to-slate-800/70 backdrop-blur-sm p-6"
                   style={{
                     boxShadow: "0 12px 30px rgba(99,102,241,0.05)",
                   }}
@@ -742,40 +742,40 @@ export default function CommentAnalysisPage() {
                     }}
                   />
                   <div className="flex items-start justify-between">
-                    <h3 className="font-serif text-lg text-slate-900">{persona.name}</h3>
+                    <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100">{persona.name}</h3>
                     <span
-                      className="rounded-md bg-slate-100 px-2 py-1 text-xs font-mono"
+                      className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs font-mono"
                       style={{ color: persona.color ?? "#6366f1" }}
                     >
                       {persona.count} users
                     </span>
                   </div>
                   {persona.description && (
-                    <p className="mt-3 text-sm text-slate-500">{persona.description}</p>
+                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{persona.description}</p>
                   )}
                   {persona.scenario && (
-                    <p className="mt-2 text-xs text-slate-400"><span className="font-medium text-slate-500">Scenario:</span> {persona.scenario}</p>
+                    <p className="mt-2 text-xs text-slate-400 dark:text-slate-500"><span className="font-medium text-slate-500 dark:text-slate-400">Scenario:</span> {persona.scenario}</p>
                   )}
                   {persona.core_need && (
-                    <p className="mt-1 text-xs text-slate-400"><span className="font-medium text-slate-500">Core Need:</span> {persona.core_need}</p>
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500"><span className="font-medium text-slate-500 dark:text-slate-400">Core Need:</span> {persona.core_need}</p>
                   )}
                   {persona.analysis && (
-                    <p className="mt-1 text-xs text-slate-400"><span className="font-medium text-slate-500">Analysis:</span> {persona.analysis}</p>
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500"><span className="font-medium text-slate-500 dark:text-slate-400">Analysis:</span> {persona.analysis}</p>
                   )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {filterTags(persona.tags).map(([key, value]) => (
                       <span
                         key={`${persona.name}-${key}`}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-500"
+                        className="rounded-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-3 py-1 text-xs text-slate-500 dark:text-slate-400"
                       >
-                        {key}: <span className="text-slate-900 font-medium">{value}</span>
+                        {key}: <span className="text-slate-900 dark:text-slate-200 font-medium">{value}</span>
                       </span>
                     ))}
                   </div>
                   {!!persona.topic_labels?.length && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {persona.topic_labels.map((label, ti) => (
-                        <span key={ti} className="rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 text-xs text-indigo-600">
+                        <span key={ti} className="rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 px-2.5 py-0.5 text-xs text-indigo-600 dark:text-indigo-400">
                           {label}
                         </span>
                       ))}
@@ -806,11 +806,11 @@ export default function CommentAnalysisPage() {
         {/* 5. Golden Samples */}
         {!!report.golden_samples?.length && (
           <section className="space-y-6">
-            <div className="flex items-baseline gap-4 border-b border-indigo-100 pb-4">
-              <span className="font-serif text-4xl font-light text-indigo-200">05</span>
+            <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
+              <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">05</span>
               <div>
-                <h2 className="font-serif text-2xl text-slate-900">Golden Samples</h2>
-                <p className="text-sm text-slate-500">Deep dive into high-information comments</p>
+                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Golden Samples</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Deep dive into high-information comments</p>
               </div>
             </div>
             <div className="space-y-4">
@@ -820,7 +820,7 @@ export default function CommentAnalysisPage() {
                 return (
                   <details
                     key={`${sample.body}-${index}`}
-                    className="group rounded-xl border border-white/50 bg-white/70 backdrop-blur-sm shadow-sm"
+                    className="group rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm"
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                       <div className="flex flex-wrap items-center gap-3">
@@ -828,25 +828,25 @@ export default function CommentAnalysisPage() {
                           {sentimentLabel(sample.sentiment)}
                         </span>
                         {sample.persona_name && (
-                          <span className="text-xs text-slate-400">{sample.persona_name}</span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">{sample.persona_name}</span>
                         )}
                       </div>
                       {sample.info_score !== undefined && (
-                        <span className="rounded bg-amber-50 px-2 py-1 text-xs font-mono text-amber-600">
+                        <span className="rounded bg-amber-50 dark:bg-amber-900/30 px-2 py-1 text-xs font-mono text-amber-600 dark:text-amber-400">
                           {sample.info_score}/10
                         </span>
                       )}
                     </summary>
-                    <div className="px-5 pb-5 text-sm text-slate-500">
-                      <p className="leading-7 text-slate-600">{sample.body}</p>
+                    <div className="px-5 pb-5 text-sm text-slate-500 dark:text-slate-400">
+                      <p className="leading-7 text-slate-600 dark:text-slate-300">{sample.body}</p>
                       {sample.reason && (
-                        <p className="mt-3 text-sm italic text-indigo-600">{sample.reason}</p>
+                        <p className="mt-3 text-sm italic text-indigo-600 dark:text-indigo-400">{sample.reason}</p>
                       )}
                       <div className="mt-4 flex flex-wrap gap-2">
                         {filterTags(sample.tags).map(([key, value]) => (
                           <span
                             key={`${index}-${key}`}
-                            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-600"
+                            className="rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30 px-3 py-1 text-xs text-sky-600 dark:text-sky-400"
                           >
                             {key}: {value}
                           </span>
@@ -865,8 +865,8 @@ export default function CommentAnalysisPage() {
           <CommentList taggedData={report.tagged_data} personas={report.personas ?? []} />
         )}
 
-        <footer className="border-t border-indigo-100 py-10 text-center text-xs text-slate-400">
-          <div className="font-serif text-lg text-indigo-600">Generated by AI</div>
+        <footer className="border-t border-indigo-100 dark:border-indigo-800 py-10 text-center text-xs text-slate-400 dark:text-slate-500">
+          <div className="font-serif text-lg text-indigo-600 dark:text-indigo-400">Generated by AI</div>
           {report.analysis_date && <p className="mt-2">{formatAnalysisDate(report.analysis_date)}</p>}
         </footer>
       </div>

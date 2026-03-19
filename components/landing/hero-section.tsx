@@ -110,7 +110,7 @@ export function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="text-base lg:text-lg px-8 py-6 h-auto rounded-full bg-white/50 backdrop-blur-sm hover:bg-white/80 border-primary/10"
+                className="text-base lg:text-lg px-8 py-6 h-auto rounded-full bg-none bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm hover:bg-white/80 dark:hover:bg-slate-800/80 border-primary/10 dark:border-slate-700"
                 onClick={() => {
                   document.getElementById("marketing-functions")?.scrollIntoView({ behavior: "smooth" })
                 }}
@@ -245,7 +245,7 @@ export function HeroSection() {
                         <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs">
                           Approve All
                         </Button>
-                        <Button size="sm" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-800 hover:text-white h-8 text-xs">
+                        <Button size="sm" variant="outline" className="bg-none border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-800 hover:text-white h-8 text-xs">
                           Review Individually
                         </Button>
                       </div>

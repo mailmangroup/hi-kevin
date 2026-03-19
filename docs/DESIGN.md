@@ -124,6 +124,32 @@ Onest for English text, with PingFang SC and Microsoft YaHei fallbacks for Chine
 
 ---
 
+## Border Radius
+
+### Standard Border Radius
+
+```css
+--radius-sm: 4px    /* Small interactive elements */
+--radius-md: 8px    /* Buttons, inputs, badges, tabs, dropdowns */
+--radius-lg: 12px   /* Cards, dialogs, larger containers */
+--radius-full: 9999px /* Pills, avatars, full-rounded elements */
+```
+
+### Component Specifications
+
+| Component | Border Radius |
+|-----------|---------------|
+| Buttons | `8px` (`rounded-[8px]`) |
+| Inputs | `8px` (`rounded-[8px]`) |
+| Badges/Tags | `8px` (`rounded-[8px]`) |
+| Tabs | `8px` (`rounded-[8px]`) |
+| Dropdown Items | `8px` (`rounded-[8px]`) |
+| Tooltips | `8px` (`rounded-[8px]`) |
+| Dialog/Sheet | `8px` (`rounded-lg`) |
+| Cards | `12px` (via Tailwind `rounded-xl`) |
+
+---
+
 ## Component Specifications
 
 ### Glass Layers (Cards & Containers)
@@ -166,3 +192,74 @@ Onest for English text, with PingFang SC and Microsoft YaHei fallbacks for Chine
 - Background: Transparent with color tint (e.g., `bg-red-500/10`)
 - Border: Translucent colored border (e.g., `border-red-500/20`)
 - Text: Colored text
+
+---
+
+## Dark Mode
+
+### Color System
+
+Dark mode uses a slate-based palette with the following key values:
+
+```css
+/* Background */
+--background: hsl(222.2 84% 4.9%)     /* Near-black slate */
+--foreground: hsl(210 40% 98%)        /* Off-white text */
+
+/* Cards & Surfaces */
+--card: hsl(222.2 84% 4.9%)
+--card-foreground: hsl(210 40% 98%)
+--border: hsl(217.2 32.6% 17.5%)     /* slate-700 */
+--input: hsl(217.2 32.6% 17.5%)
+
+/* Primary */
+--primary: hsl(239 84% 67%)           /* Indigo - same as light mode */
+--primary-foreground: hsl(0 0% 98%)
+
+/* Muted */
+--muted: hsl(217.2 32.6% 17.5%)
+--muted-foreground: hsl(215 20.2% 65.1%)  /* slate-400 equivalent */
+```
+
+### Glass Utilities
+
+The following CSS utilities support dark mode via `.dark` selector:
+
+```css
+.glass              /* bg-white/70, border-white/80 */
+.dark .glass        /* bg-slate-900/70, border-slate-700/80 */
+
+.glass-card         /* Cards with hover effects */
+.dark .glass-card   /* bg-slate-900/70, border-slate-700/80 */
+
+.glass-premium      /* Premium UI elements */
+.dark .glass-premium /* Dark translucent surface */
+
+.glass-input        /* Input backgrounds */
+.dark .glass-input  /* bg-slate-900/70, border-slate-700 */
+```
+
+### Component Dark Mode Patterns
+
+**Text Colors**
+- Primary text: `text-slate-900 dark:text-slate-100`
+- Secondary text: `text-slate-500 dark:text-slate-400`
+- Muted text: `text-slate-400 dark:text-slate-500`
+
+**Backgrounds**
+- Cards: `bg-white/70 dark:bg-slate-800/70`
+- Borders: `border-slate-200 dark:border-slate-700`
+- Hover states: `hover:bg-slate-50 dark:hover:bg-slate-700/50`
+
+**Colored Badges/Spans**
+Use dark variants with opacity:
+- `bg-emerald-50 dark:bg-emerald-900/30`
+- `text-emerald-600 dark:text-emerald-400`
+
+### Implementation Rules
+
+1. Always pair light/dark classes: `text-slate-900 dark:text-slate-100`
+2. Use CSS utility `.dark .glass-*` classes for glassmorphism elements
+3. For colored backgrounds, add dark variants with `/30` or `/40` opacity
+4. Border colors: replace `slate-100` with `slate-700`, `slate-200` with `slate-600`
+5. Avoid hardcoded white backgrounds in components - use `bg-white/70 dark:bg-slate-800/70`
