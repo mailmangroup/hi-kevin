@@ -306,7 +306,7 @@ export function Sidebar({ className }: { className?: string }) {
 
   // Use TanStack Query for data fetching (replaces manual cache)
   const { data: leadsData } = useNewLeadsCount()
-  const { data: conversationsData } = useConversations(20, 0, "agent")
+  const { data: conversationsData } = useConversations(20, 0)
 
   const leadsCount = leadsData?.count ?? null
   const chatHistory = conversationsData?.conversations ?? []

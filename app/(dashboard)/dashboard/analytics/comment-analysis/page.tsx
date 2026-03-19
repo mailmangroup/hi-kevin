@@ -55,19 +55,6 @@ type Persona = {
   topic_labels?: string[]
 }
 
-type GoldenSample = {
-  sentiment: string
-  sentiment_class?: string
-  persona_name?: string
-  topic?: string
-  info_score?: number
-  body: string
-  reason?: string
-  tags: Record<string, string>
-  likes?: number
-  replies?: number
-}
-
 type InsightStrength = {
   point: string
   evidence: string
@@ -125,7 +112,6 @@ type CommentAnalysisReport = {
   personas?: Persona[]
   sentiment_distribution?: Record<string, number>
   tag_statistics?: Record<string, number>
-  golden_samples?: GoldenSample[]
   tagged_data?: any[]
   schema_snapshot?: {
     dimensions: SchemaDimension[]
@@ -150,11 +136,26 @@ function filterTags(tags: Record<string, string>) {
   return Object.entries(tags).filter(([, value]) => value && !EXCLUDED_TAG_VALUES.has(value))
 }
 
+function getNormalizedSentimentDistribution(dist?: Record<string, number>) {
+  if (!dist) return null
+  const normalized: Record<string, number> = { positive: 0, neutral: 0, negative: 0 }
+  Object.entries(dist).forEach(([key, count]) => {
+    const k = String(key).toLowerCase()
+    if (k === "1" || k === "positive" || k === "正面") normalized.positive += count
+    else if (k === "-1" || k === "negative" || k === "负面") normalized.negative += count
+    else normalized.neutral += count
+  })
+  return normalized
+}
+
 function downloadHTMLReport(report: CommentAnalysisReport) {
   const taggedDataJson = JSON.stringify(report.tagged_data || [])
   const personasJson = JSON.stringify(report.personas || [])
-  const totalSentiment = report.sentiment_distribution
-    ? Object.values(report.sentiment_distribution).reduce((sum, value) => sum + value, 0)
+  const schemaSnapshotJson = JSON.stringify(report.schema_snapshot || { dimensions: [] })
+  
+  const normSentimentDist = getNormalizedSentimentDistribution(report.sentiment_distribution)
+  const totalSentiment = normSentimentDist
+    ? Object.values(normSentimentDist).reduce((sum, value) => sum + value, 0)
     : 0
 
   const html = `<!DOCTYPE html>
@@ -205,9 +206,6 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     .priority { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.625rem; font-weight: 500; text-transform: uppercase; }
     .priority-high { background: #eef2ff; color: #4f46e5; }
     .priority-medium { background: #e0f2fe; color: #0284c7; }
-    .golden-sample { background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
-    .golden-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
-    .golden-body { padding: 0 20px 20px; font-size: 0.875rem; color: #475569; }
     .sentiment-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; }
     .info-score { background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-family: monospace; }
     footer { border-top: 1px solid #e2e8f0; padding-top: 40px; text-align: center; font-size: 0.75rem; color: #94a3b8; }
@@ -248,6 +246,15 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     .topic-expand.show { display: block; }
     .topic-comment { padding: 8px; background: #f8fafc; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; }
     .topic-comment:last-child { margin-bottom: 0; }
+    .dim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .dim-card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .dim-name { font-weight: 600; font-size: 0.875rem; margin-bottom: 4px; color: #4f46e5; }
+    .dim-desc { font-size: 0.75rem; color: #94a3b8; margin-bottom: 12px; }
+    .dim-option { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .dim-option-label { font-size: 0.8rem; min-width: 100px; color: #475569; }
+    .dim-bar-track { flex: 1; height: 14px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+    .dim-bar-fill { height: 100%; border-radius: 3px; }
+    .dim-count { font-size: 0.75rem; font-family: monospace; color: #64748b; min-width: 36px; text-align: right; }
   </style>
 </head>
 <body>
@@ -334,7 +341,7 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     </div>
     ` : ''}
 
-    ${report.sentiment_distribution ? `
+    ${normSentimentDist ? `
     <div class="section">
       <div class="section-header">
         <span class="section-number">02</span>
@@ -344,12 +351,13 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
         </div>
       </div>
       <div class="card">
-        ${Object.entries(report.sentiment_distribution).map(([label, count]) => {
+        ${Object.entries(normSentimentDist).map(([label, count]) => {
           const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
           const colors: Record<string, string> = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' }
+          const displayLabel = label.charAt(0).toUpperCase() + label.slice(1)
           return `
           <div class="sentiment-bar">
-            <span class="sentiment-label">${label}</span>
+            <span class="sentiment-label">${displayLabel}</span>
             <div class="sentiment-bar-bg">
               <div class="sentiment-bar-fill" style="width: ${percent}%; background: ${colors[label] || '#94a3b8'};"></div>
             </div>
@@ -388,52 +396,23 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     </div>
     ` : ''}
 
-    ${report.golden_samples && report.golden_samples.length ? `
-    <div class="section">
-      <div class="section-header">
-        <span class="section-number">05</span>
-        <div>
-          <h2>Golden Samples</h2>
-          <p class="subtitle">Deep dive into high-information comments</p>
-        </div>
-      </div>
-      ${report.golden_samples.map((sample) => {
-        const badgeColors: Record<string, string> = { positive: '#dcfce7 #166534', neutral: '#f1f5f9 #475569', negative: '#ffe4e6 #e11d48' }
-        const [bg, text] = (badgeColors[sample.sentiment] || badgeColors.neutral).split(' ')
-        return `
-        <div class="golden-sample">
-          <div class="golden-header">
-            <span class="sentiment-badge" style="background: ${bg}; color: ${text};">${sample.sentiment}</span>
-            ${sample.persona_name ? `<span style="font-size: 0.75rem; color: #94a3b8;">${sample.persona_name}</span>` : ''}
-            ${sample.info_score !== undefined ? `<span class="info-score">${sample.info_score}/10</span>` : ''}
-          </div>
-          <div class="golden-body">
-            <p style="margin-bottom: 12px;">${sample.body}</p>
-            ${sample.reason ? `<p style="color: #4f46e5; font-style: italic;">${sample.reason}</p>` : ''}
-            ${Object.keys(sample.tags).length ? `<div style="margin-top: 12px;">${Object.entries(sample.tags).filter(([, v]) => v && !EXCLUDED_TAG_VALUES.has(v)).map(([k, v]) => `<span class="tag" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">${k}: ${v}</span>`).join('')}</div>` : ''}
-          </div>
-        </div>
-      `}).join('')}
-    </div>
-    ` : ''}
-
-    ${report.tagged_data && report.tagged_data.length && report.sentiment_distribution ? `
+    ${report.tagged_data && report.tagged_data.length && report.schema_snapshot?.dimensions?.length ? `
     <div class="section">
       <div class="section-header">
         <span class="section-number">04</span>
         <div>
-          <h2>Topic Analysis</h2>
-          <p class="subtitle">Topic clusters with sentiment breakdown</p>
+          <h2>Dimension Analysis</h2>
+          <p class="subtitle">Distribution of ${report.schema_snapshot.dimensions.length} analysis dimensions</p>
         </div>
       </div>
-      <div id="topic-list"></div>
+      <div id="dim-container"></div>
     </div>
     ` : ''}
 
     ${report.tagged_data && report.tagged_data.length ? `
     <div class="section">
       <div class="section-header">
-        <span class="section-number">06</span>
+        <span class="section-number">05</span>
         <div>
           <h2>All Comments</h2>
           <p class="subtitle" id="comments-count">${report.tagged_data.length} comments</p>
@@ -452,15 +431,30 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           <span class="filter-label">Persona</span>
           <button class="filter-btn active" data-filter="persona" data-value="all">All</button>
         </div>
-        <div class="filter-row" id="topic-filters">
-          <span class="filter-label">Topic</span>
-          <button class="filter-btn active" data-filter="topic" data-value="all">All</button>
-        </div>
+        <div id="dimension-filter-rows"></div>
         <div class="filter-row">
           <span class="filter-label">Sort by</span>
-          <button class="filter-btn active" data-sort="info_score" data-order="desc">Score ↓</button>
+          <button class="filter-btn active" data-sort="combined" data-order="desc">Score ↓</button>
+          <button class="filter-btn" data-sort="info_score" data-order="desc">Info ↓</button>
           <button class="filter-btn" data-sort="likes" data-order="desc">Likes ↓</button>
           <button class="filter-btn" data-sort="replies" data-order="desc">Replies ↓</button>
+        </div>
+        <div class="filter-row" id="slider-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+            <label style="font-size:0.75rem;color:#64748b;display:flex;align-items:center;gap:6px;">
+              👍 ÷ <input type="range" id="likes-div" min="1" max="200" value="50" style="width:80px;">
+              <span id="likes-div-val" style="font-family:monospace;font-weight:700;color:#4f46e5;min-width:28px;">50</span>
+            </label>
+            <label style="font-size:0.75rem;color:#64748b;display:flex;align-items:center;gap:6px;">
+              💬 ÷ <input type="range" id="replies-div" min="1" max="50" value="10" style="width:80px;">
+              <span id="replies-div-val" style="font-family:monospace;font-weight:700;color:#4f46e5;min-width:28px;">10</span>
+            </label>
+            <label style="font-size:0.75rem;color:#64748b;display:flex;align-items:center;gap:6px;">
+              ⭐ weight <input type="range" id="info-weight" min="0" max="10" value="5" style="width:80px;">
+              <span id="info-weight-val" style="font-family:monospace;font-weight:700;color:#4f46e5;min-width:28px;">0.5</span>
+            </label>
+          </div>
+          <code id="formula-preview" style="font-size:0.7rem;color:#94a3b8;">score = 0.5 × info_score + 0.5 × (likes/50 + replies/10)</code>
         </div>
       </div>
 
@@ -470,9 +464,8 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           <thead>
             <tr>
               <th data-sort="sentiment">Sentiment <span class="sort-icon">↕</span></th>
-              <th style="width: 40%;">Comment</th>
+              <th style="width: 50%;">Comment</th>
               <th data-sort="persona_name">Persona <span class="sort-icon">↕</span></th>
-              <th data-sort="topic">Topic <span class="sort-icon">↕</span></th>
               <th data-sort="info_score">Score <span class="sort-icon">↕</span></th>
             </tr>
           </thead>
@@ -490,47 +483,78 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
   </div>
 
   <script>
-    const EXCLUDED_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None"]);
+    const EXCLUDED_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None", "其他", "other", ""]);
     const data = ${taggedDataJson};
     const personas = ${personasJson};
+    const schema = ${schemaSnapshotJson};
     const PAGE_SIZE = 50;
 
     let state = {
       sentiment: 'all',
       persona: 'all',
-      topic: 'all',
-      sortBy: 'info_score',
+      dimensions: {},   // { dimKey: selectedValue | 'all' }
+      sortBy: 'combined',
       sortOrder: 'desc',
-      page: 1
+      page: 1,
+      likesDiv: 50,
+      repliesDiv: 10,
+      infoWeight: 0.5,
+      selectedDimension: null,
+      expandedOption: null,
     };
 
-    function getSentimentClass(sent) {
-      if (sent === 'positive') return 'sentiment-pos';
-      if (sent === 'negative') return 'sentiment-neg';
-      return 'sentiment-neu';
+    function normalizeSentiment(sent) {
+      if (sent === 1 || sent === '1' || sent === 'positive' || sent === '正面') return 'positive';
+      if (sent === -1 || sent === '-1' || sent === 'negative' || sent === '负面') return 'negative';
+      return 'neutral';
     }
 
-    function getSentimentBadge(sent) {
+    function getSentimentBadge(rawSent) {
+      const sent = normalizeSentiment(rawSent);
       const colors = { positive: '#dcfce7', neutral: '#f1f5f9', negative: '#ffe4e6' };
       const textColors = { positive: '#166534', neutral: '#475569', negative: '#e11d48' };
       const bg = colors[sent] || colors.neutral;
       const tc = textColors[sent] || textColors.neutral;
-      return '<span class="sentiment-badge" style="background:' + bg + ';color:' + tc + ';">' + (sent || 'unknown') + '</span>';
+      const label = sent.charAt(0).toUpperCase() + sent.slice(1);
+      return '<span class="sentiment-badge" style="background:' + bg + ';color:' + tc + ';">' + label + '</span>';
+    }
+
+    function renderSentimentBar(counts, total) {
+      if (!total) return '';
+      const posPct = (counts.positive || 0) / total * 100;
+      const neuPct = (counts.neutral || 0) / total * 100;
+      const negPct = (counts.negative || 0) / total * 100;
+      return '<div style="display:flex; height:6px; width:80px; border-radius:3px; overflow:hidden; background:#e2e8f0;">' +
+             '<div style="width:' + posPct + '%; background:#22c55e;"></div>' +
+             '<div style="width:' + neuPct + '%; background:#94a3b8;"></div>' +
+             '<div style="width:' + negPct + '%; background:#ef4444;"></div>' +
+             '</div>';
     }
 
     function getUniqueValues(field) {
       const vals = new Set();
-      data.forEach(d => { if (d[field] && !EXCLUDED_VALUES.has(d[field])) vals.add(d[field]); });
+      data.forEach(d => { 
+        const val = d.tags && d.tags[field] ? d.tags[field] : d[field];
+        if (val && !EXCLUDED_VALUES.has(val)) vals.add(val); 
+      });
       return Array.from(vals).sort();
     }
 
+    function combinedScore(item) {
+      const eng = (item.likes || 0) / state.likesDiv + (item.replies || 0) / state.repliesDiv;
+      return state.infoWeight * (item.info_score || 0) + (1 - state.infoWeight) * eng;
+    }
+
+    function updateFormulaPreview() {
+      const el = document.getElementById('formula-preview');
+      if (el) el.textContent = 'score = ' + state.infoWeight.toFixed(1) + ' × info_score + ' + (1 - state.infoWeight).toFixed(1) + ' × (likes/' + state.likesDiv + ' + replies/' + state.repliesDiv + ')';
+    }
+
     function initFilters() {
-      const personas = getUniqueValues('persona_name');
-      const topics = getUniqueValues('topic');
+      // Persona filter buttons
       const pfRow = document.getElementById('persona-filters');
-      const tfRow = document.getElementById('topic-filters');
-      if (pfRow && personas.length) {
-        personas.forEach(p => {
+      if (pfRow) {
+        getUniqueValues('persona_name').forEach(p => {
           const btn = document.createElement('button');
           btn.className = 'filter-btn';
           btn.dataset.filter = 'persona';
@@ -539,25 +563,79 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           pfRow.appendChild(btn);
         });
       }
-      if (tfRow && topics.length) {
-        topics.forEach(t => {
-          const btn = document.createElement('button');
-          btn.className = 'filter-btn';
-          btn.dataset.filter = 'topic';
-          btn.dataset.value = t;
-          btn.textContent = t;
-          tfRow.appendChild(btn);
+
+      // Dimension filter rows (one per dimension)
+      const dimContainer = document.getElementById('dimension-filter-rows');
+      if (dimContainer && schema.dimensions) {
+        schema.dimensions.forEach(dim => {
+          const validOpts = (dim.options || []).filter(o => o && !EXCLUDED_VALUES.has(o) && data.some(d => {
+            const val = d.tags ? d.tags[dim.key] : d[dim.key];
+            return val === o;
+          }));
+          if (!validOpts.length) return;
+          state.dimensions[dim.key] = 'all';
+          const row = document.createElement('div');
+          row.className = 'filter-row';
+          row.id = 'dim-filter-' + dim.key;
+          const label = document.createElement('span');
+          label.className = 'filter-label';
+          label.textContent = dim.key;
+          label.title = dim.description || '';
+          row.appendChild(label);
+          const allBtn = document.createElement('button');
+          allBtn.className = 'filter-btn active';
+          allBtn.dataset.dimFilter = dim.key;
+          allBtn.dataset.value = 'all';
+          allBtn.textContent = 'All';
+          row.appendChild(allBtn);
+          validOpts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'filter-btn';
+            btn.dataset.dimFilter = dim.key;
+            btn.dataset.value = opt;
+            btn.textContent = opt;
+            row.appendChild(btn);
+          });
+          dimContainer.appendChild(row);
+        });
+      }
+
+      // Slider listeners
+      const sliderRow = document.getElementById('slider-row');
+      if (sliderRow) {
+        document.getElementById('likes-div').addEventListener('input', function() {
+          state.likesDiv = parseFloat(this.value);
+          document.getElementById('likes-div-val').textContent = this.value;
+          updateFormulaPreview(); renderComments();
+        });
+        document.getElementById('replies-div').addEventListener('input', function() {
+          state.repliesDiv = parseFloat(this.value);
+          document.getElementById('replies-div-val').textContent = this.value;
+          updateFormulaPreview(); renderComments();
+        });
+        document.getElementById('info-weight').addEventListener('input', function() {
+          state.infoWeight = parseFloat(this.value) / 10;
+          document.getElementById('info-weight-val').textContent = state.infoWeight.toFixed(1);
+          updateFormulaPreview(); renderComments();
         });
       }
     }
 
     function getFiltered() {
       return data.filter(d => {
-        if (state.sentiment !== 'all' && (d.sentiment || '').toLowerCase() !== state.sentiment) return false;
+        const itemSent = normalizeSentiment(d.sentiment);
+        if (state.sentiment !== 'all' && itemSent !== state.sentiment) return false;
         if (state.persona !== 'all' && d.persona_name !== state.persona) return false;
-        if (state.topic !== 'all' && d.topic !== state.topic) return false;
+        for (const [key, val] of Object.entries(state.dimensions)) {
+          const itemVal = d.tags ? d.tags[key] : d[key];
+          if (val !== 'all' && itemVal !== val) return false;
+        }
         return true;
       }).sort((a, b) => {
+        if (state.sortBy === 'combined') {
+          const diff = combinedScore(b) - combinedScore(a);
+          return state.sortOrder === 'desc' ? diff : -diff;
+        }
         let va = a[state.sortBy], vb = b[state.sortBy];
         if (va === undefined || va === null) va = 0;
         if (vb === undefined || vb === null) vb = 0;
@@ -582,12 +660,12 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
       const tbody = document.getElementById('comments-tbody');
       if (!tbody) return;
       tbody.innerHTML = pageItems.map(item => {
+        const score = state.sortBy === 'combined' ? combinedScore(item).toFixed(2) : (item.info_score !== undefined ? item.info_score + '/10' : '-');
         return '<tr>' +
           '<td>' + getSentimentBadge(item.sentiment) + '</td>' +
           '<td style="max-width:300px;"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (item.body || '') + '</span></td>' +
           '<td>' + (item.persona_name || '-') + '</td>' +
-          '<td>' + (item.topic || '-') + '</td>' +
-          '<td style="text-align:right;font-family:monospace;">' + (item.info_score !== undefined ? item.info_score + '/10' : '-') + '</td>' +
+          '<td style="text-align:right;font-family:monospace;">' + score + '</td>' +
           '</tr>';
       }).join('');
 
@@ -601,50 +679,149 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     function prevPage() { state.page--; renderComments(); }
     function nextPage() { state.page++; renderComments(); }
 
-    function renderTopics() {
-      const stats = {};
-      data.forEach(item => {
-        const topic = item.topic || 'Uncategorized';
-        if (!stats[topic]) stats[topic] = { count: 0, likes: 0, replies: 0, comments: [], sentiment: {} };
-        stats[topic].count++;
-        stats[topic].likes += item.likes || 0;
-        stats[topic].replies += item.replies || 0;
-        stats[topic].comments.push(item);
-        const s = item.sentiment || 'neutral';
-        stats[topic].sentiment[s] = (stats[topic].sentiment[s] || 0) + 1;
-      });
+    function renderDimensions() {
+      const container = document.getElementById('dim-container');
+      if (!container || !schema.dimensions) return;
 
-      const sorted = Object.entries(stats).map(([topic, d]) => ({ topic, ...d, score: d.count + d.likes * 0.3 + d.replies * 0.5 }))
-        .sort((a, b) => b.score - a.score).slice(0, 20);
+      if (!state.selectedDimension) {
+        let html = '<div class="dim-grid">';
+        schema.dimensions.forEach(dim => {
+          let count = 0;
+          const sentCounts = { positive: 0, neutral: 0, negative: 0 };
+          data.forEach(item => {
+            const val = item.tags ? item.tags[dim.key] : item[dim.key];
+            if (val && !EXCLUDED_VALUES.has(val)) {
+              count++;
+              sentCounts[normalizeSentiment(item.sentiment)]++;
+            }
+          });
 
-      const container = document.getElementById('topic-list');
-      if (!container) return;
-      container.innerHTML = sorted.map(t => {
-        const colors = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' };
-        const bars = Object.entries(t.sentiment).map(([s, c]) =>
-          '<div class="topic-bar-segment" style="width:' + ((c / t.count) * 100) + '%;background:' + (colors[s] || '#94a3b8') + ';"></div>'
-        ).join('');
-        const topComments = t.comments.slice(0, 3).map(c =>
-          '<div class="topic-comment">' + getSentimentBadge(c.sentiment) + ' ' + (c.body || '').substring(0, 150) + '</div>'
-        ).join('');
-        return '<div class="topic-card" onclick="toggleTopic(this)">' +
-          '<div class="topic-header">' +
-          '<div><div class="topic-name">' + t.topic + '</div><div class="topic-stats">' + t.count + ' comments · ' + t.likes + ' likes · ' + t.replies + ' replies</div></div>' +
-          '<div style="text-align:right;"><div style="font-size:0.625rem;color:#94a3b8;text-transform:uppercase;">Score</div><div style="font-family:monospace;font-size:1.25rem;color:#4f46e5;">' + Math.round(t.score) + '</div></div>' +
-          '</div><div class="topic-bar">' + bars + '</div>' +
-          '<div class="topic-expand">' + topComments + '</div></div>';
-      }).join('');
+          const optsHtml = (dim.options || []).slice(0, 5).map(o => '<span class="tag">' + o + '</span>').join('');
+          const moreOpts = dim.options && dim.options.length > 5 ? '<span class="tag">+' + (dim.options.length - 5) + '</span>' : '';
+
+          html += '<div class="dim-card" style="cursor:pointer; transition:all 0.2s;" onclick="selectDimension(\\'' + dim.key + '\\')" onmouseover="this.style.boxShadow=\\'0 4px 12px rgba(0,0,0,0.1)\\';" onmouseout="this.style.boxShadow=\\'0 1px 3px rgba(0,0,0,0.1)\\';">' +
+              '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">' +
+                '<div>' +
+                  '<div class="dim-name" style="color:#1e293b; font-size:1rem;">' + dim.key + '</div>' +
+                  '<div class="dim-desc" style="margin-bottom:0;">' + (dim.description || '') + '</div>' +
+                '</div>' +
+                '<span style="color:#94a3b8;">&rarr;</span>' +
+              '</div>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
+                '<span style="font-size:0.75rem; color:#64748b;">' + count + ' comments</span>' +
+                renderSentimentBar(sentCounts, count) +
+              '</div>' +
+              '<div style="display:flex; flex-wrap:wrap; gap:4px;">' +
+                optsHtml + moreOpts +
+              '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      } else {
+        const dim = schema.dimensions.find(d => d.key === state.selectedDimension);
+        if (!dim) return;
+
+        let html = '<div style="margin-bottom:24px;">' +
+            '<button onclick="selectDimension(null)" style="background:none; border:none; color:#4f46e5; cursor:pointer; font-weight:500; font-size:0.875rem; padding:0; margin-bottom:8px; display:inline-flex; align-items:center; gap:4px;">' +
+              '&larr; Back' +
+            '</button>' +
+            '<h3 style="font-size:1.25rem; font-weight:600;">' + dim.key + '</h3>' +
+            '<p style="font-size:0.875rem; color:#64748b;">' + (dim.description || '') + '</p>' +
+          '</div>';
+
+        const stats = {};
+        data.forEach(item => {
+          const val = item.tags ? item.tags[dim.key] : item[dim.key];
+          if (!val || EXCLUDED_VALUES.has(val)) return;
+          if (!stats[val]) {
+            stats[val] = { option: val, count: 0, likes: 0, replies: 0, score: 0, comments: [], sentCounts: {positive:0, neutral:0, negative:0} };
+          }
+          stats[val].count++;
+          stats[val].likes += item.likes || 0;
+          stats[val].replies += item.replies || 0;
+          stats[val].score += combinedScore(item);
+          stats[val].comments.push(item);
+          stats[val].sentCounts[normalizeSentiment(item.sentiment)]++;
+        });
+
+        const sortedOptions = Object.values(stats).sort((a, b) => b.score - a.score);
+
+        html += '<div style="display:flex; flex-direction:column; gap:12px;">';
+        sortedOptions.forEach(opt => {
+          const isExpanded = state.expandedOption === opt.option;
+          html += '<div style="background:white; border-radius:8px; border:1px solid ' + (isExpanded ? '#c7d2fe' : '#e2e8f0') + '; box-shadow:' + (isExpanded ? '0 0 0 2px rgba(79,70,229,0.1)' : '0 1px 2px rgba(0,0,0,0.05)') + '; overflow:hidden;">' +
+              '<div style="padding:16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleOption(\\'' + opt.option.replace(/'/g, "\\'") + '\\')">' +
+                '<div style="flex:1;">' +
+                  '<div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">' +
+                    '<div style="font-weight:500; color:#1e293b;">' + opt.option + '</div>' +
+                    renderSentimentBar(opt.sentCounts, opt.count) +
+                  '</div>' +
+                  '<div style="font-size:0.75rem; color:#64748b; display:flex; gap:16px;">' +
+                    '<span>' + opt.count + ' comments</span>' +
+                    '<span>' + opt.likes + ' likes</span>' +
+                    '<span>' + opt.replies + ' replies</span>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="text-align:right; margin-right:16px;">' +
+                  '<div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em;">Score</div>' +
+                  '<div style="font-weight:600; color:#4f46e5; font-size:1.125rem;">' + opt.score.toFixed(0) + '</div>' +
+                '</div>' +
+                '<div style="color:#94a3b8;">' +
+                  (isExpanded ? '&#9652;' : '&#9662;') +
+                '</div>' +
+              '</div>';
+
+          if (isExpanded) {
+            const topComments = opt.comments.sort((a, b) => combinedScore(b) - combinedScore(a)).slice(0, 10);
+            html += '<div style="border-top:1px solid #e1e7ef; padding:16px; background:#f8fafc; display:flex; flex-direction:column; gap:8px;">';
+            topComments.forEach(c => {
+              html += '<div style="background:white; padding:12px; border-radius:6px; border:1px solid #e2e8f0;">' +
+                  '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
+                    '<div style="display:flex; gap:8px; align-items:center;">' +
+                      getSentimentBadge(c.sentiment) +
+                      (c.persona_name ? '<span style="font-size:0.75rem; color:#64748b;">' + c.persona_name + '</span>' : '') +
+                    '</div>' +
+                    '<div style="font-size:0.7rem; font-family:monospace; color:#94a3b8;">' +
+                      (c.likes || 0) + ' likes &middot; ' + (c.replies || 0) + ' replies' +
+                    '</div>' +
+                  '</div>' +
+                  '<div style="font-size:0.875rem; color:#334155; line-height:1.5;">' + (c.body || '') + '</div>' +
+                '</div>';
+            });
+            if (opt.comments.length > 10) {
+              html += '<div style="font-size:0.75rem; color:#64748b; text-align:center; margin-top:4px;">Showing top 10 of ' + opt.comments.length + ' comments</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+      }
     }
 
-    function toggleTopic(el) {
-      const expand = el.querySelector('.topic-expand');
-      expand.classList.toggle('show');
-    }
+    window.selectDimension = function(key) {
+      state.selectedDimension = key;
+      state.expandedOption = null;
+      renderDimensions();
+    };
+
+    window.toggleOption = function(opt) {
+      if (state.expandedOption === opt) {
+        state.expandedOption = null;
+      } else {
+        state.expandedOption = opt;
+      }
+      renderDimensions();
+    };
 
     function init() {
       initFilters();
       renderComments();
-      renderTopics();
+      renderDimensions();
+      updateFormulaPreview();
 
       document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -656,6 +833,18 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           btn.classList.add('active');
           renderComments();
         });
+      });
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-dim-filter]');
+        if (!btn) return;
+        const dimKey = btn.dataset.dimFilter;
+        const value = btn.dataset.value;
+        state.dimensions[dimKey] = value;
+        state.page = 1;
+        document.querySelectorAll('[data-dim-filter="' + dimKey + '"]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderComments();
       });
 
       document.querySelectorAll('.filter-btn[data-sort]').forEach(btn => {
@@ -1370,66 +1559,9 @@ export default function CommentAnalysisPage() {
           )
         )}
 
-        {/* 5. Golden Samples */}
-        {!!report.golden_samples?.length && (
-          <section className="space-y-6">
-            <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
-              <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">05</span>
-              <div>
-                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Golden Samples</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Deep dive into high-information comments</p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {report.golden_samples.map((sample, index) => {
-                const accentClass = sentimentBadgeClass(sample.sentiment)
-
-                return (
-                  <details
-                    key={`${sample.body}-${index}`}
-                    className="group rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm"
-                  >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className={`rounded px-2 py-1 text-xs font-medium ${accentClass}`}>
-                          {sentimentLabel(sample.sentiment)}
-                        </span>
-                        {sample.persona_name && (
-                          <span className="text-xs text-slate-400 dark:text-slate-500">{sample.persona_name}</span>
-                        )}
-                      </div>
-                      {sample.info_score !== undefined && (
-                        <span className="rounded bg-amber-50 dark:bg-amber-900/30 px-2 py-1 text-xs font-mono text-amber-600 dark:text-amber-400">
-                          {sample.info_score}/10
-                        </span>
-                      )}
-                    </summary>
-                    <div className="px-5 pb-5 text-sm text-slate-500 dark:text-slate-400">
-                      <p className="leading-7 text-slate-600 dark:text-slate-300">{sample.body}</p>
-                      {sample.reason && (
-                        <p className="mt-3 text-sm italic text-indigo-600 dark:text-indigo-400">{sample.reason}</p>
-                      )}
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {filterTags(sample.tags).map(([key, value]) => (
-                          <span
-                            key={`${index}-${key}`}
-                            className="rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30 px-3 py-1 text-xs text-sky-600 dark:text-sky-400"
-                          >
-                            {key}: {value}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </details>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* 6. All Comments */}
+        {/* 5. All Comments */}
         {!!report.tagged_data?.length && (
-          <CommentList taggedData={report.tagged_data} personas={report.personas ?? []} />
+          <CommentList taggedData={report.tagged_data} personas={report.personas ?? []} schemaSnapshot={report.schema_snapshot} />
         )}
 
         <footer className="border-t border-indigo-100 dark:border-indigo-800 py-10 text-center text-xs text-slate-400 dark:text-slate-500">

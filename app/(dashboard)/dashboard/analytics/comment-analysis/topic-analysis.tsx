@@ -81,8 +81,8 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       <div className="flex items-baseline gap-4 border-b border-indigo-100 pb-4">
         <span className="font-serif text-4xl font-light text-indigo-200">04</span>
         <div className="flex-1">
-          <h2 className="font-serif text-2xl text-slate-900">话题深度分析</h2>
-          <p className="text-sm text-slate-500">基于 {topicStats.length} 个话题聚类的声量与互动权重分析</p>
+          <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Topic Depth Analysis</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Analysis based on {topicStats.length} topic clusters</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -93,7 +93,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
             className={cn("text-xs border-slate-200 text-slate-600 hover:bg-slate-50", showWeights && "bg-indigo-50 text-indigo-600 border-indigo-200")}
           >
             <SlidersHorizontal className="w-3 h-3 mr-2" />
-            权重设置
+            Weight Settings
           </Button>
         </div>
       </div>
@@ -102,7 +102,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 rounded-xl bg-white/50 border border-indigo-100 mb-6 animate-in slide-in-from-top-2 backdrop-blur-sm shadow-sm">
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>基础分 (每条评论)</span>
+              <span>Base Score (per comment)</span>
               <span className="font-mono text-slate-900">{weights.comment}</span>
             </div>
             <Slider
@@ -116,7 +116,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>点赞权重 (每点赞)</span>
+              <span>Like Weight (per like)</span>
               <span className="font-mono text-slate-900">{weights.like}</span>
             </div>
             <Slider
@@ -130,7 +130,7 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>回复权重 (每回复)</span>
+              <span>Reply Weight (per reply)</span>
               <span className="font-mono text-slate-900">{weights.reply}</span>
             </div>
             <Slider
@@ -205,9 +205,9 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <span>{topic.count} 评论</span>
-                  <span>{topic.likes} 点赞</span>
-                  <span>{topic.replies} 回复</span>
+                  <span>{topic.count} comments</span>
+                  <span>{topic.likes} likes</span>
+                  <span>{topic.replies} replies</span>
                 </div>
               </div>
 

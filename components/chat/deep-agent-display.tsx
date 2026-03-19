@@ -15,7 +15,7 @@ function TaskStatusIcon({ status }: { status: SubagentStreamInterface["status"] 
     case "error":
       return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
     case "pending":
-      return <Circle className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+      return <Circle className="h-3.5 w-3.5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
     case "running":
     default:
       return <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin flex-shrink-0" />
@@ -41,7 +41,7 @@ function formatToolCall(name: string, args?: Record<string, unknown>): string {
 function ToolCallRow({ tc }: { tc: SubagentStreamInterface["activeTools"][number] }) {
   const label = formatToolCall(tc.tool, tc.input)
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-gray-600 py-0.5">
+    <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400 py-0.5">
       {tc.status === "running" ? (
         <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />
       ) : (
@@ -58,8 +58,8 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
   const activeItem = todos.find(t => t.status === "in_progress")
 
   return (
-    <div className="mb-3 rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm max-w-2xl">
-      <ul className="divide-y divide-gray-100">
+    <div className="mb-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm max-w-2xl">
+      <ul className="divide-y divide-gray-100 dark:divide-gray-700">
         {todos.map(todo => {
           const done = todo.status === "completed"
           const active = todo.status === "in_progress"
@@ -70,13 +70,13 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
               ) : active ? (
                 <Loader2 className="h-5 w-5 text-blue-500 animate-spin flex-shrink-0" />
               ) : (
-                <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
               )}
               <span className={cn(
                 "text-sm truncate",
-                done && "line-through text-gray-400",
-                active && "text-gray-800 font-medium",
-                !done && !active && "text-gray-500",
+                done && "line-through text-gray-400 dark:text-gray-600",
+                active && "text-gray-800 dark:text-gray-100 font-medium",
+                !done && !active && "text-gray-500 dark:text-gray-400",
               )}>
                 {todo.content}
               </span>
@@ -85,9 +85,9 @@ export function TodoList({ todos }: { todos: TodoItem[] }) {
         })}
       </ul>
       {activeItem && (
-        <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-gray-50">
+        <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin flex-shrink-0" />
-          <span className="text-xs text-gray-500 truncate">{activeItem.content}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{activeItem.content}</span>
         </div>
       )}
     </div>
@@ -139,21 +139,21 @@ function ResearchTaskCard({
       className={cn(
         "mb-2 rounded-lg border overflow-hidden",
         isRunning
-          ? "border-blue-200 bg-blue-50/50"
+          ? "border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-950/20"
           : isFailed
-            ? "border-red-200 bg-red-50/50"
-            : "border-green-200 bg-green-50/50"
+            ? "border-red-200 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/20"
+            : "border-green-200 dark:border-green-800/40 bg-green-50/50 dark:bg-green-950/20"
       )}
     >
       <button
         onClick={handleToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-black/5 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
       >
         <TaskStatusIcon status={subagent.status} />
         <span
           className={cn(
             "text-xs font-medium flex-1 truncate",
-            isRunning ? "text-blue-700" : isFailed ? "text-red-700" : "text-green-700"
+            isRunning ? "text-blue-700 dark:text-blue-400" : isFailed ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"
           )}
         >
           {subagent.toolCall.args.description || "Subagent task"}
@@ -161,20 +161,20 @@ function ResearchTaskCard({
         {subagent.toolCall.args.subagent_type && (
           <span className={cn(
             "text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium",
-            isRunning ? "bg-blue-100 text-blue-600" : isFailed ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
+            isRunning ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300" : isFailed ? "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300" : "bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-300"
           )}>
             {subagent.toolCall.args.subagent_type}
           </span>
         )}
         {!isExpanded && isRunning && activityLabel && (
-          <span className="text-[10px] text-blue-500 flex-shrink-0 truncate max-w-[120px]">
+          <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 truncate max-w-[120px]">
             {activityLabel}
           </span>
         )}
         <ChevronDown
           className={cn(
             "h-4 w-4 transition-transform flex-shrink-0",
-            isRunning ? "text-blue-600" : isFailed ? "text-red-500" : "text-green-600",
+            isRunning ? "text-blue-600 dark:text-blue-400" : isFailed ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400",
             isExpanded ? "rotate-180" : ""
           )}
         />
@@ -193,14 +193,14 @@ function ResearchTaskCard({
 
           {/* Live streaming content from subagent LLM */}
           {isRunning && hasLiveContent && (
-            <div className="text-xs text-gray-600 leading-relaxed">
+            <div className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
               <MessageContent content={latestMessage?.content || ""} className="prose-xs" />
               {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
             </div>
           )}
 
           {isRunning && subagent.thinking && (
-            <div className="text-xs text-slate-500 leading-relaxed italic">
+            <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">
               <MessageContent content={subagent.thinking} className="prose-xs" />
             </div>
           )}
@@ -208,7 +208,7 @@ function ResearchTaskCard({
           {/* Idle state */}
           {isRunning && !hasLiveContent && !hasToolCalls && !subagent.thinking && (
             <div className="text-xs text-gray-600 leading-relaxed">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Researching...</span>
               </div>
@@ -217,17 +217,17 @@ function ResearchTaskCard({
 
           {/* Completed result */}
           {!isRunning && !isFailed && subagent.result && (
-            <div className="text-xs text-gray-700 leading-relaxed">
+            <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
               <MessageContent content={subagent.result || ""} className="prose-xs" />
             </div>
           )}
 
           {/* Error */}
           {isFailed && subagent.error && (
-            <div className="text-xs text-red-600 leading-relaxed">{subagent.error}</div>
+            <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed">{subagent.error}</div>
           )}
           {isFailed && !subagent.error && (
-            <div className="text-xs text-red-500">Task failed.</div>
+            <div className="text-xs text-red-500 dark:text-red-400">Task failed.</div>
           )}
         </div>
       )}
@@ -252,10 +252,10 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
     if (!isStreaming) return null
     return (
       <div className="space-y-1 max-w-2xl">
-        <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
+        <div className="mb-3 rounded-lg border border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-950/20 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2">
-            <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-            <span className="text-xs font-medium text-blue-700">Starting Lobster Mode...</span>
+            <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Starting Lobster Mode...</span>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
 
   return (
     <div className="space-y-1 max-w-2xl">
-      <div className="mb-1 text-[10px] text-gray-500 font-medium px-0.5">
+      <div className="mb-1 text-[10px] text-gray-500 dark:text-gray-400 font-medium px-0.5">
         Research tasks: {completedCount}/{taskCount} completed
       </div>
       {messageOrder.map((messageId) => {

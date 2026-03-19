@@ -1,22 +1,28 @@
 import type { ContentPart, ToolCall } from "@/components/chat/chat-interface"
+import type {
+  DeepAgentStreamState,
+  SubagentStreamInterface,
+} from "@/lib/hooks/use-deep-agent-stream"
 
 export function parseSubContentList(subContentList: any[] = []): {
   toolCalls: ToolCall[],
   content: string,
   images: Array<{ image_url: string; filename?: string; file_type?: string }>,
   documents: any[],
-  contentParts: ContentPart[]
+  contentParts: ContentPart[],
+  deepStreamParts: ContentPart[]
 } {
   const toolCalls: ToolCall[] = []
   const images: Array<{ image_url: string; filename?: string; file_type?: string }> = []
   const documents: any[] = []
   const contentParts: ContentPart[] = []
+  const deepStreamParts: ContentPart[] = []
   const incompleteToolCalls = new Map<string, ToolCall>()
   let lastToolCall: ToolCall | null = null
   let textContent = ""
 
   if (!Array.isArray(subContentList)) {
-    return { toolCalls, content: textContent, images, documents, contentParts }
+    return { toolCalls, content: textContent, images, documents, contentParts, deepStreamParts }
   }
 
   for (const item of subContentList) {
@@ -98,7 +104,7 @@ export function parseSubContentList(subContentList: any[] = []): {
        if (item.tool_call_id) {
            toolCall = incompleteToolCalls.get(item.tool_call_id)
        }
-       
+
        // Fallback for missing ID if sequential
        if (!toolCall && lastToolCall && lastToolCall.name === item.name) {
            toolCall = lastToolCall
@@ -112,6 +118,65 @@ export function parseSubContentList(subContentList: any[] = []): {
            }
            if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
        }
+    } else if (item.type === 'deep_agent_state') {
+      // Reconstruct DeepAgentStreamState from checkpointer data
+      const subagentsMap = new Map<string, SubagentStreamInterface>()
+      const subagentOrder: string[] = []
+
+      for (const sa of (item.subagents || [])) {
+        const saId = sa.id || Date.now().toString()
+        subagentsMap.set(saId, {
+          id: saId,
+          status: sa.status || "complete",
+          messages: [],
+          thinking: "",
+          result: sa.result,
+          error: undefined,
+          toolCall: {
+            id: saId,
+            name: "task",
+            args: {
+              description: sa.description || "",
+              subagent_type: sa.subagent_type || "",
+            },
+          },
+          startedAt: undefined,
+          completedAt: undefined,
+          parentMessageId: "coordinator",
+          activeTools: [],
+        })
+        subagentOrder.push(saId)
+      }
+
+      const deepState: DeepAgentStreamState = {
+        subagents: subagentsMap,
+        subagentOrder,
+        messageOrder: ["coordinator"],
+        subagentsByMessage: { coordinator: subagentOrder },
+        values: { todos: item.todos || [] },
+        isComplete: true,
+      }
+      deepStreamParts.push({ type: "deep_agent", deepAgent: deepState })
+
+      // Track coordinator text for the `content` return field (used for fallback/search)
+      // but do NOT add to contentParts — DeepAgentDisplay already renders it
+      if (item.coordinator_content) {
+        textContent += item.coordinator_content
+      }
+
+      // Add coordinator-level tools to contentParts (these aren't rendered by DeepAgentDisplay)
+      for (const tool of (item.coordinator_tools || [])) {
+        const tc: ToolCall = {
+          id: tool.id || Date.now().toString(),
+          name: tool.name,
+          input: tool.input || {},
+          output: tool.output,
+          state: 'completed',
+          artifact: tool.artifact,
+        }
+        toolCalls.push(tc)
+        contentParts.push({ type: 'tool', tool: tc })
+      }
     } else if (item.type === 'image') {
       if (item.url) images.push({ image_url: item.url })
     } else if (item.type === 'user_image') {
@@ -133,5 +198,5 @@ export function parseSubContentList(subContentList: any[] = []): {
     }
   }
 
-  return { toolCalls, content: textContent, images, documents, contentParts }
+  return { toolCalls, content: textContent, images, documents, contentParts, deepStreamParts }
 }

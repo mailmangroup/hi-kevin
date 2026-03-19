@@ -402,24 +402,28 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
   const loadHistory = async (id: string) => {
       try {
           const { messages: history } = await aiService.getMessages(id)
-          const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
+          const formattedMessages: Message[] = history.map((msg: ApiMessage, index: number) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent, images, documents, contentParts } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images, documents, contentParts, deepStreamParts } = parseSubContentList(msg.sub_content_list)
 
               return {
                   id: msg.id,
                   role: msg.role,
                   // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
                   content: parsedContent || msg.content || "",
-                  timestamp: new Date(msg.created_at),
+                  // Use created_at if available, otherwise use index to preserve API order
+                  timestamp: msg.created_at ? new Date(msg.created_at) : new Date(index),
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   images: images.length > 0 ? images : undefined,
                   documents: documents.length > 0 ? documents : undefined,
                   contentParts: contentParts.length > 0 ? contentParts : undefined,
+                  deepStreamParts: deepStreamParts.length > 0 ? deepStreamParts : undefined,
                   report: msg.report
               }
           })
           // Sort by timestamp ascending (oldest first)
+          // API returns messages in order; sort preserves that for messages with
+          // real timestamps and uses index-based fallback for checkpointer messages.
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
           
           setMessages(prev => {
@@ -1335,8 +1339,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
 
                     {/* Deep stream lane: thinking + deep-agent task updates */}
                     {message.deepStreamParts && message.deepStreamParts.length > 0 && (
-                      <div className="mb-4 rounded-lg border border-blue-200/70 bg-blue-50/40 p-3 space-y-3">
-                        <div className="text-[11px] font-medium text-blue-700">Deep think / agent stream</div>
+                      <div className="mb-4 rounded-lg border border-blue-200/70 dark:border-blue-800/40 bg-blue-50/40 dark:bg-blue-950/20 p-3 space-y-3">
+                        <div className="text-[11px] font-medium text-blue-700 dark:text-blue-400">Deep think / agent stream</div>
                         {message.deepStreamParts.map((part, index) => (
                           <React.Fragment key={`deep-${index}`}>
                             {part.type === "thinking" ? (
