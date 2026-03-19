@@ -1068,6 +1068,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               ))
           }
 
+          // Backend sends {"stopped": true} when the user cancels a deep agent run.
+          if (chunk.stopped) {
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, isStreaming: false }
+                      : msg
+              ))
+          }
+
           if (chunk.error) {
               fullContent += `\n[Error: ${chunk.error}]`
               currentTextContent += `\n[Error: ${chunk.error}]`

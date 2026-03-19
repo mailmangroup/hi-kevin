@@ -204,6 +204,11 @@ export function useDeepAgentStream() {
       return true
     }
 
+    if (type === "stopped") {
+      setAndSync(prev => ({ ...prev, isComplete: true }))
+      return true
+    }
+
     if (type === "done") {
       setAndSync(prev => ({ ...prev, isComplete: true }))
       return true

@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical, Eye, Loader2 } from "lucide-react"
+import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical, Eye, Loader2, Download } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
+import { aiService } from "@/lib/api/client"
 import { ReportOutlineSidebar } from "./report-outline-sidebar"
 import { isBrandPosts, isWebSearch, isHelpCenter, parseArtifactData } from "@/lib/utils/artifact-types"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
@@ -31,6 +32,7 @@ const ARTIFACT_ICONS = {
   html: FileText,
   markdown: FileText,
   mermaid: Code,
+  file: Download,
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -295,6 +297,45 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
   )
 }
 
+function FileArtifactContent({ data }: { data: any }) {
+  const [loading, setLoading] = React.useState(false)
+
+  const handleDownload = async () => {
+    if (!data?.document_id || !data?.conversation_id) return
+    setLoading(true)
+    try {
+      const { document_url } = await aiService.getConversationDocumentUrl(data.conversation_id, data.document_id)
+      window.open(document_url, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to get download URL:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 gap-4">
+      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100">
+        <Download className="h-7 w-7 text-blue-500" />
+      </div>
+      <div className="text-center">
+        <p className="font-medium text-gray-900 text-sm">{data?.filename || "File"}</p>
+        {data?.description && (
+          <p className="text-xs text-gray-500 mt-1 max-w-xs">{data.description}</p>
+        )}
+      </div>
+      <button
+        onClick={handleDownload}
+        disabled={loading || !data?.document_id}
+        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        Download
+      </button>
+    </div>
+  )
+}
+
 /** The actual rendered output (no toggle logic) */
 function ArtifactRenderedContent({ artifact }: { artifact: ArtifactData }) {
   const rawData = artifact.data
@@ -317,6 +358,8 @@ function ArtifactRenderedContent({ artifact }: { artifact: ArtifactData }) {
       return <MarkdownContent data={artifact.data} />
     case "mermaid":
       return <MermaidContent data={artifact.data} />
+    case "file":
+      return <FileArtifactContent data={artifact.data} />
     default:
       return <DataContent data={artifact.data} />
   }

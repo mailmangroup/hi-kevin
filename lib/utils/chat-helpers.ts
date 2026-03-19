@@ -1,4 +1,5 @@
-export function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
+export function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" | "file" {
+  if (artifact?.oss_key && artifact?.filename) return "file"
   if (artifact?.type === "artifact" && artifact?.artifact_type) {
     return artifact.artifact_type
   }
