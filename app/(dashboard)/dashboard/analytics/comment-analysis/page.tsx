@@ -6,7 +6,7 @@ import { directApiCall } from "@/lib/api/client"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { LoadingState } from "@/components/ui/loading"
 import { Button } from "@/components/ui/button"
-import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download } from "lucide-react"
+import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download, Database } from "lucide-react"
 import { FileUploader } from "./file-uploader"
 import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
@@ -146,6 +146,32 @@ function getNormalizedSentimentDistribution(dist?: Record<string, number>) {
     else normalized.neutral += count
   })
   return normalized
+}
+
+function downloadJSONData(report: CommentAnalysisReport) {
+  const baseName = report.filename ? report.filename.replace(/\.[^/.]+$/, "") : "analysis"
+
+  const download = (data: any, suffix: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${baseName}-${suffix}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  if (report.schema_snapshot?.dimensions) {
+    download(report.schema_snapshot.dimensions, "dimensions")
+  }
+  if (report.tagged_data) {
+    setTimeout(() => download(report.tagged_data, "tagged-comments"), 500)
+  }
+  if (report.insights) {
+    setTimeout(() => download(report.insights, "insights"), 1000)
+  }
 }
 
 function downloadHTMLReport(report: CommentAnalysisReport) {
@@ -346,24 +372,31 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
       <div class="section-header">
         <span class="section-number">02</span>
         <div>
-          <h2>Sentiment Analysis</h2>
-          <p class="subtitle">Distribution of customer sentiment</p>
+          <h2>Sentiment & Topic Distribution</h2>
+          <p class="subtitle">Distribution of customer sentiment and topics</p>
         </div>
       </div>
-      <div class="card">
-        ${Object.entries(normSentimentDist).map(([label, count]) => {
-          const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
-          const colors: Record<string, string> = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' }
-          const displayLabel = label.charAt(0).toUpperCase() + label.slice(1)
-          return `
-          <div class="sentiment-bar">
-            <span class="sentiment-label">${displayLabel}</span>
-            <div class="sentiment-bar-bg">
-              <div class="sentiment-bar-fill" style="width: ${percent}%; background: ${colors[label] || '#94a3b8'};"></div>
+      <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="card">
+          <h3 style="margin-bottom: 16px;">Sentiment</h3>
+          ${Object.entries(normSentimentDist).map(([label, count]) => {
+            const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
+            const colors: Record<string, string> = { positive: '#22c55e', neutral: '#94a3b8', negative: '#ef4444' }
+            const displayLabel = label.charAt(0).toUpperCase() + label.slice(1)
+            return `
+            <div class="sentiment-bar">
+              <span class="sentiment-label">${displayLabel}</span>
+              <div class="sentiment-bar-bg">
+                <div class="sentiment-bar-fill" style="width: ${percent}%; background: ${colors[label] || '#94a3b8'};"></div>
+              </div>
+              <span class="sentiment-count">${count} (${percent}%)</span>
             </div>
-            <span class="sentiment-count">${count} (${percent}%)</span>
-          </div>
-        `}).join('')}
+          `}).join('')}
+        </div>
+        <div class="card" id="topic-dist-card">
+          <h3 style="margin-bottom: 16px;">Topics</h3>
+          <!-- Filled by JS -->
+        </div>
       </div>
     </div>
     ` : ''}
@@ -432,6 +465,10 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           <button class="filter-btn active" data-filter="persona" data-value="all">All</button>
         </div>
         <div id="dimension-filter-rows"></div>
+        <div class="filter-row" id="topic-filters">
+          <span class="filter-label">Topic</span>
+          <button class="filter-btn active" data-filter="topic" data-value="all">All</button>
+        </div>
         <div class="filter-row">
           <span class="filter-label">Sort by</span>
           <button class="filter-btn active" data-sort="combined" data-order="desc">Score ↓</button>
@@ -492,6 +529,7 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     let state = {
       sentiment: 'all',
       persona: 'all',
+      topic: 'all',
       dimensions: {},   // { dimKey: selectedValue | 'all' }
       sortBy: 'combined',
       sortOrder: 'desc',
@@ -564,6 +602,24 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
         });
       }
 
+      // Topic filter buttons
+      const topicRow = document.getElementById('topic-filters');
+      if (topicRow) {
+        const topics = getUniqueValues('topic');
+        if (topics.length > 0) {
+          topics.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'filter-btn';
+            btn.dataset.filter = 'topic';
+            btn.dataset.value = t;
+            btn.textContent = t;
+            topicRow.appendChild(btn);
+          });
+        } else {
+          topicRow.style.display = 'none';
+        }
+      }
+
       // Dimension filter rows (one per dimension)
       const dimContainer = document.getElementById('dimension-filter-rows');
       if (dimContainer && schema.dimensions) {
@@ -626,6 +682,8 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
         const itemSent = normalizeSentiment(d.sentiment);
         if (state.sentiment !== 'all' && itemSent !== state.sentiment) return false;
         if (state.persona !== 'all' && d.persona_name !== state.persona) return false;
+        const itemTopic = d.tags && d.tags.topic ? d.tags.topic : d.topic;
+        if (state.topic !== 'all' && itemTopic !== state.topic) return false;
         for (const [key, val] of Object.entries(state.dimensions)) {
           const itemVal = d.tags ? d.tags[key] : d[key];
           if (val !== 'all' && itemVal !== val) return false;
@@ -661,9 +719,26 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
       if (!tbody) return;
       tbody.innerHTML = pageItems.map(item => {
         const score = state.sortBy === 'combined' ? combinedScore(item).toFixed(2) : (item.info_score !== undefined ? item.info_score + '/10' : '-');
+        
+        let tagsHtml = '';
+        if (item.topic || (item.tags && item.tags.topic)) {
+          tagsHtml += '<span class="topic-tag">' + (item.topic || item.tags.topic) + '</span> ';
+        }
+        if (schema && schema.dimensions) {
+          schema.dimensions.forEach(dim => {
+            const val = item.tags ? item.tags[dim.key] : item[dim.key];
+            if (val && !EXCLUDED_VALUES.has(val)) {
+              tagsHtml += '<span class="tag">' + dim.key + ': ' + val + '</span> ';
+            }
+          });
+        }
+
         return '<tr>' +
           '<td>' + getSentimentBadge(item.sentiment) + '</td>' +
-          '<td style="max-width:300px;"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (item.body || '') + '</span></td>' +
+          '<td style="max-width:300px;">' +
+            '<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (item.body || '') + '</span>' +
+            (tagsHtml ? '<div style="margin-top:8px;">' + tagsHtml + '</div>' : '') +
+          '</td>' +
           '<td>' + (item.persona_name || '-') + '</td>' +
           '<td style="text-align:right;font-family:monospace;">' + score + '</td>' +
           '</tr>';
@@ -674,6 +749,39 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
       pag.innerHTML = '<button class="page-btn" onclick="prevPage()" ' + (state.page <= 1 ? 'disabled' : '') + '>← Prev</button>' +
         '<span style="font-size:0.875rem;color:#64748b;">Page ' + state.page + ' of ' + totalPages + '</span>' +
         '<button class="page-btn" onclick="nextPage()" ' + (state.page >= totalPages ? 'disabled' : '') + '>Next →</button>';
+    }
+
+    function renderTopicDist() {
+      const el = document.getElementById('topic-dist-card');
+      if (!el) return;
+      const topics = {};
+      let total = 0;
+      data.forEach(d => {
+        const t = d.tags && d.tags.topic ? d.tags.topic : d.topic;
+        const topicName = t && !EXCLUDED_VALUES.has(t) ? t : 'Uncategorized';
+        topics[topicName] = (topics[topicName] || 0) + 1;
+        total++;
+      });
+      const sorted = Object.entries(topics).sort((a, b) => b[1] - a[1]);
+      
+      let html = '<h3 style="margin-bottom: 16px;">Topics</h3>';
+      if (total === 0 || sorted.length === 0) {
+        html += '<p style="color:#94a3b8; font-size:0.875rem;">No topics available</p>';
+      } else {
+        html += '<div style="display:flex; flex-direction:column; gap:12px;">';
+        sorted.forEach(([topic, count]) => {
+          const pct = Math.round((count / total) * 1000) / 10;
+          html += '<div style="display:flex; align-items:center; gap:12px;">' +
+              '<span style="min-width:100px; color:#64748b; font-size:0.875rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + topic + '">' + topic + '</span>' +
+              '<div style="flex:1; height:24px; background:#e2e8f0; border-radius:4px; overflow:hidden;">' +
+                '<div style="height:100%; border-radius:4px; width:' + pct + '%; background:#6366f1;"></div>' +
+              '</div>' +
+              '<span style="min-width:80px; text-align:right; font-family:monospace; font-size:0.875rem;">' + count + ' (' + pct + '%)</span>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
+      el.innerHTML = html;
     }
 
     function prevPage() { state.page--; renderComments(); }
@@ -820,6 +928,7 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
     function init() {
       initFilters();
       renderComments();
+      renderTopicDist();
       renderDimensions();
       updateFormulaPreview();
 
@@ -1027,6 +1136,21 @@ export default function CommentAnalysisPage() {
     return Object.values(report.sentiment_distribution).reduce((sum, value) => sum + value, 0)
   }, [report?.sentiment_distribution])
 
+  const topicDistribution = useMemo(() => {
+    if (!report?.tagged_data) return []
+    const dist: Record<string, number> = {}
+    let total = 0
+    report.tagged_data.forEach(item => {
+      const t = item.tags?.topic || item.topic
+      const topicName = t && !EXCLUDED_TAG_VALUES.has(t) ? t : "Uncategorized"
+      dist[topicName] = (dist[topicName] || 0) + 1
+      total++
+    })
+    return Object.entries(dist)
+      .map(([topic, count]) => ({ topic, count, percent: total ? Math.round((count / total) * 1000) / 10 : 0 }))
+      .sort((a, b) => b.count - a.count)
+  }, [report?.tagged_data])
+
   const handleDeleteSource = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     if (!confirm("Are you sure you want to delete this analysis report?")) return
@@ -1178,15 +1302,26 @@ export default function CommentAnalysisPage() {
           </div>
         </div>
         {report && !isAnalyzing && !showUploader && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => downloadHTMLReport(report)}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download HTML
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadJSONData(report)}
+              className="gap-2"
+            >
+              <Database className="h-4 w-4" />
+              Download Data
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadHTMLReport(report)}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download HTML
+            </Button>
+          </div>
         )}
       </div>
     </header>
@@ -1438,33 +1573,62 @@ export default function CommentAnalysisPage() {
             <div className="flex items-baseline gap-4 border-b border-indigo-100 dark:border-indigo-800 pb-4">
               <span className="font-serif text-4xl font-light text-indigo-200 dark:text-indigo-800">02</span>
               <div>
-                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Sentiment Analysis</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Distribution of customer sentiment</p>
+                <h2 className="font-serif text-2xl text-slate-900 dark:text-slate-100">Sentiment & Topic Distribution</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Distribution of customer sentiment and topics</p>
               </div>
             </div>
-            <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
-              <div className="space-y-4">
-                {Object.entries(report.sentiment_distribution).map(([label, count]) => {
-                  const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Sentiment</h3>
+                <div className="space-y-4">
+                  {Object.entries(report.sentiment_distribution).map(([label, count]) => {
+                    const percent = totalSentiment ? Math.round((count / totalSentiment) * 1000) / 10 : 0
 
-                  return (
-                    <div key={label} className="flex flex-wrap items-center gap-3">
-                      <div className="min-w-[110px] text-sm text-slate-500 dark:text-slate-400">{sentimentLabel(label)}</div>
-                      <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
-                        <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${percent}%`,
-                            background: sentimentColor(label),
-                          }}
-                        />
+                    return (
+                      <div key={label} className="flex flex-wrap items-center gap-3">
+                        <div className="min-w-[110px] text-sm text-slate-500 dark:text-slate-400">{sentimentLabel(label)}</div>
+                        <div className="h-8 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
+                          <div
+                            className="h-full rounded"
+                            style={{
+                              width: `${percent}%`,
+                              background: sentimentColor(label),
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
+                          {count} ({percent}%)
+                        </div>
                       </div>
-                      <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
-                        {count} ({percent}%)
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-6">
+                <h3 className="font-serif text-lg text-slate-900 dark:text-slate-100 mb-4">Topics</h3>
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                  {topicDistribution.length === 0 ? (
+                    <p className="text-sm text-slate-500">No topics available</p>
+                  ) : (
+                    topicDistribution.map(({ topic, count, percent }) => (
+                      <div key={topic} className="flex flex-wrap items-center gap-3">
+                        <div className="min-w-[110px] max-w-[150px] truncate text-sm text-slate-500 dark:text-slate-400" title={topic}>
+                          {topic}
+                        </div>
+                        <div className="h-6 flex-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-700">
+                          <div
+                            className="h-full rounded bg-indigo-500 dark:bg-indigo-400"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <div className="min-w-[90px] text-right font-mono text-sm text-slate-600 dark:text-slate-300">
+                          {count} ({percent}%)
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </section>

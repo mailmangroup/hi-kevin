@@ -31,6 +31,7 @@ function filterTags(tags: Record<string, string>) {
 export function CommentList({ taggedData, personas = [], schemaSnapshot }: CommentListProps) {
   const [sentimentFilter, setSentimentFilter] = useState<string>("all")
   const [personaFilter, setPersonaFilter] = useState<string>("all")
+  const [topicFilter, setTopicFilter] = useState<string>("all")
   const [dimensionFilters, setDimensionFilters] = useState<Record<string, string>>({})
   const [sortBy, setSortBy] = useState<SortKey>("combined")
   const [likesDiv, setLikesDiv] = useState(50)
@@ -51,6 +52,17 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
     return Array.from(names).sort()
   }, [taggedData])
 
+  const uniqueTopics = useMemo(() => {
+    const topics = new Set<string>()
+    for (const item of taggedData) {
+      const t = item.tags?.topic || item.topic
+      if (t && !EXCLUDED_TAG_VALUES.has(t)) {
+        topics.add(t)
+      }
+    }
+    return Array.from(topics).sort()
+  }, [taggedData])
+
   function combinedScore(item: any) {
     const eng = (item.likes ?? 0) / likesDiv + (item.replies ?? 0) / repliesDiv
     return infoWeight * (item.info_score ?? 0) + (1 - infoWeight) * eng
@@ -60,8 +72,10 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
     let result = taggedData.filter((item) => {
       if (sentimentFilter !== "all" && sentimentLabel(item.sentiment).toLowerCase() !== sentimentFilter) return false
       if (personaFilter !== "all" && item.persona_name !== personaFilter) return false
+      const itemTopic = item.tags?.topic || item.topic
+      if (topicFilter !== "all" && itemTopic !== topicFilter) return false
       for (const [dimKey, dimVal] of Object.entries(dimensionFilters)) {
-        if (dimVal !== "all" && item[dimKey] !== dimVal) return false
+        if (dimVal !== "all" && item[dimKey] !== dimVal && item.tags?.[dimKey] !== dimVal) return false
       }
       return true
     })
@@ -75,7 +89,7 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
 
     return result
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taggedData, sentimentFilter, personaFilter, dimensionFilters, sortBy, likesDiv, repliesDiv, infoWeight])
+  }, [taggedData, sentimentFilter, personaFilter, topicFilter, dimensionFilters, sortBy, likesDiv, repliesDiv, infoWeight])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -160,7 +174,7 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
         {/* Dimension filters */}
         {dimensions.map((dim) => {
           const validOptions = dim.options.filter(
-            (o) => o && !EXCLUDED_TAG_VALUES.has(o) && taggedData.some((item) => item[dim.key] === o)
+            (o) => o && !EXCLUDED_TAG_VALUES.has(o) && taggedData.some((item) => item[dim.key] === o || item.tags?.[dim.key] === o)
           )
           if (validOptions.length === 0) return null
           const active = dimensionFilters[dim.key] ?? "all"
@@ -191,6 +205,34 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
             </div>
           )
         })}
+
+        {/* Topic filter */}
+        {uniqueTopics.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400 dark:text-slate-500 w-16 shrink-0">Topic</span>
+            <button
+              onClick={() => { setTopicFilter("all"); resetPage() }}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                topicFilter === "all" ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/15"
+              )}
+            >
+              All
+            </button>
+            {uniqueTopics.map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTopicFilter(t); resetPage() }}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  topicFilter === t ? "bg-pink-500 text-white" : "bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/15"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Sort */}
         <div className="flex flex-wrap items-center gap-2">
@@ -294,6 +336,22 @@ export function CommentList({ taggedData, personas = [], schemaSnapshot }: Comme
                         {item.persona_name}
                       </span>
                     )}
+                    {(item.tags?.topic || item.topic) && !EXCLUDED_TAG_VALUES.has(item.tags?.topic || item.topic) && (
+                      <span className="rounded-full bg-pink-50 dark:bg-pink-900/30 border border-pink-100 dark:border-pink-700/50 px-2 py-0.5 text-pink-600 dark:text-pink-400">
+                        {item.tags?.topic || item.topic}
+                      </span>
+                    )}
+                    {dimensions.map(dim => {
+                      const val = item.tags?.[dim.key] || item[dim.key]
+                      if (val && !EXCLUDED_TAG_VALUES.has(val)) {
+                        return (
+                          <span key={dim.key} className="rounded-full bg-sky-50 dark:bg-sky-900/30 border border-sky-100 dark:border-sky-700/50 px-2 py-0.5 text-sky-600 dark:text-sky-400">
+                            {dim.key}: <span className="font-medium">{val}</span>
+                          </span>
+                        )
+                      }
+                      return null
+                    })}
                     {(item.likes ?? 0) > 0 && (
                       <span className="flex items-center gap-1">
                         <ThumbsUp className="w-3 h-3" /> {item.likes}
