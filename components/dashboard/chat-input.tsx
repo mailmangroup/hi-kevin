@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
@@ -125,11 +125,23 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     setDeepAgent(enabled)
   }
 
-  const greeting = projectName
+  const fullGreeting = projectName
     ? projectName
     : fullName
       ? `Hi ${fullName}, how can I help you today?`
       : "How can I help you today?"
+
+  const [displayedGreeting, setDisplayedGreeting] = useState("")
+  useEffect(() => {
+    setDisplayedGreeting("")
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setDisplayedGreeting(fullGreeting.slice(0, i))
+      if (i >= fullGreeting.length) clearInterval(timer)
+    }, 10)
+    return () => clearInterval(timer)
+  }, [fullGreeting])
 
   const handleAnalyzeVideo = () => activateFastPath("analyze_video")
   const handleGetHelp = () => activateFastPath("helpcenter")
@@ -177,7 +189,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
         ) : (
           // Dashboard layout
           <>
-            <h1 className="text-4xl font-semibold tracking-[-0.02em] text-foreground text-center">{greeting}</h1>
+            <h1 className="text-4xl font-semibold tracking-[-0.02em] text-foreground text-center">{displayedGreeting}</h1>
 
             <div className="w-full max-w-3xl relative">
               <ChatInputArea
