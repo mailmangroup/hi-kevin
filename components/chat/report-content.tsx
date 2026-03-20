@@ -495,7 +495,7 @@ export function ReportContent({ data }: { data: any }) {
                 {data.metadata.generated_at && (
                     <div className="flex items-center gap-1">
                     <span className="font-medium">Generated:</span>
-                    <span>{new Date(data.metadata.generated_at).toLocaleDateString()}</span>
+                    <span>{new Date(data.metadata.generated_at).toLocaleDateString([], { timeZone: 'Asia/Shanghai' })}</span>
                     </div>
                 )}
                 </div>

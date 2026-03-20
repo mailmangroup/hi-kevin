@@ -179,6 +179,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     return initialMessage ?? searchParams?.get('q') ?? undefined
   }, [initialMessage, searchParams])
 
+  // Consume pending auto-send message from sessionStorage.
+  const pendingMessageRef = React.useRef<string | null>(null)
+  if (typeof window !== 'undefined' && !chatId && pendingMessageRef.current === null) {
+      const msg = sessionStorage.getItem('pending_chat_message')
+      if (msg !== null) {
+          pendingMessageRef.current = msg
+          sessionStorage.removeItem('pending_chat_message')
+      }
+  }
+
   const { profile, isLoading: isProfileLoading } = useUserStore()
   const { state: deepAgentState, processEvent: processDeepAgentEvent, reset: resetDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
 
@@ -347,7 +357,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
       setConversationTitle("")
       setIsThinking(false)
       setIsFavorite(false)
-      justCreatedConversationId.current = undefined
+      justCreatedConversationId.current = null
+      initialized.current = false
     }
   }, [chatId])
 
@@ -533,15 +544,19 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     // If we have content to send (text or files)
     // Check initialMessage !== undefined to allow empty string (for file-only messages)
     // Skip auto-send if chatId is present — this is an existing chat (e.g. page refresh)
-    if (!conversationId && !chatId && (initialQuery !== undefined || images.length > 0 || documents.length > 0)) {
+    const hasInitialContent = pendingMessageRef.current !== null || initialQuery !== undefined || images.length > 0 || documents.length > 0
+    
+    if (!conversationId && !chatId && hasInitialContent) {
         initialized.current = true
         
-        if (initialQuery) {
-            setInput(initialQuery)
+        const textToSend = pendingMessageRef.current ?? initialQuery ?? ""
+        if (textToSend) {
+            setInput(textToSend)
         }
 
         // Automatically send the message
-        handleSend(initialQuery || "", images, documents)
+        handleSend(textToSend, images, documents)
+        pendingMessageRef.current = null
     }
   }, [initialQuery, chatId, credentialsLoading, credentials.orgId])
 
@@ -843,21 +858,34 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           const chunkThinking = chunk?.type === "coordinator_thinking" ? chunk.content : (!chunk?.type ? chunk.thinking : undefined)
           const chunkContent = chunk?.type === "coordinator_token" ? chunk.content : (!chunk?.type ? chunk.content : undefined)
 
-          // Handle thinking chunks — always in contentParts to maintain correct
+          // Handle thinking chunks — always in contentParts or deepStreamParts to maintain correct
           // sequence with tool calls (thinking → tool → thinking → text).
           if (chunkThinking !== undefined && chunkThinking !== null) {
               thinkingContent += chunkThinking || ""
               currentThinkingContent += chunkThinking || ""
 
-              if (lastPartWasThinking && contentParts.length > 0) {
-                  const lastPart = contentParts[contentParts.length - 1]
-                  if (lastPart.type === "thinking") {
-                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
+              if (effectiveDeepAgent) {
+                  if (lastPartWasThinking && deepStreamParts.length > 0) {
+                      const lastPart = deepStreamParts[deepStreamParts.length - 1]
+                      if (lastPart.type === "thinking") {
+                          deepStreamParts[deepStreamParts.length - 1] = { ...lastPart, content: currentThinkingContent }
+                      }
+                  } else {
+                      deepStreamParts.push({ type: "thinking", content: currentThinkingContent })
+                      lastPartWasThinking = true
+                      lastPartWasText = false
                   }
               } else {
-                  contentParts.push({ type: "thinking", content: currentThinkingContent })
-                  lastPartWasThinking = true
-                  lastPartWasText = false
+                  if (lastPartWasThinking && contentParts.length > 0) {
+                      const lastPart = contentParts[contentParts.length - 1]
+                      if (lastPart.type === "thinking") {
+                          contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
+                      }
+                  } else {
+                      contentParts.push({ type: "thinking", content: currentThinkingContent })
+                      lastPartWasThinking = true
+                      lastPartWasText = false
+                  }
               }
 
               setMessages((prev) => prev.map(msg =>

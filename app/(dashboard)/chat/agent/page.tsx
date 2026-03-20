@@ -15,7 +15,7 @@ export default function AgentChatHistoryPage() {
     <div className="flex-1 space-y-4 p-8 pt-6 h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Agent Chat History</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Agent Chat History</h2>
           <Link href="/chat/agent/new" prefetch={false}>
             <Button className="gap-2 shadow-sm hover:shadow-md transition-all">
               <Plus className="h-4 w-4" />

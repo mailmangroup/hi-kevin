@@ -395,13 +395,13 @@ export function Sidebar({ className }: { className?: string }) {
             </Link>
             <div className="space-y-1">
                 <div className="flex items-center gap-1">
-                    <Link href="/chat/agent/new" className="flex-1 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition-all hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 text-left">
+                    <Link href="/chat/agent/new" prefetch={false} className="flex-1 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition-all hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 text-left">
                             <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
                                 <MessageSquare className="h-2.5 w-2.5 text-slate-500 dark:text-slate-400" />
                             </div>
                             New Chat
                     </Link>
-                    <Link href="/chat/deep-agent/new" title="New Lobster Mode Chat" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
+                    <Link href="/chat/deep-agent/new" prefetch={false} title="New Lobster Mode Chat" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
                             <LobsterIcon className="h-3.5 w-3.5" />
                     </Link>
                 </div>

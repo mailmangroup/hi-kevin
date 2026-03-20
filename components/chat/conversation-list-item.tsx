@@ -146,9 +146,9 @@ export function ConversationListItem({
         <div className={cn(
           "flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300",
           // Glass/Aura Effect
-          isSelected 
-            ? "bg-primary/10 border-primary/30" 
-            : "bg-white/40 hover:bg-white/70 backdrop-blur-sm border border-white/40 hover:border-white/60",
+          isSelected
+            ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
+            : "bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 backdrop-blur-sm border border-white/40 dark:border-white/10 hover:border-white/60 dark:hover:border-white/20",
           // Shadow/Hover
           "shadow-sm hover:shadow-md hover:-translate-y-[1px]"
         )}>
@@ -156,7 +156,7 @@ export function ConversationListItem({
             <div className="mr-3 flex-shrink-0">
               <div className={cn(
                 "h-5 w-5 rounded border flex items-center justify-center transition-all",
-                isSelected ? "bg-primary border-primary text-white" : "border-slate-300 bg-white"
+                isSelected ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-white/10"
               )}>
                 {isSelected && <Check className="h-3.5 w-3.5" />}
               </div>
@@ -165,7 +165,7 @@ export function ConversationListItem({
 
           <div className="flex-1 min-w-0 mr-4">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-slate-800 truncate group-hover:text-primary transition-colors">
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate group-hover:text-primary transition-colors">
                 {conversation.title || "New Conversation"}
               </h3>
               {conversation.is_favorite && (
@@ -173,20 +173,20 @@ export function ConversationListItem({
               )}
             </div>
             {!lastMessageIsTimestamp && (
-              <p className="text-xs text-slate-500 truncate max-w-[500px] font-normal mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[500px] font-normal mt-0.5">
                 {conversation.last_message || "No messages yet."}
               </p>
             )}
           </div>
           
-          <div className="flex items-center gap-4 text-xs font-medium text-slate-400 whitespace-nowrap">
+          <div className="flex items-center gap-4 text-xs font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
             <div className="flex items-center gap-1.5" title="Message count">
               <MessageSquare className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
-              <span className="group-hover:text-slate-600 transition-colors text-[10px] leading-none">{conversation.message_count}</span>
+              <span className="group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors text-[10px] leading-none">{conversation.message_count}</span>
             </div>
             <div className="flex items-center gap-1.5 min-w-[80px] justify-end" title="Last updated">
               <Clock className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
-              <span className="group-hover:text-slate-600 transition-colors text-[10px] leading-none" suppressHydrationWarning>
+              <span className="group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors text-[10px] leading-none" suppressHydrationWarning>
                 {conversation.updated_at 
                   ? formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true })
                   : 'Just now'}
@@ -201,7 +201,7 @@ export function ConversationListItem({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-8 w-8 rounded-full hover:bg-slate-200/50 -mr-2 text-slate-400 hover:text-slate-600 opacity-70 hover:opacity-100 transition-all"
+                      className="h-8 w-8 rounded-full hover:bg-slate-200/50 dark:hover:bg-white/10 -mr-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 opacity-70 hover:opacity-100 transition-all"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>

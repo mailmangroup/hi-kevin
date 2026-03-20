@@ -46,7 +46,7 @@ export function ThinkingDisplay({ content, isStreaming = false }: ThinkingDispla
             <div className="pl-4 py-1 text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {content}
               {isStreaming && (
-                <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-primary/50 animate-pulse" />
+                <span className="inline-block w-1.5 h-3 ml-1 align-baseline bg-primary/40 animate-pulse" />
               )}
             </div>
           </div>
