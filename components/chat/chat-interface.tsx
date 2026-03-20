@@ -547,8 +547,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     const hasInitialContent = pendingMessageRef.current !== null || initialQuery !== undefined || images.length > 0 || documents.length > 0
     
     if (!conversationId && !chatId && hasInitialContent) {
+        if (credentialsLoading) return
+        if (initialized.current) return
         initialized.current = true
-        
+
         const textToSend = pendingMessageRef.current ?? initialQuery ?? ""
         if (textToSend) {
             setInput(textToSend)
