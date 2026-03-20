@@ -1246,12 +1246,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               {/* Assistant Avatar */}
               {message.role !== "user" && (
                 <div className="flex-shrink-0 mt-1">
-                   <Image 
-                     src="/kevin-icon.svg" 
-                     alt="Kevin" 
-                     width={32} 
-                     height={32} 
-                     className="w-8 h-8 rounded-full shadow-sm"
+                   <Image
+                     src="/kevin-icon.svg"
+                     alt="Kevin"
+                     width={32}
+                     height={32}
+                     className={cn("w-8 h-8", message.isStreaming && "animate-kevin-pulse")}
                      unoptimized
                    />
                 </div>

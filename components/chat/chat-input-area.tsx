@@ -438,8 +438,12 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] glass-input flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-elevated dark:bg-slate-900/70 dark:border-slate-700/60", className)}>
-      {/* Citation Context Indicator */}
+    <div className={cn("relative group", className)}>
+      {/* Glow Effect Background */}
+      <div className="absolute -inset-[1px] rounded-[1.5rem] transition-all duration-500 opacity-0 group-focus-within:opacity-100 shadow-[0_0_20px_rgba(99,102,241,0.3)] dark:shadow-[0_0_25px_rgba(99,102,241,0.4)] pointer-events-none z-0" />
+      
+      <div className="relative rounded-[1.5rem] glass-input flex flex-col transition-all duration-300 group-focus-within:border-primary/50 group-focus-within:ring-1 group-focus-within:ring-primary/50 dark:bg-slate-900/70 dark:border-slate-700/60 z-10">
+        {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">
               <div className="bg-primary/10 text-primary text-xs font-medium px-3 py-1 rounded-full backdrop-blur-sm border border-primary/20 shadow-sm flex items-center gap-1.5 max-w-[90%] truncate">
@@ -761,6 +765,7 @@ export function ChatInputArea({
                 </Button>
             )}
         </div>
+      </div>
       </div>
     </div>
   )

@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@keyframes kevin-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+.animate-kevin-pulse {
+  animation: kevin-pulse 1.2s ease-in-out infinite;
+}
+
 @plugin "tailwindcss-animate";
 @custom-variant dark (&:where(.dark, .dark *));
 
