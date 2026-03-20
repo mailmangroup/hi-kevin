@@ -198,9 +198,8 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
     <div className="group/item relative flex items-center">
         <Link
             href={chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`}
-            prefetch={false}
             className={cn(
-                "flex-1 flex items-center rounded-lg px-3 py-2 leading-relaxed text-[13px] font-medium transition-all pr-8", 
+                "flex-1 flex items-center rounded-lg px-3 py-2 leading-relaxed text-[13px] font-medium transition-all pr-8",
                 isActive
                     ? "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-primary dark:text-primary-foreground shadow-sm border border-white/60 dark:border-slate-700/60"
                     : "text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200"
@@ -391,23 +390,19 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Chat History Section - scrollable */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-3 mt-4">
-            <Link href="/chat/agent" prefetch={false} className="block mb-1 px-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer">
+            <Link href="/chat/agent" className="block mb-1 px-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer">
                 History
             </Link>
             <div className="space-y-1">
                 <div className="flex items-center gap-1">
-                    <Link href="/chat/agent/new" prefetch={false} className="flex-1">
-                        <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition-all hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 text-left">
+                    <Link href="/chat/agent/new" className="flex-1 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition-all hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 text-left">
                             <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
                                 <MessageSquare className="h-2.5 w-2.5 text-slate-500 dark:text-slate-400" />
                             </div>
                             New Chat
-                        </button>
                     </Link>
-                    <Link href="/chat/deep-agent/new" prefetch={false} title="New Lobster Mode Chat">
-                        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
+                    <Link href="/chat/deep-agent/new" title="New Lobster Mode Chat" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
                             <LobsterIcon className="h-3.5 w-3.5" />
-                        </button>
                     </Link>
                 </div>
                 {chatHistory.map((chat) => {
@@ -421,7 +416,6 @@ export function Sidebar({ className }: { className?: string }) {
             {chatHistory.length < totalChats && (
                 <Link
                     href="/chat/agent"
-                    prefetch={false}
                     className="block text-xs text-center text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200 hover:underline transition-all py-1 cursor-pointer"
                 >
                     Showing {chatHistory.length} of {totalChats} chats
@@ -434,7 +428,6 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex items-center gap-2">
             <Link
                 href="/dashboard/settings"
-                prefetch={false}
                 className="flex-1 flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 p-2 shadow-sm transition-all hover:shadow-md border border-transparent dark:border-slate-700"
             >
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">

@@ -309,7 +309,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
       // navigated away and came back mid-stream), subscribe to the registry
       // and sync state from the buffered snapshot instead of loading history.
       const session = streamRegistry.getSession(chatId)
-      
+
       // Always restore from session if available (even if finished) to avoid
       // race conditions where backend hasn't indexed the new messages yet.
       if (session) {
@@ -318,7 +318,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
         if (session.lastArtifact) {
           openArtifact(session.lastArtifact as ArtifactData)
         }
-        
+
         // If still streaming, subscribe to updates
         if (session.isStreaming) {
           setIsThinking(true)
@@ -340,6 +340,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
       // Load history and title in parallel
       loadHistory(chatId)
       loadConversationTitle(chatId)
+    } else {
+      // Navigated to "new" chat — reset all state
+      setConversationId(undefined)
+      setMessages([])
+      setConversationTitle("")
+      setIsThinking(false)
+      setIsFavorite(false)
+      justCreatedConversationId.current = undefined
     }
   }, [chatId])
 

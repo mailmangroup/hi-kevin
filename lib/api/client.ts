@@ -421,7 +421,6 @@ export const aiService = {
         },
         fastPath?: string,
         deepAgent?: boolean,
-        maxResearchSteps?: number,
         sqlEnabled?: boolean
     }
   ): AsyncGenerator<any, void, unknown> {
@@ -445,7 +444,7 @@ export const aiService = {
         stream: true,
         model: model,
         include_web_search: options.includeWebSearch ?? true,
-        thinking_enabled: options.thinkingEnabled ?? false,
+        thinking_enabled: options.thinkingEnabled ?? true,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
         images: options.images,
         document_ids: options.documentIds,
@@ -485,7 +484,7 @@ export const aiService = {
         brand_id: brandId,
         project_id: options.projectId,
         model: model,
-        max_research_steps: options.maxResearchSteps ?? 5,
+        thinking_enabled: options.thinkingEnabled ?? true,
         include_web_search: options.includeWebSearch ?? true,
       }
     }
