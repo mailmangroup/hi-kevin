@@ -355,6 +355,36 @@ export function ChatInputArea({
     }
   }
 
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageItems = items.filter(item => item.type.startsWith('image/'))
+    if (imageItems.length === 0) return
+
+    e.preventDefault()
+    const newImages: UploadedImage[] = []
+
+    for (const item of imageItems) {
+      const file = item.getAsFile()
+      if (!file) continue
+      const id = Math.random().toString(36).substring(7)
+      const filename = file.name || `pasted-image-${Date.now()}.png`
+      const namedFile = new File([file], filename, { type: file.type })
+      const imageObj: UploadedImage = {
+        id,
+        url: URL.createObjectURL(namedFile),
+        file: namedFile,
+        uploading: true
+      }
+      newImages.push(imageObj)
+    }
+
+    if (newImages.length === 0) return
+    setSelectedImages(prev => [...prev, ...newImages])
+    for (const img of newImages) {
+      uploadImage(img)
+    }
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing || isComposing.current) {
       return
@@ -570,6 +600,7 @@ export function ChatInputArea({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
+            onPaste={handlePaste}
             onCompositionStart={() => { isComposing.current = true }}
             onCompositionEnd={() => { isComposing.current = false }}
             placeholder={placeholder}
