@@ -58,6 +58,7 @@ export interface ToolCall {
   output?: any
   state: 'running' | 'completed' | 'failed'
   artifact?: any
+  executeStatus?: "executing" | "done" | "error"
 }
 
 export interface Message {
@@ -1019,6 +1020,36 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                 }
                 streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
               }
+          }
+
+          // Handle execute_status events — update the running execute tool with sandbox status
+          if (chunk.type === "execute_status") {
+              const execStatus = chunk.status as string
+              contentParts = contentParts.map((part): ContentPart => {
+                  if (part.type === "tool" && part.tool && part.tool.name === "execute" && part.tool.state === "running") {
+                      return {
+                          ...part,
+                          tool: {
+                              ...part.tool,
+                              executeStatus: execStatus === "started" ? "executing" as const
+                                  : execStatus === "completed" ? "done" as const
+                                  : execStatus === "error" ? "error" as const
+                                  : undefined,
+                          },
+                      }
+                  }
+                  return part
+              })
+
+              const updatedToolCalls = contentParts
+                  .filter(p => p.type === "tool" && p.tool)
+                  .map(p => p.tool!)
+
+              setMessages((prev) => prev.map(msg => {
+                  if (msg.id !== assistantMsgId) return msg
+                  return { ...msg, toolCalls: updatedToolCalls, contentParts: [...contentParts] }
+              }))
+              pushToRegistry()
           }
 
           // Handle streaming tool input args (for create_artifact content preview)

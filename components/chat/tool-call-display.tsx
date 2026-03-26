@@ -20,6 +20,7 @@ const TOOL_ICONS: Record<string, string> = {
   extract_post_analysis: "✨",
   crawl_url: "🌐",
   python_execute: "🐍",
+  execute: "💻",
   default: "⚡",
 }
 
@@ -37,6 +38,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   extract_post_analysis: "Extracting Post Analysis",
   crawl_url: "Crawling Web Page",
   python_execute: "Running Python Code",
+  execute: "Running Command",
 }
 
 export interface ToolCall {
@@ -46,6 +48,7 @@ export interface ToolCall {
   output?: any
   artifact?: any
   state: "running" | "completed" | "failed"
+  executeStatus?: "executing" | "done" | "error"
 }
 
 interface ToolCallDisplayProps {
@@ -117,6 +120,11 @@ export function ToolCallDisplay({ tool, defaultExpanded = false, isFirst = false
             <span className="text-sm font-medium text-foreground truncate">
               {displayName}
             </span>
+            {tool.state === "running" && tool.name === "execute" && tool.executeStatus === "executing" && (
+              <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
+                Running in sandbox...
+              </span>
+            )}
             <span className="text-xs text-muted-foreground hidden sm:inline-block opacity-0 group-hover/btn:opacity-100 transition-opacity truncate ml-1">
               {tool.name}
             </span>

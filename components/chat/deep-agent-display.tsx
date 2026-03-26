@@ -51,6 +51,11 @@ function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["acti
         <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
       )}
       <span className="truncate flex-1">{label}</span>
+      {tc.status === "running" && tc.tool === "execute" && tc.executeStatus === "executing" && (
+        <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
+          Running...
+        </span>
+      )}
       {hasArtifact && onOpenArtifact && (
         <button
           onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}

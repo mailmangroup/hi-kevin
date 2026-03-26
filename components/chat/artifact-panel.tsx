@@ -36,14 +36,8 @@ const ARTIFACT_ICONS = {
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  get_account_insights: "Account Insights",
-  get_content_performance: "Content Performance",
   search_web: "Web Search Results",
   web_search: "Web Search Results",
-  analyze_competitors: "Competitor Analysis",
-  generate_content: "Generated Content",
-  schedule_post: "Scheduled Post",
-  get_audience_data: "Audience Data",
 }
 
 const MIN_PANEL_WIDTH = 400

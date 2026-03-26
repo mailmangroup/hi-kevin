@@ -5,10 +5,7 @@
 
 // Tool names that map to specific artifact types
 const BRAND_POST_TOOLS = new Set([
-  'analyze_brand_content',
-  'search_post',
-  'get_brand_posts',
-  'get_brand_data',
+  'run_skill',
   'extract_post_analysis',
 ])
 

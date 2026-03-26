@@ -40,6 +40,7 @@ export interface SubagentStreamInterface {
     output?: string
     artifact?: any
     status: "running" | "completed"
+    executeStatus?: "executing" | "done" | "error"
   }>
 }
 
@@ -92,6 +93,37 @@ export function useDeepAgentStream() {
           })),
         },
       }))
+      return true
+    }
+
+    // Subagent execute status — update the active tool with execution state
+    if (type === "subagent_execute_status") {
+      const subagentId = String(chunk.subagent_id ?? "")
+      if (!subagentId) return true
+      setAndSync(prev => {
+        const existing = prev.subagents.get(subagentId)
+        if (!existing) return prev
+        const subagents = new Map(prev.subagents)
+        const next: SubagentStreamInterface = { ...existing }
+        const tools = [...next.activeTools]
+
+        if (chunk.status === "started") {
+          // Mark the latest running "execute" tool as actively executing
+          const idx = tools.findLastIndex(t => t.tool === "execute" && t.status === "running")
+          if (idx >= 0) {
+            tools[idx] = { ...tools[idx], executeStatus: "executing" }
+          }
+        } else if (chunk.status === "completed" || chunk.status === "error") {
+          const idx = tools.findLastIndex(t => t.tool === "execute" && t.status === "running")
+          if (idx >= 0) {
+            tools[idx] = { ...tools[idx], executeStatus: chunk.status === "completed" ? "done" : "error" }
+          }
+        }
+
+        next.activeTools = tools
+        subagents.set(subagentId, next)
+        return { ...prev, subagents }
+      })
       return true
     }
 
