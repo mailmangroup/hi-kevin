@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { BarChart3, Code, Table2, FileText, ExternalLink, ChevronRight } from "lucide-react"
+import { BarChart3, Code, Table2, FileText, ExternalLink, ChevronRight, Image, FileDown } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
 import { isWebSearch as isWebSearchData, extractWebSearchResults } from "@/lib/utils/artifact-types"
@@ -15,6 +15,7 @@ const ARTIFACT_ICONS = {
   html: FileText,
   markdown: FileText,
   mermaid: Code,
+  file: FileDown,
 }
 
 const ARTIFACT_COLORS = {
@@ -74,6 +75,13 @@ const ARTIFACT_COLORS = {
     text: "text-cyan-900",
     subtext: "text-cyan-600",
   },
+  file: {
+    bg: "bg-indigo-50 hover:bg-indigo-100",
+    border: "border-indigo-200 hover:border-indigo-300",
+    icon: "text-indigo-600",
+    text: "text-indigo-900",
+    subtext: "text-indigo-600",
+  },
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -107,11 +115,14 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
     return `${toolName || "artifact"}-${JSON.stringify(artifact).slice(0, 50)}`
   }, [artifact, toolName])
 
-  // Normalize data: pass full artifact object for create_artifact so renderers can access content + language
-  const artifactData = (artifact?.type === "artifact") ? artifact : (artifact?.data ?? artifact?.content ?? artifact)
+  // Normalize data: pass full artifact object for file/create_artifact so renderers can access all fields
+  const artifactData = artifactType === "file"
+    ? artifact
+    : (artifact?.type === "artifact") ? artifact : (artifact?.data ?? artifact?.content ?? artifact)
 
   // Extract title and description
-  const title = artifact?.title ||
+  const title = (artifactType === "file" ? artifact?.filename : null) ||
+    artifact?.title ||
     (toolName ? TOOL_DISPLAY_NAMES[toolName] : null) ||
     getDefaultTitle(artifactType)
 
@@ -171,7 +182,9 @@ export function ArtifactSnippet({ artifact, toolName, className }: ArtifactSnipp
 }
 
 // Helper to determine artifact type from data or tool name
-function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
+function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" | "file" {
+  // File artifacts from deliver_file_to_user
+  if (artifact?.oss_key && artifact?.filename) return "file"
   // Backend create_artifact sends { type: "artifact", artifact_type: "html"|"markdown"|"code"|"mermaid" }
   if (artifact?.type === "artifact" && artifact?.artifact_type) {
     return artifact.artifact_type
@@ -219,11 +232,16 @@ function getDefaultTitle(type: string): string {
     html: "HTML",
     markdown: "Markdown",
     mermaid: "Diagram",
+    file: "File",
   }
   return titles[type] || "Artifact"
 }
 
 function getArtifactDescription(artifact: any, toolName?: string): string | null {
+  // File artifacts show description
+  if (artifact?.oss_key && artifact?.filename) {
+    return artifact?.description || "Click to preview"
+  }
   // Check session info
   if (artifact?.session) {
     const parts: string[] = []

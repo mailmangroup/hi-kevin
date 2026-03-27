@@ -291,41 +291,185 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
   )
 }
 
+/** Detect renderable file category from filename extension */
+function getFileCategory(filename: string): "image" | "pdf" | "html" | "markdown" | "video" | "audio" | "other" {
+  const ext = (filename || "").split(".").pop()?.toLowerCase() || ""
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"].includes(ext)) return "image"
+  if (ext === "pdf") return "pdf"
+  if (["html", "htm"].includes(ext)) return "html"
+  if (["md", "markdown"].includes(ext)) return "markdown"
+  if (["mp4", "webm", "ogg", "mov"].includes(ext)) return "video"
+  if (["mp3", "wav", "ogg", "aac", "flac"].includes(ext)) return "audio"
+  return "other"
+}
+
 function FileArtifactContent({ data }: { data: any }) {
   const [loading, setLoading] = React.useState(false)
+  const [fileUrl, setFileUrl] = React.useState<string | null>(data?.oss_url || null)
+  const [error, setError] = React.useState<string | null>(null)
+  const retryCountRef = React.useRef(0)
 
-  const handleDownload = async () => {
-    if (!data?.document_id || !data?.conversation_id) return
+  const filename: string = data?.filename || "File"
+  const category = getFileCategory(filename)
+
+  // Fetch a fresh signed URL (handles expired pre-signed URLs)
+  const refreshUrl = React.useCallback(async () => {
+    if (!data?.document_id || !data?.conversation_id) return null
     setLoading(true)
+    setError(null)
     try {
       const { document_url } = await aiService.getConversationDocumentUrl(data.conversation_id, data.document_id)
-      window.open(document_url, "_blank", "noopener,noreferrer")
+      setFileUrl(document_url)
+      retryCountRef.current = 0
+      return document_url
     } catch (err) {
-      if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to get download URL:", err)
+      setError("Failed to load file URL")
+      if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to get URL:", err)
+      return null
     } finally {
       setLoading(false)
     }
+  }, [data?.document_id, data?.conversation_id])
+
+  // Auto-retry once on load error (e.g. expired signed URL)
+  const handleLoadError = React.useCallback(() => {
+    if (retryCountRef.current < 1 && data?.document_id) {
+      retryCountRef.current += 1
+      refreshUrl()
+    } else {
+      setError("Failed to load file — the URL may have expired")
+    }
+  }, [refreshUrl, data?.document_id])
+
+  // Auto-fetch URL on mount if we don't have one and the file is renderable
+  React.useEffect(() => {
+    if (!fileUrl && category !== "other") {
+      refreshUrl()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDownload = async () => {
+    const url = fileUrl || (await refreshUrl())
+    if (url) window.open(url, "_blank", "noopener,noreferrer")
   }
 
+  // --- Inline renderers by category ---
+  const renderInlinePreview = () => {
+    if (!fileUrl) return null
+
+    switch (category) {
+      case "image":
+        return (
+          <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-gray-200 min-h-[200px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fileUrl}
+              alt={data?.description || filename}
+              className="max-w-full max-h-[600px] rounded-lg object-contain"
+              onError={handleLoadError}
+            />
+          </div>
+        )
+
+      case "pdf":
+        return (
+          <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
+            <iframe
+              src={fileUrl}
+              title={filename}
+              className="w-full h-full"
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        )
+
+      case "html":
+        return (
+          <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
+            <iframe
+              src={fileUrl}
+              title={filename}
+              className="w-full h-full bg-white"
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        )
+
+      case "video":
+        return (
+          <div className="rounded-lg border border-gray-200 overflow-hidden bg-black">
+            <video controls className="w-full max-h-[500px]" preload="metadata">
+              <source src={fileUrl} />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        )
+
+      case "audio":
+        return (
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <audio controls className="w-full" preload="metadata">
+              <source src={fileUrl} />
+              Your browser does not support the audio tag.
+            </audio>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  const inlinePreview = renderInlinePreview()
+
   return (
-    <div className="flex flex-col items-center justify-center py-12 gap-4">
-      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100">
-        <Download className="h-7 w-7 text-blue-500" />
+    <div className="flex flex-col gap-4">
+      {/* Header with filename + download */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 text-sm truncate">{filename}</p>
+          {data?.description && (
+            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{data.description}</p>
+          )}
+        </div>
+        <button
+          onClick={handleDownload}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Download
+        </button>
       </div>
-      <div className="text-center">
-        <p className="font-medium text-gray-900 text-sm">{data?.filename || "File"}</p>
-        {data?.description && (
-          <p className="text-xs text-gray-500 mt-1 max-w-xs">{data.description}</p>
-        )}
-      </div>
-      <button
-        onClick={handleDownload}
-        disabled={loading || !data?.document_id}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-        Download
-      </button>
+
+      {/* Error state */}
+      {error && (
+        <div className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          {error}
+          <button onClick={refreshUrl} className="ml-2 underline hover:no-underline">Retry</button>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && !inlinePreview && (
+        <div className="flex items-center justify-center py-12 gap-2 text-gray-400">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Loading preview...</span>
+        </div>
+      )}
+
+      {/* Inline preview */}
+      {inlinePreview}
+
+      {/* Fallback for non-previewable files */}
+      {!inlinePreview && !loading && !error && (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100">
+            <Download className="h-6 w-6 text-blue-500" />
+          </div>
+          <p className="text-xs text-gray-400">Preview not available for this file type</p>
+        </div>
+      )}
     </div>
   )
 }

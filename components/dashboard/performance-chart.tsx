@@ -34,7 +34,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
                       <li><span className="font-medium">XHS:</span> like + share + comment + fav + danmaku</li>
                       <li><span className="font-medium">SPH:</span> fav + like + forward + comment</li>
                       <li><span className="font-medium">Weibo:</span> likes + reposts + comments</li>
-                      <li><span className="font-medium">WeChat:</span> share + add_to_fav</li>
+                      <li><span className="font-medium">WeChat:</span> likes + recommends + shares + favorites + comments</li>
                       <li><span className="font-medium">Douyin:</span> digg + share + comment + completion + subscribe + forward + download</li>
                       <li><span className="font-medium">Bilibili:</span> like + reply + share + fav + coin + danmaku</li>
                     </ul>
