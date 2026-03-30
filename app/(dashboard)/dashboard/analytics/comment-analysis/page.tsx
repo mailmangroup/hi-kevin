@@ -6,13 +6,20 @@ import { directApiCall } from "@/lib/api/client"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { LoadingState } from "@/components/ui/loading"
 import { Button } from "@/components/ui/button"
-import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download, Database } from "lucide-react"
+import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download, Database, Layers, X } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { FileUploader } from "./file-uploader"
 import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
 import { DimensionAnalysis } from "./dimension-analysis"
 import { CommentList } from "./comment-list"
-import { analyzeContentStream, type AnalysisPhase } from "@/lib/api/content-analysis"
+import { analyzeContentStream, batchAnalyzeContentStream, type AnalysisPhase } from "@/lib/api/content-analysis"
 import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
@@ -25,13 +32,13 @@ type DataSource = {
   updated_at?: string
   comment_count?: number
   filename?: string
+  is_batch?: boolean
 }
 
 type Summary = {
   total_reviews: number
   tagged_reviews: number
   persona_count: number
-  avg_rating?: number
 }
 
 type PersonaTopic = {
@@ -107,11 +114,13 @@ type SchemaDimension = {
 type CommentAnalysisReport = {
   filename?: string
   analysis_date?: string
+  is_batch?: boolean
   summary: Summary
   insights?: Insights
   personas?: Persona[]
   sentiment_distribution?: Record<string, number>
   tag_statistics?: Record<string, number>
+  topic_distribution?: Record<string, number>
   tagged_data?: any[]
   schema_snapshot?: {
     dimensions: SchemaDimension[]
@@ -305,13 +314,6 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
           <div class="stat-value">${report.summary.persona_count}<span style="font-size: 0.875rem; color: #94a3b8;"> types</span></div>
           <div class="stat-accent" style="background: #a78bfa;"></div>
         </div>
-        ${report.summary.avg_rating && report.summary.avg_rating > 0 ? `
-        <div class="stat-card">
-          <div class="stat-label">Avg Rating</div>
-          <div class="stat-value">${report.summary.avg_rating}<span style="font-size: 0.875rem; color: #94a3b8;">/5</span></div>
-          <div class="stat-accent" style="background: #fbbf24;"></div>
-        </div>
-        ` : ''}
       </div>
     </div>
 
@@ -989,6 +991,101 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
   URL.revokeObjectURL(url)
 }
 
+type ModelMode = "flash" | "plus" | "flash-thinking" | "plus-thinking"
+const MODEL_MODE_OPTIONS: ModelMode[] = ["flash", "plus", "flash-thinking", "plus-thinking"]
+
+function BatchModal({
+  sources,
+  postContents,
+  onPostContentChange,
+  onAnalyze,
+  onClose,
+}: {
+  sources: DataSource[]
+  postContents: Record<string, string>
+  onPostContentChange: (id: string, value: string) => void
+  onAnalyze: (name: string, modelInsights: ModelMode) => void
+  onClose: () => void
+}) {
+  const [batchName, setBatchName] = useState(`Batch Analysis (${sources.map(s => s.name).join(", ").slice(0, 40)}${sources.length > 2 ? "..." : ""})`)
+  const [modelInsights, setModelInsights] = useState<ModelMode>("plus-thinking")
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            <h2 className="font-serif text-lg font-semibold text-slate-900 dark:text-slate-100">Batch Analysis</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Batch Name</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={batchName}
+              onChange={e => setBatchName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Insights model</label>
+            <Select value={modelInsights} onValueChange={(v: ModelMode) => setModelInsights(v)}>
+              <SelectTrigger className="mt-1 bg-white dark:bg-slate-800">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODEL_MODE_OPTIONS.map(mode => (
+                  <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Selected Posts — Add post content for better synthesis (optional)
+            </p>
+            {sources.map(source => (
+              <div key={source.id} className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{source.name}</span>
+                  <span className="ml-auto text-xs text-slate-400">{source.comment_count || 0} reviews</span>
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Optional: paste the original post content here..."
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                  value={postContents[source.id] || ""}
+                  onChange={e => onPostContentChange(source.id, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 px-6 py-4">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            onClick={() => onAnalyze(batchName, modelInsights)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+          >
+            <Layers className="h-4 w-4" />
+            Analyze {sources.length} Posts
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CommentAnalysisPage() {
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
@@ -999,9 +1096,16 @@ export default function CommentAnalysisPage() {
   
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isAnalyzingBatch, setIsAnalyzingBatch] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<number>(0)
   const [analysisMessage, setAnalysisMessage] = useState<string>("")
   const [showUploader, setShowUploader] = useState(false)
+
+  // Batch Mode State
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set())
+  const [showBatchModal, setShowBatchModal] = useState(false)
+  const [batchPostContents, setBatchPostContents] = useState<Record<string, string>>({})
 
   // Load sources on mount
   useEffect(() => {
@@ -1079,6 +1183,7 @@ export default function CommentAnalysisPage() {
     modelModes: AnalysisModelModes
   ) => {
     setIsAnalyzing(true)
+    setIsAnalyzingBatch(false)
     setAnalysisPhase(0)
     setAnalysisMessage("Starting analysis...")
     setShowUploader(false) // Hide uploader, show progress
@@ -1131,12 +1236,66 @@ export default function CommentAnalysisPage() {
     }
   }
 
+  const handleBatchAnalysis = async (batchName: string, modelInsights: ModelMode) => {
+    const ids = Array.from(selectedBatchIds)
+    setShowBatchModal(false)
+    setIsBatchMode(false)
+    setSelectedBatchIds(new Set())
+    setIsAnalyzing(true)
+    setIsAnalyzingBatch(true)
+    setAnalysisPhase(0)
+    setAnalysisMessage("Starting batch analysis...")
+
+    try {
+      const items = ids.map(id => ({
+        source_id: id,
+        post_content: batchPostContents[id] || undefined,
+      }))
+
+      const stream = batchAnalyzeContentStream({
+        items,
+        name: batchName || "Batch Analysis",
+        model_insights: modelInsights,
+      })
+
+      for await (const update of stream) {
+        if (typeof update.phase === 'number') {
+          setAnalysisPhase(update.phase)
+          if (update.message) setAnalysisMessage(update.message)
+        } else if (update.phase === 'done' && update.source_id) {
+          const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
+          const sources = response?.sources ?? []
+          setDataSources(sources)
+          setSelectedSourceId(update.source_id)
+          setIsAnalyzing(false)
+          setBatchPostContents({})
+          return
+        } else if (update.phase === 'error') {
+          throw new Error(update.message || "Batch analysis failed")
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err : new Error("Batch analysis failed"))
+      setIsAnalyzing(false)
+    }
+  }
+
   const totalSentiment = useMemo(() => {
     if (!report?.sentiment_distribution) return 0
     return Object.values(report.sentiment_distribution).reduce((sum, value) => sum + value, 0)
   }, [report?.sentiment_distribution])
 
   const topicDistribution = useMemo(() => {
+    // For batch reports use the aggregated topic_distribution
+    if (!report?.tagged_data && report?.topic_distribution) {
+      const dist = report.topic_distribution
+      const total = Object.values(dist).reduce((s, v) => s + v, 0)
+      return Object.entries(dist)
+        .filter(([t]) => t && !EXCLUDED_TAG_VALUES.has(t))
+        .map(([topic, count]) => ({ topic, count, percent: total ? Math.round((count / total) * 1000) / 10 : 0 }))
+        .sort((a, b) => b.count - a.count)
+    }
     if (!report?.tagged_data) return []
     const dist: Record<string, number> = {}
     let total = 0
@@ -1149,7 +1308,7 @@ export default function CommentAnalysisPage() {
     return Object.entries(dist)
       .map(([topic, count]) => ({ topic, count, percent: total ? Math.round((count / total) * 1000) / 10 : 0 }))
       .sort((a, b) => b.count - a.count)
-  }, [report?.tagged_data])
+  }, [report?.tagged_data, report?.topic_distribution])
 
   const handleDeleteSource = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -1188,6 +1347,40 @@ export default function CommentAnalysisPage() {
                 AI-powered insights from your customer feedback
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              {isBatchMode ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setIsBatchMode(false); setSelectedBatchIds(new Set()) }}
+                    className="gap-1.5 text-slate-500"
+                  >
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={selectedBatchIds.size < 2}
+                    onClick={() => setShowBatchModal(true)}
+                    className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <Layers className="h-4 w-4" />
+                    Analyze {selectedBatchIds.size > 0 ? `(${selectedBatchIds.size})` : "Selected"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBatchMode(true)}
+                  className="gap-1.5"
+                >
+                  <Layers className="h-4 w-4" />
+                  Batch Analysis
+                </Button>
+              )}
+            </div>
           </header>
 
           {error && (
@@ -1214,58 +1407,116 @@ export default function CommentAnalysisPage() {
             </div>
 
             {/* Report Cards */}
-            {dataSources.map((source) => (
-              <div
-                key={source.id}
-                onClick={() => setSelectedSourceId(source.id)}
-                className="group relative flex h-64 cursor-pointer flex-col justify-between rounded-xl border border-white/50 dark:border-slate-700/50 bg-white dark:bg-slate-800 p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
-                      <BarChart3 className="h-5 w-5" />
+            {dataSources.map((source) => {
+              const isSelectable = isBatchMode && !source.is_batch
+              const isSelected = selectedBatchIds.has(source.id)
+              return (
+                <div
+                  key={source.id}
+                  onClick={() => {
+                    if (isBatchMode) {
+                      if (!isSelectable) return
+                      setSelectedBatchIds(prev => {
+                        const next = new Set(prev)
+                        if (next.has(source.id)) next.delete(source.id)
+                        else next.add(source.id)
+                        return next
+                      })
+                    } else {
+                      setSelectedSourceId(source.id)
+                    }
+                  }}
+                  className={cn(
+                    "group relative flex h-64 flex-col justify-between rounded-xl border bg-white dark:bg-slate-800 p-6 shadow-sm transition-all",
+                    isBatchMode
+                      ? isSelectable
+                        ? isSelected
+                          ? "cursor-pointer border-indigo-500 ring-2 ring-indigo-400 shadow-md"
+                          : "cursor-pointer border-white/50 dark:border-slate-700/50 hover:-translate-y-1 hover:shadow-md hover:border-indigo-300"
+                        : "cursor-not-allowed opacity-50 border-white/50 dark:border-slate-700/50"
+                      : "cursor-pointer border-white/50 dark:border-slate-700/50 hover:-translate-y-1 hover:shadow-md"
+                  )}
+                >
+                  {/* Batch mode checkbox */}
+                  {isBatchMode && isSelectable && (
+                    <div className={cn(
+                      "absolute top-3 left-3 flex h-5 w-5 items-center justify-center rounded border-2 transition-colors",
+                      isSelected ? "border-indigo-500 bg-indigo-500" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                    )}>
+                      {isSelected && <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      {source.updated_at && (
-                        <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                          <Clock className="h-3 w-3" />
-                          {formatAnalysisDate(source.updated_at)}
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-300 dark:text-slate-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => handleDeleteSource(e, source.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="line-clamp-2 font-serif text-lg font-medium text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                      {source.name}
-                    </h3>
-                    {source.filename && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                        <FileText className="h-3 w-3" />
-                        {source.filename}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                  )}
 
-                <div className="flex items-center gap-4 border-t border-slate-100 dark:border-slate-700 pt-4 text-sm text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <MessageSquare className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                    <span>{source.comment_count || 0} reviews</span>
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className={cn(
+                        "flex h-10 w-10 items-center justify-center rounded-lg",
+                        source.is_batch
+                          ? "bg-violet-50 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400"
+                          : "bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400"
+                      )}>
+                        {source.is_batch ? <Layers className="h-5 w-5" /> : <BarChart3 className="h-5 w-5" />}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {source.is_batch && (
+                          <span className="rounded-full bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                            Batch
+                          </span>
+                        )}
+                        {source.updated_at && (
+                          <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                            <Clock className="h-3 w-3" />
+                            {formatAnalysisDate(source.updated_at)}
+                          </span>
+                        )}
+                        {!isBatchMode && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-300 dark:text-slate-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => handleDeleteSource(e, source.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="line-clamp-2 font-serif text-lg font-medium text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                        {source.name}
+                      </h3>
+                      {source.filename && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                          <FileText className="h-3 w-3" />
+                          {source.filename}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 border-t border-slate-100 dark:border-slate-700 pt-4 text-sm text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <MessageSquare className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                      <span>{source.comment_count || 0} reviews</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
+
+        {/* Batch Modal */}
+        {showBatchModal && (
+          <BatchModal
+            sources={dataSources.filter(s => selectedBatchIds.has(s.id))}
+            postContents={batchPostContents}
+            onPostContentChange={(id, value) => setBatchPostContents(prev => ({ ...prev, [id]: value }))}
+            onAnalyze={handleBatchAnalysis}
+            onClose={() => setShowBatchModal(false)}
+          />
+        )}
       </div>
     )
   }
@@ -1289,12 +1540,19 @@ export default function CommentAnalysisPage() {
             </Button>
           )}
           <div>
-            <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              {isAnalyzing ? "Analyzing Content..." : showUploader ? "New Analysis" : report?.filename || "Analysis Report"}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-serif text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                {isAnalyzing ? "Analyzing Content..." : showUploader ? "New Analysis" : report?.filename || "Analysis Report"}
+              </h1>
+              {!isAnalyzing && !showUploader && selectedSourceId && dataSources.find(s => s.id === selectedSourceId)?.is_batch && (
+                <span className="rounded-full bg-violet-100 dark:bg-violet-900/40 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                  Batch
+                </span>
+              )}
+            </div>
             {!isAnalyzing && !showUploader && report && (
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                 <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {report.summary.total_reviews} reviews</span>
+                 <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {report.summary.total_reviews} comments</span>
                  <span>·</span>
                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {report.analysis_date && formatAnalysisDate(report.analysis_date)}</span>
               </p>
@@ -1336,7 +1594,7 @@ export default function CommentAnalysisPage() {
       <div className="relative min-h-screen text-slate-900 dark:text-slate-100">
         <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
           {renderHeader()}
-          <AnalysisProgress phase={analysisPhase} message={analysisMessage} />
+          <AnalysisProgress phase={analysisPhase} message={analysisMessage} isBatch={isAnalyzingBatch} />
         </div>
       </div>
     )
@@ -1403,44 +1661,34 @@ export default function CommentAnalysisPage() {
       <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
         {renderHeader()}
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Total Reviews</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
-              {summary.total_reviews}
-              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
-            </div>
-            <div className="absolute inset-y-0 left-0 w-1 bg-sky-400" />
-          </div>
-          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Tagged</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
-              {summary.tagged_reviews}
-              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
-            </div>
-            <div className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
-          </div>
-          <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
-            <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Personas</div>
-            <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
-              {summary.persona_count}
-              <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">types</span>
-            </div>
-            <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
-          </div>
-          {summary.avg_rating !== undefined && summary.avg_rating > 0 ? (
+        {!report.is_batch && (
+          <section className="grid gap-4 md:grid-cols-4">
             <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
-              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Avg Rating</div>
+              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Total Comments</div>
               <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
-                {summary.avg_rating}
-                <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">/5</span>
+                {summary.total_reviews}
+                <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
               </div>
-              <div className="absolute inset-y-0 left-0 w-1 bg-amber-400" />
+              <div className="absolute inset-y-0 left-0 w-1 bg-sky-400" />
             </div>
-          ) : (
-            <div className="hidden md:block" />
-          )}
-        </section>
+            <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Tagged</div>
+              <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
+                {summary.tagged_reviews}
+                <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">items</span>
+              </div>
+              <div className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
+            </div>
+            <div className="relative overflow-hidden rounded-xl border border-white/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-sm p-5">
+              <div className="text-[0.7rem] uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Personas</div>
+              <div className="mt-3 font-mono text-3xl font-semibold text-slate-900 dark:text-slate-100">
+                {summary.persona_count}
+                <span className="ml-1 text-sm text-slate-400 dark:text-slate-500">types</span>
+              </div>
+              <div className="absolute inset-y-0 left-0 w-1 bg-purple-400" />
+            </div>
+          </section>
+        )}
 
         {/* 1. Insights */}
         {report.insights && !report.insights.error && (

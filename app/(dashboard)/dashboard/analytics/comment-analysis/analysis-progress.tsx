@@ -6,19 +6,15 @@ import { Loader2 } from "lucide-react"
 interface AnalysisProgressProps {
   phase: number
   message: string
+  isBatch?: boolean
 }
 
-export function AnalysisProgress({ phase, message }: AnalysisProgressProps) {
-  // Phase 0-4 mapping to percentage
-  const progress = Math.min(100, Math.max(5, (phase + 1) * 20))
+export function AnalysisProgress({ phase, message, isBatch = false }: AnalysisProgressProps) {
+  const steps = isBatch
+    ? ["Fetching Reports", "Synthesizing Insights", "Saving"]
+    : ["Schema Generation", "Tagging & Sentiment", "Persona Analysis", "Insights Generation", "Finalizing"]
 
-  const steps = [
-    "Schema Generation",
-    "Tagging & Sentiment",
-    "Persona Analysis",
-    "Insights Generation",
-    "Finalizing"
-  ]
+  const progress = Math.min(100, Math.max(5, Math.round(((phase + 1) / steps.length) * 100)))
 
   return (
     <div className="w-full max-w-xl mx-auto space-y-6 py-12">
