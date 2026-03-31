@@ -70,7 +70,7 @@ const DEFAULT_TIMEOUT_MS = 30_000 // 30 seconds
 
 export async function directApiCall<T>(
   endpoint: string,
-  options?: RequestInit & { timeoutMs?: number }
+  options?: RequestInit & { timeoutMs?: number; includeOrgBrandHeaders?: boolean }
 ): Promise<T> {
   const config = getKawoConfig()
 
@@ -82,10 +82,16 @@ export async function directApiCall<T>(
 
   // Ensure headers are properly set
   const headers = new Headers(options?.headers)
-  headers.set('Content-Type', 'application/json')
   headers.set('Authorization', `Bearer ${config.token}`)
-  headers.set('X-KAWO-Org-Id', config.orgId)
-  headers.set('X-KAWO-Brand-Id', config.brandId)
+  if (options?.includeOrgBrandHeaders !== false) {
+    headers.set('X-KAWO-Org-Id', config.orgId)
+    headers.set('X-KAWO-Brand-Id', config.brandId)
+  }
+
+  const hasBody = options?.body !== undefined && options?.body !== null
+  if (hasBody && !(options?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), options?.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -124,6 +130,9 @@ export async function directApiCall<T>(
     clearTimeout(timeoutId)
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(`Request to ${endpoint} timed out`)
+    }
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error(`Failed to reach ${endpoint}. This is usually a network/CORS/proxy issue, not an auth token issue.`)
     }
     throw err
   }

@@ -1118,7 +1118,8 @@ export default function CommentAnalysisPage() {
         setError(null)
 
         const response = await directApiCall<{ sources: DataSource[] }>(
-          "content-analysis/data-sources"
+          "content-analysis/data-sources",
+          { includeOrgBrandHeaders: false }
         )
 
         if (!isMounted) return
@@ -1157,7 +1158,8 @@ export default function CommentAnalysisPage() {
         setShowUploader(false)
 
         const response = await directApiCall<CommentAnalysisReport>(
-          `content-analysis/content-analysis?source_id=${encodeURIComponent(sourceId)}`
+          `content-analysis/content-analysis?source_id=${encodeURIComponent(sourceId)}`,
+          { includeOrgBrandHeaders: false }
         )
 
         if (!isMounted) return
@@ -1222,7 +1224,7 @@ export default function CommentAnalysisPage() {
             if (progress.message) setAnalysisMessage(progress.message)
           }
         } else if (job.status === 'done' && job.results?.source_id) {
-          const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
+          const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources", { includeOrgBrandHeaders: false })
           const sources = response?.sources ?? []
           setDataSources(sources)
           setSelectedSourceId(job.results.source_id)
@@ -1272,7 +1274,7 @@ export default function CommentAnalysisPage() {
             if (progress.message) setAnalysisMessage(progress.message)
           }
         } else if (job.status === 'done' && job.results?.source_id) {
-          const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
+          const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources", { includeOrgBrandHeaders: false })
           const sources = response?.sources ?? []
           setDataSources(sources)
           setSelectedSourceId(job.results.source_id)
