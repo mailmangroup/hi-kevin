@@ -19,7 +19,7 @@ import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
 import { DimensionAnalysis } from "./dimension-analysis"
 import { CommentList } from "./comment-list"
-import { analyzeContentStream, batchAnalyzeContentStream, type AnalysisPhase } from "@/lib/api/content-analysis"
+import { createAnalysisJob, createBatchAnalysisJob, pollJob, type AnalysisPhase } from "@/lib/api/content-analysis"
 import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
@@ -1198,7 +1198,7 @@ export default function CommentAnalysisPage() {
         replies: c.replies,
       }))
 
-      const stream = analyzeContentStream({
+      const { job_id } = await createAnalysisJob({
         items,
         filename,
         name: name || filename.split('.')[0] || "Uploaded Analysis",
@@ -1211,21 +1211,24 @@ export default function CommentAnalysisPage() {
         model_insights: modelModes.model_insights,
       })
 
-      for await (const update of stream) {
-        if (typeof update.phase === 'number') {
-          setAnalysisPhase(update.phase)
-          if (update.message) setAnalysisMessage(update.message)
-        } else if (update.phase === 'done' && update.source_id) {
-          // Analysis complete
-          // Reload sources and select the new one
+      while (true) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const job = await pollJob(job_id)
+        if (job.status === 'processing') {
+          const partial = job.partial_results
+          if (partial && typeof partial.phase === 'number') {
+            setAnalysisPhase(partial.phase)
+            if (partial.message) setAnalysisMessage(partial.message)
+          }
+        } else if (job.status === 'done' && job.results?.source_id) {
           const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
           const sources = response?.sources ?? []
           setDataSources(sources)
-          setSelectedSourceId(update.source_id)
+          setSelectedSourceId(job.results.source_id)
           setIsAnalyzing(false)
           return
-        } else if (update.phase === 'error') {
-          throw new Error(update.message || "Analysis failed")
+        } else if (job.status === 'error') {
+          throw new Error(job.error || "Analysis failed")
         }
       }
     } catch (err) {
@@ -1252,26 +1255,31 @@ export default function CommentAnalysisPage() {
         post_content: batchPostContents[id] || undefined,
       }))
 
-      const stream = batchAnalyzeContentStream({
+      const { job_id } = await createBatchAnalysisJob({
         items,
         name: batchName || "Batch Analysis",
         model_insights: modelInsights,
       })
 
-      for await (const update of stream) {
-        if (typeof update.phase === 'number') {
-          setAnalysisPhase(update.phase)
-          if (update.message) setAnalysisMessage(update.message)
-        } else if (update.phase === 'done' && update.source_id) {
+      while (true) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const job = await pollJob(job_id)
+        if (job.status === 'processing') {
+          const partial = job.partial_results
+          if (partial && typeof partial.phase === 'number') {
+            setAnalysisPhase(partial.phase)
+            if (partial.message) setAnalysisMessage(partial.message)
+          }
+        } else if (job.status === 'done' && job.results?.source_id) {
           const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
           const sources = response?.sources ?? []
           setDataSources(sources)
-          setSelectedSourceId(update.source_id)
+          setSelectedSourceId(job.results.source_id)
           setIsAnalyzing(false)
           setBatchPostContents({})
           return
-        } else if (update.phase === 'error') {
-          throw new Error(update.message || "Batch analysis failed")
+        } else if (job.status === 'error') {
+          throw new Error(job.error || "Batch analysis failed")
         }
       }
     } catch (err) {
