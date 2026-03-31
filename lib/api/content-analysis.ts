@@ -56,12 +56,13 @@ export function getJobProgress(job: JobStatus): AnalysisPhase | null {
 }
 
 function getHeaders(config: ReturnType<typeof getKawoConfig>) {
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${config.token}`,
-    'X-KAWO-Org-Id': config.orgId!,
-    'X-KAWO-Brand-Id': config.brandId!,
   }
+  if (config.orgId) headers['X-KAWO-Org-Id'] = config.orgId
+  if (config.brandId) headers['X-KAWO-Brand-Id'] = config.brandId
+  return headers
 }
 
 export async function createAnalysisJob(
@@ -69,7 +70,7 @@ export async function createAnalysisJob(
 ): Promise<{ job_id: string; source_id?: string }> {
   const config = getKawoConfig()
 
-  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+  if (!config.apiUrl || !config.token) {
     throw new Error('KAWO credentials not configured')
   }
 
@@ -94,7 +95,7 @@ export async function createBatchAnalysisJob(
 ): Promise<{ job_id: string; source_id?: string }> {
   const config = getKawoConfig()
 
-  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+  if (!config.apiUrl || !config.token) {
     throw new Error('KAWO credentials not configured')
   }
 
@@ -117,7 +118,7 @@ export async function createBatchAnalysisJob(
 export async function pollJob(job_id: string): Promise<JobStatus> {
   const config = getKawoConfig()
 
-  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+  if (!config.apiUrl || !config.token) {
     throw new Error('KAWO credentials not configured')
   }
 

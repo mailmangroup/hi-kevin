@@ -74,8 +74,12 @@ export async function directApiCall<T>(
 ): Promise<T> {
   const config = getKawoConfig()
 
-  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+  if (!config.apiUrl || !config.token) {
     throw new Error('KAWO credentials not configured. Please complete setup.')
+  }
+
+  if (options?.includeOrgBrandHeaders !== false && (!config.orgId || !config.brandId)) {
+    throw new Error('KAWO Organization and Brand IDs not configured. Please complete setup.')
   }
 
   const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`
@@ -84,8 +88,8 @@ export async function directApiCall<T>(
   const headers = new Headers(options?.headers)
   headers.set('Authorization', `Bearer ${config.token}`)
   if (options?.includeOrgBrandHeaders !== false) {
-    headers.set('X-KAWO-Org-Id', config.orgId)
-    headers.set('X-KAWO-Brand-Id', config.brandId)
+    headers.set('X-KAWO-Org-Id', config.orgId!)
+    headers.set('X-KAWO-Brand-Id', config.brandId!)
   }
 
   const hasBody = options?.body !== undefined && options?.body !== null

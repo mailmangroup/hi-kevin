@@ -23,6 +23,7 @@ import { createAnalysisJob, createBatchAnalysisJob, getJobProgress, pollJob } fr
 import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
+import { useUserStore } from "@/lib/store/user-store"
 import type { AnalysisModelModes } from "./file-uploader"
 
 type DataSource = {
@@ -1088,6 +1089,8 @@ function BatchModal({
 }
 
 export default function CommentAnalysisPage() {
+  const profile = useUserStore(state => state.profile)
+
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [report, setReport] = useState<CommentAnalysisReport | null>(null)
@@ -1110,6 +1113,8 @@ export default function CommentAnalysisPage() {
 
   // Load sources on mount
   useEffect(() => {
+    if (!profile?.kawo_token) return
+
     let isMounted = true
 
     async function loadSources() {
@@ -1138,10 +1143,11 @@ export default function CommentAnalysisPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [profile?.kawo_token])
 
   // Load report when source changes
   useEffect(() => {
+    if (!profile?.kawo_token) return
     if (!selectedSourceId) {
       setReport(null)
       return
@@ -1176,7 +1182,7 @@ export default function CommentAnalysisPage() {
     return () => {
       isMounted = false
     }
-  }, [selectedSourceId])
+  }, [selectedSourceId, profile?.kawo_token])
 
   const handleFileProcessed = async (
     comments: ProcessedComment[],
