@@ -19,7 +19,7 @@ import { AnalysisProgress } from "./analysis-progress"
 import { TopicAnalysis } from "./topic-analysis"
 import { DimensionAnalysis } from "./dimension-analysis"
 import { CommentList } from "./comment-list"
-import { createAnalysisJob, createBatchAnalysisJob, pollJob, type AnalysisPhase } from "@/lib/api/content-analysis"
+import { createAnalysisJob, createBatchAnalysisJob, getJobProgress, pollJob } from "@/lib/api/content-analysis"
 import { sentimentLabel, sentimentColor, sentimentBadgeClass } from "@/lib/utils/sentiment"
 import type { ProcessedComment } from "@/lib/utils/file-processor"
 import { cn } from "@/lib/utils"
@@ -128,6 +128,7 @@ type CommentAnalysisReport = {
 }
 
 const EXCLUDED_TAG_VALUES = new Set(["Unknown", "unknown", "不明", "未提及", "nan", "None"])
+const ANALYSIS_POLL_INTERVAL_MS = 10000
 
 function formatAnalysisDate(value?: string) {
   if (!value) return ""
@@ -1212,13 +1213,13 @@ export default function CommentAnalysisPage() {
       })
 
       while (true) {
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => setTimeout(resolve, ANALYSIS_POLL_INTERVAL_MS))
         const job = await pollJob(job_id)
         if (job.status === 'processing') {
-          const partial = job.partial_results
-          if (partial && typeof partial.phase === 'number') {
-            setAnalysisPhase(partial.phase)
-            if (partial.message) setAnalysisMessage(partial.message)
+          const progress = getJobProgress(job)
+          if (progress && typeof progress.phase === 'number') {
+            setAnalysisPhase(progress.phase)
+            if (progress.message) setAnalysisMessage(progress.message)
           }
         } else if (job.status === 'done' && job.results?.source_id) {
           const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")
@@ -1262,13 +1263,13 @@ export default function CommentAnalysisPage() {
       })
 
       while (true) {
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => setTimeout(resolve, ANALYSIS_POLL_INTERVAL_MS))
         const job = await pollJob(job_id)
         if (job.status === 'processing') {
-          const partial = job.partial_results
-          if (partial && typeof partial.phase === 'number') {
-            setAnalysisPhase(partial.phase)
-            if (partial.message) setAnalysisMessage(partial.message)
+          const progress = getJobProgress(job)
+          if (progress && typeof progress.phase === 'number') {
+            setAnalysisPhase(progress.phase)
+            if (progress.message) setAnalysisMessage(progress.message)
           }
         } else if (job.status === 'done' && job.results?.source_id) {
           const response = await directApiCall<{ sources: DataSource[] }>("content-analysis/data-sources")

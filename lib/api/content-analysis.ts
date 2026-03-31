@@ -42,10 +42,17 @@ export type JobStatus = {
   job_id: string
   status: "processing" | "done" | "error"
   results: any
-  partial_results: any
+  partial_results?: any
   error?: string
   created_at?: string
   updated_at?: string
+  status_url?: string
+  events_url?: string
+}
+
+export function getJobProgress(job: JobStatus): AnalysisPhase | null {
+  const progress = job.status === "processing" ? (job.results ?? job.partial_results) : null
+  return progress && typeof progress === "object" ? progress as AnalysisPhase : null
 }
 
 function getHeaders(config: ReturnType<typeof getKawoConfig>) {
