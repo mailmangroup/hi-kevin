@@ -42,8 +42,9 @@ export function TopicAnalysis({ taggedData, sentimentDistribution }: TopicAnalys
       // Filter by sentiment if selected
       if (selectedSentiment && sentimentInt(item.sentiment) !== sentimentInt(selectedSentiment)) return
 
-      const topic = item.topic ?? ""
-      
+      const rawTopic = item.topic ?? ""
+      const topic = (rawTopic === "其他" || rawTopic === "") ? "" : rawTopic
+
       if (!stats[topic]) {
         stats[topic] = { count: 0, likes: 0, replies: 0, score: 0, comments: [], sentimentBreakdown: {} }
       }
