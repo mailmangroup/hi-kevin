@@ -1164,7 +1164,7 @@ export default function CommentAnalysisPage() {
         setShowUploader(false)
 
         const response = await directApiCall<CommentAnalysisReport>(
-          `content-analysis/content-analysis?source_id=${encodeURIComponent(sourceId)}`,
+          `content-analysis?source_id=${encodeURIComponent(sourceId)}`,
           { includeOrgBrandHeaders: false }
         )
 
