@@ -10,6 +10,7 @@ export default function NewDeepAgentChatPage({
   return (
     <Suspense fallback={<LoadingState />}>
       <DeepAgentChatInterface
+        key="deep-agent-new"
         initialMessage={searchParams.q}
         projectId={searchParams.projectId}
       />

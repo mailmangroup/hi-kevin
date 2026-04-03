@@ -191,7 +191,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
   }
 
   const { profile, isLoading: isProfileLoading } = useUserStore()
-  const { state: deepAgentState, processEvent: processDeepAgentEvent, reset: resetDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
+  const { state: deepAgentState, processEvent: processDeepAgentEvent, reset: resetDeepAgent, hydrate: hydrateDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
 
   const credentials = React.useMemo(() => ({
     orgId: profile?.kawo_org_id || undefined,
@@ -291,6 +291,28 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     return mode === "deep_agent" ? `/chat/deep-agent/${id}` : `/chat/agent/${id}`
   }, [])
 
+  const hydrateDeepAgentFromMessages = React.useCallback((nextMessages: Message[]) => {
+    if (!effectiveDeepAgent) {
+      resetDeepAgent()
+      return
+    }
+
+    for (let messageIndex = nextMessages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+      const parts = nextMessages[messageIndex].deepStreamParts
+      if (!parts?.length) continue
+
+      for (let partIndex = parts.length - 1; partIndex >= 0; partIndex -= 1) {
+        const part = parts[partIndex]
+        if (part.type === "deep_agent" && part.deepAgent) {
+          hydrateDeepAgent(part.deepAgent)
+          return
+        }
+      }
+    }
+
+    resetDeepAgent()
+  }, [effectiveDeepAgent, hydrateDeepAgent, resetDeepAgent])
+
   React.useEffect(() => {
     if (!chatId || !conversationMode) return
     let mounted = true
@@ -326,6 +348,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
       if (session) {
         setConversationId(chatId)
         setMessages([...session.messages])
+        hydrateDeepAgentFromMessages(session.messages)
         if (session.lastArtifact) {
           openArtifact(session.lastArtifact as ArtifactData)
         }
@@ -337,6 +360,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
             const s = streamRegistry.getSession(chatId)
             if (!s) return
             setMessages([...s.messages])
+            hydrateDeepAgentFromMessages(s.messages)
             setIsThinking(s.isStreaming)
             if (!s.isStreaming) {
               // Stream finished while we were away — load the authoritative title
@@ -445,6 +469,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           // API returns messages in order; sort preserves that for messages with
           // real timestamps and uses index-based fallback for checkpointer messages.
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+          hydrateDeepAgentFromMessages(formattedMessages)
           
           setMessages(prev => {
               // Create a Set of IDs from the fetched history for O(1) lookup

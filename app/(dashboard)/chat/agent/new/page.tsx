@@ -10,6 +10,7 @@ export default function NewAgentChatPage({
   return (
     <Suspense fallback={<LoadingState />}>
       <AgentChatInterface
+        key="agent-new"
         initialMessage={searchParams.q}
         projectId={searchParams.projectId}
       />

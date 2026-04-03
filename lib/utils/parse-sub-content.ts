@@ -194,7 +194,15 @@ export function parseSubContentList(subContentList: any[] = []): {
         contentParts.push({ type: 'text', content: textVal })
       }
     } else if (item.type === 'thinking') {
-      contentParts.push({ type: 'thinking', content: item.thinking || item.content })
+      const thinkingPart = { type: 'thinking', content: item.thinking || item.content } as ContentPart
+      // If we've seen a deep_agent_state, or if we know this is a deep agent, 
+      // we could push to deepStreamParts, but checking subContentList is safer
+      const isDeepAgent = subContentList.some(i => i.type === 'deep_agent_state')
+      if (isDeepAgent) {
+        deepStreamParts.push(thinkingPart)
+      } else {
+        contentParts.push(thinkingPart)
+      }
     }
   }
 

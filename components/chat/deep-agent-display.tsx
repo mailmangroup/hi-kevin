@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle, FileDown, Eye } from "lucide-react"
+import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle, FileDown, Eye, ListTodo } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
 import { useArtifact, ArtifactData } from "./artifact-context"
@@ -72,40 +72,80 @@ function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["acti
 // --- Todo List (exported for sticky rendering in chat-interface) ---
 
 export function TodoList({ todos }: { todos: TodoItem[] }) {
+  const [isExpanded, setIsExpanded] = React.useState(false)
   const activeItem = todos.find(t => t.status === "in_progress")
+  const completedCount = todos.filter(todo => todo.status === "completed").length
+  const pendingCount = todos.length - completedCount
 
   return (
-    <div className="mb-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm max-w-2xl">
-      <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-        {todos.map(todo => {
-          const done = todo.status === "completed"
-          const active = todo.status === "in_progress"
-          return (
-            <li key={todo.id} className="flex items-center gap-3 px-4 py-2.5">
-              {done ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-              ) : active ? (
-                <Loader2 className="h-5 w-5 text-blue-500 animate-spin flex-shrink-0" />
-              ) : (
-                <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600 flex-shrink-0" />
-              )}
-              <span className={cn(
-                "text-sm truncate",
-                done && "line-through text-gray-400 dark:text-gray-600",
-                active && "text-gray-800 dark:text-gray-100 font-medium",
-                !done && !active && "text-gray-500 dark:text-gray-400",
-              )}>
-                {todo.content}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      {activeItem && (
-        <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin flex-shrink-0" />
-          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{activeItem.content}</span>
+    <div className="mb-3 max-w-2xl rounded-lg border border-blue-200/70 bg-white/95 shadow-sm dark:border-blue-800/40 dark:bg-gray-900/90">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-colors"
+      >
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+          <ListTodo className="h-3.5 w-3.5" />
         </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-800 dark:text-gray-100">
+            <span>Plan</span>
+            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              {completedCount}/{todos.length}
+            </span>
+            {pendingCount > 0 && (
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                {pendingCount} left
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+            {activeItem ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-blue-500 flex-shrink-0" />
+                <span className="truncate">{activeItem.content}</span>
+              </>
+            ) : (
+              <span className="truncate">
+                {completedCount === todos.length ? "All tasks completed" : "Show task list"}
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 flex-shrink-0 text-gray-400 transition-transform dark:text-gray-500",
+            isExpanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {isExpanded && (
+        <ul className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
+          {todos.map(todo => {
+            const done = todo.status === "completed"
+            const active = todo.status === "in_progress"
+            return (
+              <li key={todo.id} className="flex items-start gap-2.5 py-1.5">
+                {done ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" />
+                ) : active ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+                ) : (
+                  <Circle className="mt-0.5 h-4 w-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                )}
+                <span className={cn(
+                  "min-w-0 text-xs leading-5",
+                  done && "line-through text-gray-400 dark:text-gray-600",
+                  active && "font-medium text-gray-800 dark:text-gray-100",
+                  !done && !active && "text-gray-500 dark:text-gray-400",
+                )}>
+                  {todo.content}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )

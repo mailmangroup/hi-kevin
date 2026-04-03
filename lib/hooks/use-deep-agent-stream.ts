@@ -264,6 +264,25 @@ export function useDeepAgentStream() {
     setState(empty)
   }, [])
 
+  const hydrate = useCallback((nextState: DeepAgentStreamState) => {
+    const hydrated: DeepAgentStreamState = {
+      ...nextState,
+      subagents: new Map(nextState.subagents),
+      subagentOrder: [...nextState.subagentOrder],
+      messageOrder: [...nextState.messageOrder],
+      subagentsByMessage: Object.fromEntries(
+        Object.entries(nextState.subagentsByMessage).map(([messageId, ids]) => [messageId, [...ids]])
+      ),
+      values: {
+        ...nextState.values,
+        todos: [...nextState.values.todos],
+      },
+    }
+
+    stateRef.current = hydrated
+    setState(hydrated)
+  }, [])
+
   const getState = useCallback((): DeepAgentStreamState => stateRef.current, [])
 
   const getSubagentsByMessage = useCallback((messageId: string): SubagentStreamInterface[] => {
@@ -272,5 +291,5 @@ export function useDeepAgentStream() {
     return ids.map(id => current.subagents.get(id)).filter(Boolean) as SubagentStreamInterface[]
   }, [])
 
-  return { state, processEvent, reset, getState, getSubagentsByMessage }
+  return { state, processEvent, reset, hydrate, getState, getSubagentsByMessage }
 }

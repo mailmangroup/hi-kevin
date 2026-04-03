@@ -237,6 +237,17 @@ export interface ProjectDocument {
   processed_at?: string
 }
 
+export interface Skill {
+  id: string
+  name: string
+  description: string
+  content: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+  files: string[]
+}
+
 export interface MemoryFact {
   id: string
   content: string
@@ -1034,6 +1045,49 @@ export const aiService = {
     return directApiCall('agent/simple/query', {
       method: 'POST',
       body: JSON.stringify(payload)
+    })
+  },
+
+  /**
+   * Generate Command Center analysis
+   * Uses command_center fast path for specialized workflows
+   */
+  /**
+   * Get all skills for the current user
+   */
+  async getSkills(): Promise<{ skills: Skill[] }> {
+    return directApiCall('agent/skills', { includeOrgBrandHeaders: false })
+  },
+
+  /**
+   * Create a new skill
+   */
+  async createSkill(data: { name: string; description: string; content: string }): Promise<Skill> {
+    return directApiCall('agent/skills', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      includeOrgBrandHeaders: false
+    })
+  },
+
+  /**
+   * Update a skill
+   */
+  async updateSkill(id: string, data: Partial<Pick<Skill, 'name' | 'description' | 'content' | 'is_enabled'>>): Promise<Skill> {
+    return directApiCall(`agent/skills/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      includeOrgBrandHeaders: false
+    })
+  },
+
+  /**
+   * Delete a skill
+   */
+  async deleteSkill(id: string): Promise<{ message: string }> {
+    return directApiCall(`agent/skills/${id}`, {
+      method: 'DELETE',
+      includeOrgBrandHeaders: false
     })
   },
 

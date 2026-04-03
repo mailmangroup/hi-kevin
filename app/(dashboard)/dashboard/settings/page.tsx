@@ -6,20 +6,22 @@ import { useTheme } from 'next-themes'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Save, Bell, Globe, User, Key, CheckCircle, Loader2, Brain } from "lucide-react"
+import { Save, Bell, Globe, User, Key, CheckCircle, Loader2, Brain, Zap } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { useUserStore } from "@/lib/store/user-store"
 import { directApiCall } from "@/lib/api/client"
 import { cn } from "@/lib/utils/cn"
 import { UserMemorySection } from "@/components/settings/user-memory-section"
+import { SkillsSection } from "@/components/settings/skills-section"
 
-type SettingsPageKey = 'general' | 'connection' | 'memory'
+type SettingsPageKey = 'general' | 'connection' | 'memory' | 'skills'
 
 const SETTINGS_PAGES: { key: SettingsPageKey; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { key: 'general', label: 'General', icon: User },
   { key: 'connection', label: 'Connection', icon: Key },
   { key: 'memory', label: 'Memory', icon: Brain },
+  { key: 'skills', label: 'Skills', icon: Zap },
 ]
 
 export default function SettingsPage() {
@@ -500,6 +502,8 @@ export default function SettingsPage() {
           )}
 
           {activePage === 'memory' && <UserMemorySection />}
+
+          {activePage === 'skills' && <SkillsSection />}
         </div>
       </div>
     </div>

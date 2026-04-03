@@ -11,7 +11,11 @@ export default function ChatPage({
 }) {
   return (
     <Suspense fallback={<LoadingState />}>
-      <AgentChatInterface chatId={params.id} initialMessage={searchParams.q} />
+      <AgentChatInterface
+        key={params.id}
+        chatId={params.id}
+        initialMessage={searchParams.q}
+      />
     </Suspense>
   )
 }

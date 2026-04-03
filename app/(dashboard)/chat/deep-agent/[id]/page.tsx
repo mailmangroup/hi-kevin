@@ -12,6 +12,7 @@ export default function DeepAgentChatPage({
   return (
     <Suspense fallback={<LoadingState />}>
       <DeepAgentChatInterface
+        key={params.id}
         chatId={params.id}
         initialMessage={searchParams.q}
       />
