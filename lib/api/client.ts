@@ -510,6 +510,8 @@ export const aiService = {
         model: model,
         thinking_enabled: options.thinkingEnabled ?? true,
         include_web_search: options.includeWebSearch ?? true,
+        images: options.images,
+        document_ids: options.documentIds,
       }
     }
 
