@@ -306,6 +306,7 @@ function getFileCategory(filename: string): "image" | "pdf" | "html" | "markdown
 function FileArtifactContent({ data }: { data: any }) {
   const [loading, setLoading] = React.useState(false)
   const [fileUrl, setFileUrl] = React.useState<string | null>(data?.oss_url || null)
+  const [fileContent, setFileContent] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const retryCountRef = React.useRef(0)
 
@@ -320,6 +321,20 @@ function FileArtifactContent({ data }: { data: any }) {
     try {
       const { document_url } = await aiService.getConversationDocumentUrl(data.conversation_id, data.document_id)
       setFileUrl(document_url)
+
+      // For HTML and Markdown, attempt to fetch the raw text so we can render it natively
+      if (category === "html" || category === "markdown") {
+        try {
+          const res = await fetch(document_url)
+          if (res.ok) {
+            const text = await res.text()
+            setFileContent(text)
+          }
+        } catch (fetchErr) {
+          if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to fetch content text:", fetchErr)
+        }
+      }
+
       retryCountRef.current = 0
       return document_url
     } catch (err) {
@@ -329,7 +344,7 @@ function FileArtifactContent({ data }: { data: any }) {
     } finally {
       setLoading(false)
     }
-  }, [data?.document_id, data?.conversation_id])
+  }, [data?.document_id, data?.conversation_id, category])
 
   // Auto-retry once on load error (e.g. expired signed URL)
   const handleLoadError = React.useCallback(() => {
@@ -345,6 +360,14 @@ function FileArtifactContent({ data }: { data: any }) {
   React.useEffect(() => {
     if (!fileUrl && category !== "other") {
       refreshUrl()
+    } else if (fileUrl && (category === "html" || category === "markdown") && !fileContent) {
+      // If we already have the URL but need the content for native rendering
+      fetch(fileUrl)
+        .then(res => res.ok ? res.text() : null)
+        .then(text => { if (text) setFileContent(text) })
+        .catch(err => {
+          if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to fetch content:", err)
+        })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -384,16 +407,29 @@ function FileArtifactContent({ data }: { data: any }) {
         )
 
       case "html":
+        if (fileContent) {
+          return <HtmlContent data={fileContent} />
+        }
         return (
           <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
             <iframe
               src={fileUrl}
               title={filename}
               className="w-full h-full bg-white"
-              sandbox="allow-same-origin allow-scripts"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             />
           </div>
         )
+
+      case "markdown":
+        if (fileContent) {
+          return (
+            <div className="p-4 bg-white rounded-lg border border-gray-200">
+              <MarkdownContent data={fileContent} />
+            </div>
+          )
+        }
+        return null
 
       case "video":
         return (
