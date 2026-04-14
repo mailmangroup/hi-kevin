@@ -94,6 +94,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   generate_artifact: "Generated Artifact",
   schedule_post: "Scheduled Post",
   get_audience_data: "Audience Data",
+  write_file: "Written File",
 }
 
 interface ArtifactSnippetProps {

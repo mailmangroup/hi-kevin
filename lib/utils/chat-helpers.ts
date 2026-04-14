@@ -39,6 +39,7 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   generate_content: "Generated Content",
   schedule_post: "Scheduled Post",
   get_audience_data: "Audience Data",
+  write_file: "Written File",
 }
 
 export function getToolDisplayName(toolName: string): string {

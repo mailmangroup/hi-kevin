@@ -81,7 +81,7 @@ export interface Message {
  * Extract fields from a partial JSON string being streamed as tool call args.
  * Handles incomplete JSON where the content value may still be streaming.
  */
-function extractPartialArtifactArgs(partial: string): {
+function extractPartialArtifactArgs(partial: string, toolName: string): {
   title: string | null
   content: string | null
   artifact_type: string | null
@@ -90,11 +90,16 @@ function extractPartialArtifactArgs(partial: string): {
   // Try full parse first
   try {
     const obj = JSON.parse(partial)
+    const filePath = obj.file_path
+    let language = obj.language
+    if (toolName === "write_file" && !language && filePath) {
+      language = filePath.split('.').pop()
+    }
     return {
-      title: obj.title ?? null,
+      title: obj.title ?? (toolName === "write_file" && filePath ? filePath.split('/').pop() : null),
       content: obj.content ?? null,
-      artifact_type: obj.artifact_type ?? null,
-      language: obj.language ?? null,
+      artifact_type: obj.artifact_type ?? (toolName === "write_file" ? "code" : null),
+      language: language ?? null,
     }
   } catch {
     // Fall through to partial extraction
@@ -127,11 +132,22 @@ function extractPartialArtifactArgs(partial: string): {
     return result
   }
 
+  const title = extractField('title')
+  const filePath = extractField('file_path')
+  const content = extractField('content')
+  const artifactType = extractField('artifact_type')
+  let language = extractField('language')
+
+  if (toolName === "write_file" && !language && filePath) {
+    const ext = filePath.split('.').pop()
+    if (ext) language = ext
+  }
+
   return {
-    title: extractField('title'),
-    content: extractField('content'),
-    artifact_type: extractField('artifact_type'),
-    language: extractField('language'),
+    title: title || (toolName === "write_file" && filePath ? filePath.split('/').pop() || filePath : null),
+    content,
+    artifact_type: artifactType || (toolName === "write_file" ? "code" : null),
+    language,
   }
 }
 
@@ -1035,7 +1051,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                   isStreaming: false,
                 }
                 // If we already opened the panel during streaming, update content + mark complete
-                if (artifactPanelOpened && toolName === 'create_artifact') {
+                if (artifactPanelOpened && (toolName === 'create_artifact' || toolName === 'write_file')) {
                   updateArtifactContent(artifactData.data, {
                     title: artifactData.title,
                     isStreaming: false,
@@ -1088,8 +1104,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               artifactStreamAccum[idx].args += args_chunk
 
               const acc = artifactStreamAccum[idx]
-              if (acc.name === 'create_artifact') {
-                  const parsed = extractPartialArtifactArgs(acc.args)
+              if (acc.name === 'create_artifact' || acc.name === 'write_file') {
+                  const parsed = extractPartialArtifactArgs(acc.args, acc.name)
                   if (parsed.content !== null) {
                       const artifactType = (parsed.artifact_type || 'code') as ArtifactData['type']
                       const artifactData: ArtifactData = {
