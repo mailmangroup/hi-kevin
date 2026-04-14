@@ -24,12 +24,12 @@ export function ChartContent({ data }: { data: any }) {
   if (data?.chartType || data?.config) {
     return (
       <div className="text-center py-8">
-        <BarChart3 className="h-16 w-16 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">
+        <BarChart3 className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           {data.title || "Chart visualization"}
         </p>
         {data.description && (
-          <p className="text-xs text-gray-400 mt-2">{data.description}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{data.description}</p>
         )}
       </div>
     )
@@ -73,7 +73,7 @@ export function HtmlContent({ data }: { data: any }) {
 
   if (!html) return <p className="text-sm text-gray-500">No HTML content</p>
   return (
-    <div className="w-full rounded-lg border border-gray-200 overflow-hidden bg-white">
+    <div className="w-full rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
       <iframe
         ref={iframeRef}
         title="HTML artifact"
@@ -91,7 +91,7 @@ export function MarkdownContent({ data }: { data: any }) {
   const md = typeof data === "string" ? data : data?.content ?? data?.markdown ?? ""
   if (!md) return <p className="text-sm text-gray-500">No markdown content</p>
   return (
-    <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+    <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-blue-600 dark:prose-a:text-blue-400">
       <MessageContent content={md} />
     </div>
   )
@@ -134,7 +134,7 @@ export function MermaidContent({ data }: { data: any }) {
 
   if (!svg) {
     return (
-      <div className="flex items-center gap-2 py-8 text-sm text-gray-400">
+      <div className="flex items-center gap-2 py-8 text-sm text-gray-400 dark:text-gray-500">
         <span className="animate-spin">⟳</span> Rendering diagram…
       </div>
     )
@@ -142,7 +142,7 @@ export function MermaidContent({ data }: { data: any }) {
 
   return (
     <div
-      className="w-full overflow-auto rounded-lg border border-gray-200 bg-white p-4"
+      className="w-full overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
@@ -164,22 +164,22 @@ export function TableContent({ data }: { data: any }) {
     const headers = Object.keys(tableData[0])
 
     return (
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="min-w-full text-sm divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+        <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               {headers.map((header) => (
-                <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {formatHeader(header)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
             {tableData.map((row: any, idx: number) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
+              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 {headers.map((header) => (
-                  <td key={header} className="px-4 py-3 text-sm text-gray-600">
+                  <td key={header} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
                     {formatCellValue(row[header])}
                   </td>
                 ))}
@@ -195,22 +195,22 @@ export function TableContent({ data }: { data: any }) {
   if (tableData && typeof tableData === 'object' && Array.isArray(tableData.headers) && Array.isArray(tableData.rows)) {
     const { headers, rows } = tableData
     return (
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="min-w-full text-sm divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+        <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               {headers.map((header: any, idx: number) => (
-                <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {formatCellValue(header)}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
             {rows.map((row: any[], idx: number) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
+              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 {row.map((cell: any, cIdx: number) => (
-                  <td key={cIdx} className="px-4 py-3 text-sm text-gray-600">
+                  <td key={cIdx} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
                     {formatCellValue(cell)}
                   </td>
                 ))}
@@ -245,7 +245,7 @@ export function DataContent({ data }: { data: any }) {
         </div>
       )
     }
-    return <p className="text-sm text-gray-600 leading-relaxed">{data}</p>
+    return <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{data}</p>
   }
 
   const summaries = extractAllSummaries(data)
@@ -253,9 +253,9 @@ export function DataContent({ data }: { data: any }) {
     return (
       <div className="space-y-4">
         {summaries.map((summary, idx) => (
-          <div key={idx} className="border-b border-gray-100 pb-4 last:border-0">
+          <div key={idx} className="border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0">
             {summary.accountName && (
-              <div className="text-sm font-medium text-gray-700 mb-2">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {summary.accountName}
               </div>
             )}
@@ -268,7 +268,7 @@ export function DataContent({ data }: { data: any }) {
 
   return (
     <div className="overflow-x-auto">
-      <pre className="text-sm overflow-x-auto text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200">
+      <pre className="text-sm overflow-x-auto text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>
