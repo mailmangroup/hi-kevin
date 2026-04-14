@@ -49,6 +49,9 @@ export interface ToolCall {
   artifact?: any
   state: "running" | "completed" | "failed"
   executeStatus?: "executing" | "done" | "error"
+  command?: string
+  exitCode?: number
+  errorMessage?: string
 }
 
 interface ToolCallDisplayProps {

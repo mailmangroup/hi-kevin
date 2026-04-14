@@ -41,6 +41,9 @@ export interface SubagentStreamInterface {
     artifact?: any
     status: "running" | "completed"
     executeStatus?: "executing" | "done" | "error"
+    command?: string
+    exitCode?: number
+    errorMessage?: string
   }>
 }
 
@@ -111,12 +114,21 @@ export function useDeepAgentStream() {
           // Mark the latest running "execute" tool as actively executing
           const idx = tools.findLastIndex(t => t.tool === "execute" && t.status === "running")
           if (idx >= 0) {
-            tools[idx] = { ...tools[idx], executeStatus: "executing" }
+            tools[idx] = { 
+              ...tools[idx], 
+              executeStatus: "executing",
+              command: chunk.command
+            }
           }
         } else if (chunk.status === "completed" || chunk.status === "error") {
           const idx = tools.findLastIndex(t => t.tool === "execute" && t.status === "running")
           if (idx >= 0) {
-            tools[idx] = { ...tools[idx], executeStatus: chunk.status === "completed" ? "done" : "error" }
+            tools[idx] = { 
+              ...tools[idx], 
+              executeStatus: chunk.status === "completed" ? "done" : "error",
+              exitCode: chunk.exit_code,
+              errorMessage: chunk.error
+            }
           }
         }
 

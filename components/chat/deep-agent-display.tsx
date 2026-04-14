@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, CheckCircle2, XCircle, Loader2, Circle, FileDown, Eye, ListTodo } from "lucide-react"
+import { ChevronDown, Loader2, CheckCircle2, Circle, FileDown, Eye, XCircle, ListTodo } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
 import { useArtifact, ArtifactData } from "./artifact-context"
@@ -43,27 +43,47 @@ function formatToolCall(name: string, args?: Record<string, unknown>): string {
 function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["activeTools"][number]; onOpenArtifact?: (artifact: any, toolName: string) => void }) {
   const label = formatToolCall(tc.tool, tc.input)
   const hasArtifact = tc.artifact && typeof tc.artifact === "object" && Object.keys(tc.artifact).length > 0
+  const isError = tc.status === "completed" && tc.executeStatus === "error"
+
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400 py-0.5">
-      {tc.status === "running" ? (
-        <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />
-      ) : (
-        <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+    <div className="flex flex-col gap-1 py-0.5">
+      <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+        {tc.status === "running" ? (
+          <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />
+        ) : isError ? (
+          <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+        ) : (
+          <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+        )}
+        <span className="truncate flex-1">{label}</span>
+        {tc.status === "running" && tc.tool === "execute" && tc.executeStatus === "executing" && (
+          <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
+            Running...
+          </span>
+        )}
+        {hasArtifact && onOpenArtifact && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+          >
+            {tc.artifact?.oss_key ? <FileDown className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
+            {tc.artifact?.filename || "View"}
+          </button>
+        )}
+      </div>
+      
+      {/* Display command if available */}
+      {tc.tool === "execute" && tc.command && (
+        <div className="ml-5 font-mono text-[9px] text-gray-500 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded border border-gray-100 dark:border-gray-800 overflow-x-auto whitespace-pre">
+          $ {tc.command}
+        </div>
       )}
-      <span className="truncate flex-1">{label}</span>
-      {tc.status === "running" && tc.tool === "execute" && tc.executeStatus === "executing" && (
-        <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
-          Running...
-        </span>
-      )}
-      {hasArtifact && onOpenArtifact && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-        >
-          {tc.artifact?.oss_key ? <FileDown className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
-          {tc.artifact?.filename || "View"}
-        </button>
+      
+      {/* Display error message if execution failed */}
+      {isError && tc.errorMessage && (
+        <div className="ml-5 text-[10px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-100 dark:border-red-900/30">
+          {tc.errorMessage}
+        </div>
       )}
     </div>
   )
