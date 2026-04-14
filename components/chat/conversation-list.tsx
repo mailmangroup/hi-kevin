@@ -219,7 +219,7 @@ export function ConversationList({ conversationMode }: ConversationListProps) {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-xl bg-white/40 dark:bg-white/5" />
+            <Skeleton key={i} className="h-12 w-full rounded-lg bg-white/40 dark:bg-white/5" />
           ))}
         </div>
       ) : data?.conversations.length === 0 ? (

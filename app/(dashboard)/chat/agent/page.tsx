@@ -24,7 +24,7 @@ export default function AgentChatHistoryPage() {
           </Link>
         </div>
         <Suspense fallback={<div>Loading...</div>}>
-          <ConversationList conversationMode="agent" />
+          <ConversationList />
         </Suspense>
       </div>
     </div>

@@ -4,7 +4,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { MessageSquare, Clock, MoreHorizontal, Pencil, Star, Trash2, Check, Copy } from "lucide-react"
+import { Clock, MoreHorizontal, Pencil, Star, Trash2, Check, Copy } from "lucide-react"
 import { Conversation, aiService } from "@/lib/api/client"
 import { cn } from "@/lib/utils/cn"
 import {
@@ -131,7 +131,6 @@ export function ConversationListItem({
     // Otherwise let Link handle navigation
   }
 
-  const lastMessageIsTimestamp = conversation.last_message && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(conversation.last_message)
   const conversationPath = conversation.conversation_mode === "deep_agent"
     ? `/chat/deep-agent/${conversation.id}`
     : `/chat/agent/${conversation.id}`
@@ -144,7 +143,7 @@ export function ConversationListItem({
         onClick={handleItemClick}
       >
         <div className={cn(
-          "flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300",
+          "flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-300",
           // Glass/Aura Effect
           isSelected
             ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
@@ -168,22 +167,23 @@ export function ConversationListItem({
               <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate group-hover:text-primary transition-colors">
                 {conversation.title || "New Conversation"}
               </h3>
+              {conversation.conversation_mode === "deep_agent" && (
+                <span className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                  Lobster
+                </span>
+              )}
               {conversation.is_favorite && (
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-yellow-100 text-[9px] text-yellow-600">★</span>
               )}
             </div>
-            {!lastMessageIsTimestamp && (
+            {conversation.last_message && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(conversation.last_message) && (
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[500px] font-normal mt-0.5">
-                {conversation.last_message || "No messages yet."}
+                {conversation.last_message}
               </p>
             )}
           </div>
           
-          <div className="flex items-center gap-4 text-xs font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
-            <div className="flex items-center gap-1.5" title="Message count">
-              <MessageSquare className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
-              <span className="group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors text-[10px] leading-none">{conversation.message_count}</span>
-            </div>
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
             <div className="flex items-center gap-1.5 min-w-[80px] justify-end" title="Last updated">
               <Clock className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
               <span className="group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors text-[10px] leading-none" suppressHydrationWarning>
