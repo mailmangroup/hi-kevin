@@ -153,7 +153,16 @@ export function parseSubContentList(subContentList: any[] = []): {
         subagentOrder,
         messageOrder: ["coordinator"],
         subagentsByMessage: { coordinator: subagentOrder },
-        values: { todos: item.todos || [] },
+        values: {
+          todos: (Array.isArray(item.todos) ? item.todos : []).map((todo: any, index: number) => {
+            const status = todo?.status === "in_progress" || todo?.status === "completed" ? todo.status : "pending"
+            return {
+              id: String(todo?.id ?? `todo-${index}`),
+              content: String(todo?.content ?? todo?.description ?? todo?.title ?? ""),
+              status,
+            }
+          }),
+        },
         isComplete: true,
       }
       deepStreamParts.push({ type: "deep_agent", deepAgent: deepState })
