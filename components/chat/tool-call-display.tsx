@@ -144,8 +144,8 @@ export function ToolCallDisplay({ tool, defaultExpanded = false, isFirst = false
         "grid transition-all duration-300 ease-in-out",
         isExpanded ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 mt-0"
       )}>
-        <div className="overflow-hidden pl-7 pr-2">
-          <div className="rounded-md border border-border bg-muted/30 text-xs overflow-hidden">
+        <div className="overflow-hidden pl-7 pr-2 min-w-0">
+          <div className="rounded-md border border-border bg-muted/30 text-xs overflow-hidden min-w-0">
             {/* Input Section */}
             <div className="border-b border-border/50 px-3 py-2">
               <div className="font-mono text-[10px] font-medium text-muted-foreground uppercase mb-1">Input</div>
@@ -196,7 +196,7 @@ function ToolInputDisplay({ input }: { input: any }) {
 
   // Handle common input patterns
   if (typeof input === "string") {
-    return <span className="text-xs text-gray-600">{input}</span>
+    return <span className="text-xs text-gray-600 break-all">{input}</span>
   }
 
   // Format structured input nicely
@@ -208,9 +208,9 @@ function ToolInputDisplay({ input }: { input: any }) {
   return (
     <div className="space-y-1">
       {entries.map(([key, value]) => (
-        <div key={key} className="flex gap-2 text-xs">
-          <span className="text-gray-500 font-medium min-w-[80px]">{formatKey(key)}:</span>
-          <span className="text-gray-700">{formatValue(value)}</span>
+        <div key={key} className="flex gap-2 text-xs min-w-0">
+          <span className="text-gray-500 font-medium min-w-[80px] flex-shrink-0">{formatKey(key)}:</span>
+          <span className="text-gray-700 break-all min-w-0">{formatValue(value)}</span>
         </div>
       ))}
     </div>
@@ -234,7 +234,7 @@ function ToolOutputDisplay({ output }: { output: any }) {
             {typeof item === "string" ? (
               <MessageContent content={item} />
             ) : (
-              <pre className="overflow-x-auto text-gray-600">
+              <pre className="overflow-x-auto text-gray-600 max-w-full">
                 {JSON.stringify(item, null, 2)}
               </pre>
             )}
@@ -267,14 +267,14 @@ function ToolOutputDisplay({ output }: { output: any }) {
 
     // Fallback to JSON display
     return (
-      <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600 max-h-[200px]">
+      <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600 max-h-[200px] max-w-full">
         {JSON.stringify(output, null, 2)}
       </pre>
     )
   }
 
   return (
-    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600">
+    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-100 overflow-x-auto text-gray-600 max-w-full">
       {JSON.stringify(output, null, 2)}
     </pre>
   )

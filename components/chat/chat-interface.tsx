@@ -861,6 +861,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
         lastPartWasText = false
         lastPartWasThinking = false
         currentTextContent = ""
+        currentThinkingContent = ""
 
         setMessages((prev) =>
           prev.map((msg) =>
