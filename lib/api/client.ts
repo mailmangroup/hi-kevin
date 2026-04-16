@@ -737,7 +737,7 @@ export const aiService = {
   /**
    * Sign presigned URL for document upload
    */
-  async signDocumentUpload(filename: string, filetype: string, conversationId?: string): Promise<{
+  async signDocumentUpload(filename: string, filetype: string, conversationId?: string, conversationMode?: string): Promise<{
     upload_url: string
     object_key: string
     document_id: string
@@ -750,7 +750,7 @@ export const aiService = {
     }
     return directApiCall(`documents/sign`, {
       method: 'POST',
-      body: JSON.stringify({ filename, filetype }),
+      body: JSON.stringify({ filename, filetype, conversation_mode: conversationMode }),
     })
   },
 

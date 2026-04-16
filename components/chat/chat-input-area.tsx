@@ -68,6 +68,7 @@ export interface ChatInputAreaProps {
   selectedDocuments?: UploadedDocument[]
   setSelectedDocuments?: (documents: UploadedDocument[] | ((prev: UploadedDocument[]) => UploadedDocument[])) => void
   conversationId?: string // Needed for document upload
+  conversationMode?: string // e.g. "deep_agent" — passed to sign endpoint for orphan uploads
   className?: string
   placeholder?: string
   disabled?: boolean
@@ -101,6 +102,7 @@ export function ChatInputArea({
   selectedDocuments = [],
   setSelectedDocuments,
   conversationId,
+  conversationMode,
   className,
   placeholder = "Message Kevin...",
   disabled = false,
@@ -222,7 +224,8 @@ export function ChatInputArea({
           const { upload_url, object_key, document_id } = await aiService.signDocumentUpload(
               doc.file.name,
               doc.file.type,
-              conversationId
+              conversationId,
+              conversationMode
           )
 
           // 2. Upload to OSS

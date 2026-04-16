@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, ChevronRight, CheckCircle2, Loader2, AlertCircle, Database } from "lucide-react"
+import { ChevronDown, CheckCircle2, Loader2, AlertCircle, Database } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
 import { ArtifactSnippet } from "./artifact-snippet"
@@ -196,7 +196,7 @@ function ToolInputDisplay({ input }: { input: any }) {
 
   // Handle common input patterns
   if (typeof input === "string") {
-    return <span className="text-xs text-gray-600 break-all">{input}</span>
+    return <LongValueDisplay value={input} />
   }
 
   // Format structured input nicely
@@ -207,13 +207,29 @@ function ToolInputDisplay({ input }: { input: any }) {
 
   return (
     <div className="space-y-1">
-      {entries.map(([key, value]) => (
-        <div key={key} className="flex gap-2 text-xs min-w-0">
-          <span className="text-gray-500 font-medium min-w-[80px] flex-shrink-0">{formatKey(key)}:</span>
-          <span className="text-gray-700 break-all min-w-0">{formatValue(value)}</span>
-        </div>
-      ))}
+      {entries.map(([key, value]) => {
+        const strValue = formatValue(value)
+        const isLong = strValue.includes("\n") || strValue.length > 120
+        return (
+          <div key={key} className={isLong ? "text-xs" : "flex gap-2 text-xs"}>
+            <span className="text-gray-500 font-medium">{formatKey(key)}:</span>
+            {isLong ? (
+              <LongValueDisplay value={strValue} />
+            ) : (
+              <span className="text-gray-700 break-all ml-1">{strValue}</span>
+            )}
+          </div>
+        )
+      })}
     </div>
+  )
+}
+
+function LongValueDisplay({ value }: { value: string }) {
+  return (
+    <pre className="mt-1 text-xs text-gray-600 bg-gray-50 rounded border border-gray-100 p-2 overflow-x-auto whitespace-pre-wrap break-all max-w-full">
+      {value}
+    </pre>
   )
 }
 
@@ -332,7 +348,7 @@ function extractAllSummaries(output: any): Summary[] {
   if (!output || typeof output !== "object") return summaries
 
   // Check each key in the output
-  for (const [network, data] of Object.entries(output)) {
+  for (const [, data] of Object.entries(output)) {
     if (data && typeof data === "object" && (data as any).markdown_summary) {
       summaries.push({
         accountName: (data as any).account?.name,

@@ -1380,7 +1380,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                       "relative text-sm leading-relaxed",
                       message.role === "user"
                         ? "bg-secondary/80 text-foreground px-5 py-3 rounded-[1.5rem] rounded-tr-sm shadow-sm"
-                        : "px-0 py-1 text-foreground"
+                        : "px-0 py-1 text-foreground w-full min-w-0"
                     )}
                 >
                     {/* Uploaded Images */}
@@ -1619,6 +1619,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
             selectedDocuments={selectedDocuments}
             setSelectedDocuments={setSelectedDocuments}
             conversationId={conversationId}
+            conversationMode={effectiveConversationMode}
             placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
             disabled={credentialsLoading || !!credentialsError || isThinking}
             isThinking={isThinking}
