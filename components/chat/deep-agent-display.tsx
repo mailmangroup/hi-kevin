@@ -357,7 +357,7 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
   return (
     <div className="space-y-1 max-w-2xl">
       <div className="mb-1 text-[10px] text-gray-500 dark:text-gray-400 font-medium px-0.5">
-        Research tasks: {completedCount}/{taskCount} completed
+        Tasks: {completedCount}/{taskCount} completed
       </div>
       {messageOrder.map((messageId) => {
         const subagentIds = data.subagentsByMessage[messageId] ?? []

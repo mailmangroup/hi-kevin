@@ -69,8 +69,7 @@ export interface Message {
   toolCalls?: ToolCall[]
   images?: Array<{ image_url: string; filename?: string; file_type?: string }>
   documents?: any[]
-  contentParts?: ContentPart[]
-  deepStreamParts?: ContentPart[]
+  parts?: ContentPart[]
   thinking?: string
   report?: any
   isStreaming?: boolean
@@ -314,11 +313,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     }
 
     for (let messageIndex = nextMessages.length - 1; messageIndex >= 0; messageIndex -= 1) {
-      const parts = nextMessages[messageIndex].deepStreamParts
-      if (!parts?.length) continue
+      const msgParts = nextMessages[messageIndex].parts
+      if (!msgParts?.length) continue
 
-      for (let partIndex = parts.length - 1; partIndex >= 0; partIndex -= 1) {
-        const part = parts[partIndex]
+      for (let partIndex = msgParts.length - 1; partIndex >= 0; partIndex -= 1) {
+        const part = msgParts[partIndex]
         if (part.type === "deep_agent" && part.deepAgent) {
           hydrateDeepAgent(part.deepAgent)
           return
@@ -464,7 +463,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           const { messages: history } = await aiService.getMessages(id)
           const formattedMessages: Message[] = history.map((msg: ApiMessage, index: number) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent, images, documents, contentParts, deepStreamParts } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images, documents, parts } = parseSubContentList(msg.sub_content_list)
 
               return {
                   id: msg.id,
@@ -476,8 +475,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   images: images.length > 0 ? images : undefined,
                   documents: documents.length > 0 ? documents : undefined,
-                  contentParts: contentParts.length > 0 ? contentParts : undefined,
-                  deepStreamParts: deepStreamParts.length > 0 ? deepStreamParts : undefined,
+                  parts: parts.length > 0 ? parts : undefined,
                   report: msg.report
               }
           })
@@ -776,9 +774,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
     let thinkingContent = ""
     let followUpQuestions: string[] | undefined
     let newConversationId: string | undefined
-    // Track content parts in order for proper rendering
-    let contentParts: ContentPart[] = []
-    let deepStreamParts: ContentPart[] = []
+    // All content parts in arrival order — thinking, tool calls, deep agent, text
+    let parts: ContentPart[] = []
     let currentTextContent = ""  // Track current text segment
     let lastPartWasText = false  // Track if the last part was text (for appending)
     let currentThinkingContent = "" // Track current thinking segment
@@ -838,9 +835,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           timestamp: new Date(),
           isStreaming: true,
           thinking: thinkingContent || undefined,
-          contentParts: contentParts.length > 0 ? [...contentParts] : undefined,
-          deepStreamParts: deepStreamParts.length > 0 ? [...deepStreamParts] : undefined,
-          toolCalls: contentParts.filter(p => p.type === "tool" && p.tool).map(p => p.tool!),
+          parts: parts.length > 0 ? [...parts] : undefined,
+          toolCalls: parts.filter(p => p.type === "tool" && p.tool).map(p => p.tool!),
           report: localReport,
         }
         streamRegistry.update(currentSessionKey, s => {
@@ -851,11 +847,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
 
       // Helper to flush latest deep agent hook state into the message content parts
       const updateDeepAgentMessage = (latestState: DeepAgentStreamState) => {
-        const drPartIndex = deepStreamParts.findIndex((p) => p.type === "deep_agent")
+        const drPartIndex = parts.findIndex((p) => p.type === "deep_agent")
         if (drPartIndex >= 0) {
-          deepStreamParts[drPartIndex] = { type: "deep_agent", deepAgent: latestState }
+          parts[drPartIndex] = { type: "deep_agent", deepAgent: latestState }
         } else {
-          deepStreamParts.push({ type: "deep_agent", deepAgent: latestState })
+          parts.push({ type: "deep_agent", deepAgent: latestState })
         }
 
         lastPartWasText = false
@@ -866,7 +862,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
-              ? { ...msg, content: fullContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+              ? { ...msg, content: fullContent, parts: [...parts] }
               : msg
           )
         )
@@ -903,39 +899,25 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           const chunkThinking = chunk?.type === "coordinator_thinking" ? chunk.content : (!chunk?.type ? chunk.thinking : undefined)
           const chunkContent = chunk?.type === "coordinator_token" ? chunk.content : (!chunk?.type ? chunk.content : undefined)
 
-          // Handle thinking chunks — always in contentParts or deepStreamParts to maintain correct
-          // sequence with tool calls (thinking → tool → thinking → text).
+          // Handle thinking chunks — appended to parts in arrival order.
           if (chunkThinking !== undefined && chunkThinking !== null) {
               thinkingContent += chunkThinking || ""
               currentThinkingContent += chunkThinking || ""
 
-              if (effectiveDeepAgent) {
-                  if (lastPartWasThinking && deepStreamParts.length > 0) {
-                      const lastPart = deepStreamParts[deepStreamParts.length - 1]
-                      if (lastPart.type === "thinking") {
-                          deepStreamParts[deepStreamParts.length - 1] = { ...lastPart, content: currentThinkingContent }
-                      }
-                  } else {
-                      deepStreamParts.push({ type: "thinking", content: currentThinkingContent })
-                      lastPartWasThinking = true
-                      lastPartWasText = false
+              if (lastPartWasThinking && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
+                  if (lastPart.type === "thinking") {
+                      parts[parts.length - 1] = { ...lastPart, content: currentThinkingContent }
                   }
               } else {
-                  if (lastPartWasThinking && contentParts.length > 0) {
-                      const lastPart = contentParts[contentParts.length - 1]
-                      if (lastPart.type === "thinking") {
-                          contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
-                      }
-                  } else {
-                      contentParts.push({ type: "thinking", content: currentThinkingContent })
-                      lastPartWasThinking = true
-                      lastPartWasText = false
-                  }
+                  parts.push({ type: "thinking", content: currentThinkingContent })
+                  lastPartWasThinking = true
+                  lastPartWasText = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+                      ? { ...msg, thinking: thinkingContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
@@ -945,23 +927,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               fullContent += chunkContent
               currentTextContent += chunkContent
 
-              // Update contentParts - append to last text part or create new one
-              if (lastPartWasText && contentParts.length > 0) {
-                  // Replace the last text part with a new object to ensure React detects the change
-                  const lastPart = contentParts[contentParts.length - 1]
+              // Append to last text part or create new one
+              if (lastPartWasText && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
                   if (lastPart.type === "text") {
-                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentTextContent }
+                      parts[parts.length - 1] = { ...lastPart, content: currentTextContent }
                   }
               } else {
-                  // Create a new text part
-                  contentParts.push({ type: "text", content: currentTextContent })
+                  parts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
                   lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+                      ? { ...msg, content: fullContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
@@ -990,20 +970,18 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                   state: 'running' as const
               }
 
-              // Add tool to contentParts and reset text tracking
-              contentParts.push({ type: "tool", tool: newTool })
+              parts.push({ type: "tool", tool: newTool })
               lastPartWasText = false
               lastPartWasThinking = false
-              currentTextContent = ""  // Reset for any text that comes after this tool
-              currentThinkingContent = "" // Reset for any thinking that comes after this tool
+              currentTextContent = ""
+              currentThinkingContent = ""
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? {
                           ...msg,
                           toolCalls: [...(msg.toolCalls || []), newTool],
-                          contentParts: [...contentParts],
-                          deepStreamParts: [...deepStreamParts]
+                          parts: [...parts],
                         }
                       : msg
               ))
@@ -1015,10 +993,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               const toolOutput = chunk.tool_end.output
               const toolArtifact = chunk.tool_end.artifact
 
-              // Update the local contentParts closure immediately (synchronously) so that
-              // any subsequent setMessages calls (e.g. from content chunks) use the updated
-              // state instead of overwriting it with the stale 'running' tool state.
-              contentParts = contentParts.map((part): ContentPart => {
+              // Update parts synchronously so subsequent setMessages calls use the updated state.
+              parts = parts.map((part): ContentPart => {
                   if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
                       return {
                           ...part,
@@ -1028,13 +1004,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                   return part
               })
 
-              const completedToolCalls = contentParts
+              const completedToolCalls = parts
                   .filter(p => p.type === "tool" && p.tool)
                   .map(p => p.tool!)
 
               setMessages((prev) => prev.map(msg => {
                   if (msg.id !== assistantMsgId) return msg
-                  return { ...msg, toolCalls: completedToolCalls, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+                  return { ...msg, toolCalls: completedToolCalls, parts: [...parts] }
               }))
 
               pushToRegistry()
@@ -1067,7 +1043,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
           // Handle execute_status events — update the running execute tool with sandbox status
           if (chunk.type === "execute_status") {
               const execStatus = chunk.status as string
-              contentParts = contentParts.map((part): ContentPart => {
+              parts = parts.map((part): ContentPart => {
                   if (part.type === "tool" && part.tool && part.tool.name === "execute" && part.tool.state === "running") {
                       return {
                           ...part,
@@ -1083,13 +1059,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                   return part
               })
 
-              const updatedToolCalls = contentParts
+              const updatedToolCalls = parts
                   .filter(p => p.type === "tool" && p.tool)
                   .map(p => p.tool!)
 
               setMessages((prev) => prev.map(msg => {
                   if (msg.id !== assistantMsgId) return msg
-                  return { ...msg, toolCalls: updatedToolCalls, contentParts: [...contentParts] }
+                  return { ...msg, toolCalls: updatedToolCalls, parts: [...parts] }
               }))
               pushToRegistry()
           }
@@ -1212,20 +1188,20 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
               fullContent += `\n[Error: ${chunk.error}]`
               currentTextContent += `\n[Error: ${chunk.error}]`
 
-              if (lastPartWasText && contentParts.length > 0) {
-                  const lastPart = contentParts[contentParts.length - 1]
+              if (lastPartWasText && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
                   if (lastPart.type === "text") {
                       lastPart.content = currentTextContent
                   }
               } else {
-                  contentParts.push({ type: "text", content: currentTextContent })
+                  parts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
                   lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts], deepStreamParts: [...deepStreamParts] }
+                      ? { ...msg, content: fullContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
@@ -1463,12 +1439,11 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                     )}
 
 
-                    {/* Deep stream lane: thinking + deep-agent task updates */}
-                    {message.deepStreamParts && message.deepStreamParts.length > 0 && (
-                      <div className="mb-4 rounded-lg border border-blue-200/70 dark:border-blue-800/40 bg-blue-50/40 dark:bg-blue-950/20 p-3 space-y-3">
-                        <div className="text-[11px] font-medium text-blue-700 dark:text-blue-400">Deep think / agent stream</div>
-                        {message.deepStreamParts.map((part, index) => (
-                          <React.Fragment key={`deep-${index}`}>
+                    {/* Render all parts in arrival order: thinking, deep agent, tools, text */}
+                    {message.parts && message.parts.length > 0 ? (
+                      <div className="space-y-4">
+                        {message.parts.map((part, index) => (
+                          <React.Fragment key={index}>
                             {part.type === "thinking" ? (
                               <ThinkingDisplay
                                 content={part.content || ""}
@@ -1479,26 +1454,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                                 data={part.deepAgent!}
                                 isStreaming={message.isStreaming || false}
                               />
-                            ) : null}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Main response lane: tool calls + assistant text */}
-                    {message.contentParts && message.contentParts.length > 0 ? (
-                      <div className="space-y-4">
-                        {message.contentParts.map((part, index) => (
-                          <React.Fragment key={index}>
-                            {part.type === "tool" ? (
+                            ) : part.type === "tool" ? (
                               <div className="my-2">
                                 <ToolCallDisplay tool={part.tool!} isFirst={true} isLast={true} />
                               </div>
-                            ) : part.type === "thinking" ? (
-                              <ThinkingDisplay
-                                content={part.content || ""}
-                                isStreaming={message.isStreaming}
-                              />
                             ) : (
                               <MessageContent
                                 content={part.content || ""}
@@ -1510,12 +1469,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {/* Fallback: Tool Calls at top (legacy behavior) */}
+                        {/* Fallback: legacy messages without parts */}
                         {message.toolCalls && message.toolCalls.length > 0 && (
                           <ToolCallList toolCalls={message.toolCalls} />
                         )}
-
-                        {/* Message Content with Markdown */}
                         {message.content && (
                           <MessageContent
                             content={message.content}
@@ -1526,7 +1483,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                     )}
 
                     {/* Streaming indicator */}
-                    {message.isStreaming && !message.content && !message.contentParts?.length && !message.deepStreamParts?.length && (
+                    {message.isStreaming && !message.content && !message.parts?.length && (
                       <div className="flex items-center gap-1 h-6 px-2">
                         <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                         <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>

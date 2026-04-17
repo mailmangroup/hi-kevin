@@ -9,20 +9,18 @@ export function parseSubContentList(subContentList: any[] = []): {
   content: string,
   images: Array<{ image_url: string; filename?: string; file_type?: string }>,
   documents: any[],
-  contentParts: ContentPart[],
-  deepStreamParts: ContentPart[]
+  parts: ContentPart[],
 } {
   const toolCalls: ToolCall[] = []
   const images: Array<{ image_url: string; filename?: string; file_type?: string }> = []
   const documents: any[] = []
-  const contentParts: ContentPart[] = []
-  const deepStreamParts: ContentPart[] = []
+  const parts: ContentPart[] = []
   const incompleteToolCalls = new Map<string, ToolCall>()
   let lastToolCall: ToolCall | null = null
   let textContent = ""
 
   if (!Array.isArray(subContentList)) {
-    return { toolCalls, content: textContent, images, documents, contentParts, deepStreamParts }
+    return { toolCalls, content: textContent, images, documents, parts }
   }
 
   for (const item of subContentList) {
@@ -36,7 +34,7 @@ export function parseSubContentList(subContentList: any[] = []): {
         artifact: item.artifact
       }
       toolCalls.push(toolCall)
-      contentParts.push({ type: 'tool', tool: toolCall })
+      parts.push({ type: 'tool', tool: toolCall })
 
       if (toolCall.state === 'running') {
          if (toolCall.id) incompleteToolCalls.set(toolCall.id, toolCall)
@@ -51,7 +49,7 @@ export function parseSubContentList(subContentList: any[] = []): {
         state: 'running'
       }
       toolCalls.push(toolCall)
-      contentParts.push({ type: 'tool', tool: toolCall })
+      parts.push({ type: 'tool', tool: toolCall })
 
       incompleteToolCalls.set(id, toolCall)
       lastToolCall = toolCall
@@ -77,12 +75,11 @@ export function parseSubContentList(subContentList: any[] = []): {
     } else if (item.type === 'ai_message') {
       if (item.content) {
         textContent += item.content
-        // Merge consecutive text parts so markdown parses with full context
-        const lastPart = contentParts[contentParts.length - 1]
+        const lastPart = parts[parts.length - 1]
         if (lastPart && lastPart.type === 'text') {
           lastPart.content = (lastPart.content || '') + item.content
         } else {
-          contentParts.push({ type: 'text', content: item.content })
+          parts.push({ type: 'text', content: item.content })
         }
       }
       if (item.tool_calls && Array.isArray(item.tool_calls)) {
@@ -94,7 +91,7 @@ export function parseSubContentList(subContentList: any[] = []): {
             state: 'running'
           }
           toolCalls.push(toolCall)
-          contentParts.push({ type: 'tool', tool: toolCall })
+          parts.push({ type: 'tool', tool: toolCall })
           incompleteToolCalls.set(toolCall.id, toolCall)
           lastToolCall = toolCall
         }
@@ -105,7 +102,6 @@ export function parseSubContentList(subContentList: any[] = []): {
            toolCall = incompleteToolCalls.get(item.tool_call_id)
        }
 
-       // Fallback for missing ID if sequential
        if (!toolCall && lastToolCall && lastToolCall.name === item.name) {
            toolCall = lastToolCall
        }
@@ -119,7 +115,6 @@ export function parseSubContentList(subContentList: any[] = []): {
            if (toolCall.id) incompleteToolCalls.delete(toolCall.id)
        }
     } else if (item.type === 'deep_agent_state') {
-      // Reconstruct DeepAgentStreamState from checkpointer data
       const subagentsMap = new Map<string, SubagentStreamInterface>()
       const subagentOrder: string[] = []
 
@@ -165,15 +160,12 @@ export function parseSubContentList(subContentList: any[] = []): {
         },
         isComplete: true,
       }
-      deepStreamParts.push({ type: "deep_agent", deepAgent: deepState })
+      parts.push({ type: "deep_agent", deepAgent: deepState })
 
-      // Track coordinator text for the `content` return field (used for fallback/search)
-      // but do NOT add to contentParts — DeepAgentDisplay already renders it
       if (item.coordinator_content) {
         textContent += item.coordinator_content
       }
 
-      // Add coordinator-level tools to contentParts (these aren't rendered by DeepAgentDisplay)
       for (const tool of (item.coordinator_tools || [])) {
         const tc: ToolCall = {
           id: tool.id || Date.now().toString(),
@@ -184,7 +176,7 @@ export function parseSubContentList(subContentList: any[] = []): {
           artifact: tool.artifact,
         }
         toolCalls.push(tc)
-        contentParts.push({ type: 'tool', tool: tc })
+        parts.push({ type: 'tool', tool: tc })
       }
     } else if (item.type === 'image') {
       if (item.url) images.push({ image_url: item.url })
@@ -195,25 +187,16 @@ export function parseSubContentList(subContentList: any[] = []): {
     } else if (item.type === 'text' || item.type === 'assistant_message' || item.type === 'user_message') {
       const textVal = item.text || item.content || ""
       textContent += textVal
-      // Merge consecutive text parts so markdown parses with full context
-      const lastPart = contentParts[contentParts.length - 1]
+      const lastPart = parts[parts.length - 1]
       if (lastPart && lastPart.type === 'text') {
         lastPart.content = (lastPart.content || '') + textVal
       } else {
-        contentParts.push({ type: 'text', content: textVal })
+        parts.push({ type: 'text', content: textVal })
       }
     } else if (item.type === 'thinking') {
-      const thinkingPart = { type: 'thinking', content: item.thinking || item.content } as ContentPart
-      // If we've seen a deep_agent_state, or if we know this is a deep agent, 
-      // we could push to deepStreamParts, but checking subContentList is safer
-      const isDeepAgent = subContentList.some(i => i.type === 'deep_agent_state')
-      if (isDeepAgent) {
-        deepStreamParts.push(thinkingPart)
-      } else {
-        contentParts.push(thinkingPart)
-      }
+      parts.push({ type: 'thinking', content: item.thinking || item.content })
     }
   }
 
-  return { toolCalls, content: textContent, images, documents, contentParts, deepStreamParts }
+  return { toolCalls, content: textContent, images, documents, parts }
 }
