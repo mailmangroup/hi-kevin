@@ -289,7 +289,7 @@ function ResearchTaskCard({
             <div className="text-xs text-gray-600 leading-relaxed">
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Researching...</span>
+                <span>Executing...</span>
               </div>
             </div>
           )}
