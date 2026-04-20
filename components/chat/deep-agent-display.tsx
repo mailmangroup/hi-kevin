@@ -46,16 +46,21 @@ function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["acti
   const isError = tc.status === "completed" && tc.executeStatus === "error"
 
   return (
-    <div className="flex flex-col gap-1 py-0.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+    <div className="flex flex-col gap-1 py-1.5 px-1 group/tool">
+      <div className="flex items-center gap-2 text-xs">
         {tc.status === "running" ? (
-          <Loader2 className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0" />
+          <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin flex-shrink-0" />
         ) : isError ? (
-          <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+          <XCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
         ) : (
-          <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
         )}
-        <span className="truncate flex-1">{label}</span>
+        <span className={cn(
+          "truncate font-medium flex-1 transition-colors",
+          tc.status === "running" ? "text-foreground" : "text-muted-foreground group-hover/tool:text-foreground"
+        )}>
+          {label}
+        </span>
         {tc.status === "running" && tc.tool === "execute" && tc.executeStatus === "executing" && (
           <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
             Running...
@@ -64,9 +69,9 @@ function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["acti
         {hasArtifact && onOpenArtifact && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
           >
-            {tc.artifact?.oss_key ? <FileDown className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
+            {tc.artifact?.oss_key ? <FileDown className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
             {tc.artifact?.filename || "View"}
           </button>
         )}
@@ -74,14 +79,14 @@ function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["acti
       
       {/* Display command if available */}
       {tc.tool === "execute" && tc.command && (
-        <div className="ml-5 font-mono text-[9px] text-gray-500 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded border border-gray-100 dark:border-gray-800 overflow-x-auto whitespace-pre">
+        <div className="mt-0.5 ml-5 font-mono text-[10px] text-muted-foreground bg-background/40 px-2 py-1.5 rounded border border-border/30 overflow-x-auto whitespace-pre">
           $ {tc.command}
         </div>
       )}
       
       {/* Display error message if execution failed */}
       {isError && tc.errorMessage && (
-        <div className="ml-5 text-[10px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-100 dark:border-red-900/30">
+        <div className="mt-0.5 ml-5 text-[10px] text-destructive bg-destructive/5 px-2 py-1.5 rounded border border-destructive/10">
           {tc.errorMessage}
         </div>
       )}

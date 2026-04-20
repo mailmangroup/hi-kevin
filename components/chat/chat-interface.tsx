@@ -20,7 +20,7 @@ import { DeepAgentDisplay, TodoList } from "@/components/chat/deep-agent-display
 import { useDeepAgentStream } from "@/lib/hooks/use-deep-agent-stream"
 import type { DeepAgentStreamState } from "@/lib/hooks/use-deep-agent-stream"
 import { MessageActions } from "@/components/chat/message-actions"
-import { formatFileSize, getFileTypeDisplay, getMimeTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
+import { formatFileSize, getFileTypeDisplay, getMimeTypeDisplay, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
 import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
 import {
@@ -1372,34 +1372,20 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                     {message.documents && message.documents.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2 justify-end">
                         {message.documents.map((doc, i) => {
-                          const fileColor = getFileColor(doc.filename)
-                          const getColorClass = (color: string) => {
-                            const colorMap: Record<string, string> = {
-                              red: 'bg-red-50 text-red-700 border-red-200',
-                              blue: 'bg-blue-50 text-blue-700 border-blue-200',
-                              orange: 'bg-orange-50 text-orange-700 border-orange-200',
-                              green: 'bg-green-50 text-green-700 border-green-200',
-                              gray: 'bg-gray-50 text-gray-700 border-gray-200',
-                              purple: 'bg-purple-50 text-purple-700 border-purple-200',
-                              yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                            }
-                            return colorMap[color] || colorMap['gray']
-                          }
-
                           return (
                             <div
                               key={i}
                               className={cn(
-                                "flex items-center gap-2 px-3 py-2 rounded-lg border",
-                                getColorClass(fileColor)
+                                "flex items-center gap-2 px-2.5 py-1.5 rounded-md border bg-background/95 shadow-sm max-w-[240px]",
+                                "text-foreground"
                               )}
                             >
-                              <FileText className="h-4 w-4 flex-shrink-0" />
+                              <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs font-medium truncate">
                                   {truncateFilename(doc.filename, 25)}
                                 </div>
-                                <div className="text-[10px] opacity-70">
+                                <div className="text-[10px] text-muted-foreground truncate mt-0.5">
                                   {doc.file_type ? getMimeTypeDisplay(doc.file_type) : getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
                                   {doc.chunk_strategy && (
                                     <span className="ml-1">
@@ -1409,13 +1395,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMod
                                 </div>
                               </div>
                               {doc.processing_status === 'completed' && (
-                                <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-3 w-3 text-emerald-500 flex-shrink-0 ml-1" />
                               )}
                               {(doc.processing_status === 'processing' || doc.processing_status === 'pending') && (
-                                <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
+                                <LoaderIcon className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0 ml-1" />
                               )}
                               {doc.processing_status === 'failed' && (
-                                <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
+                                <AlertCircle className="h-3 w-3 text-destructive flex-shrink-0 ml-1" />
                               )}
                             </div>
                           )
