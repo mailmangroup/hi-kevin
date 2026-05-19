@@ -353,6 +353,37 @@ export const aiService = {
   },
 
   /**
+   * Export a report as a downloadable HTML file
+   */
+  async exportReport(reportId: string): Promise<void> {
+    const config = getKawoConfig()
+    if (!config.apiUrl || !config.token) {
+      throw new Error('KAWO credentials not configured.')
+    }
+    const url = `${config.apiUrl.replace(/\/$/, '')}/agent/reports/${reportId}/export`
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'X-KAWO-Org-Id': config.orgId ?? '',
+        'X-KAWO-Brand-Id': config.brandId ?? '',
+      },
+    })
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`)
+    }
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i)
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : `report-${reportId}.html`
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(objectUrl)
+  },
+
+  /**
    * Update report section insights
    */
   async updateReportInsights(

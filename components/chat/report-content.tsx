@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus, MessageSquare, Pencil, X, Check, Plus, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Minus, MessageSquare, Pencil, X, Check, Plus, Trash2, Download } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -414,6 +414,19 @@ function ReportSectionRenderer({ section, pageIndex, sectionIndex, reportId }: {
 export function ReportContent({ data }: { data: any }) {
   const { reportNavigation, setReportNavigation } = useArtifact()
   const [activePage, setActivePage] = React.useState(0)
+  const [exporting, setExporting] = React.useState(false)
+
+  const handleExport = async () => {
+    if (!data?.id) return
+    setExporting(true)
+    try {
+      await aiService.exportReport(data.id)
+    } catch (err) {
+      console.error('Export failed', err)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   React.useEffect(() => {
       if (reportNavigation.pageNumber > 0 && reportNavigation.pageNumber - 1 !== activePage) {
@@ -475,7 +488,21 @@ export function ReportContent({ data }: { data: any }) {
         <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 backdrop-blur z-10 border-b shadow-sm space-y-4">
           <div className="space-y-2">
             {data.title && (
-                <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+                <div className="flex items-start justify-between gap-2">
+                    <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+                    {data.id && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExport}
+                            disabled={exporting}
+                            className="flex-shrink-0 h-8 text-xs gap-1.5"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            {exporting ? 'Exporting…' : 'Export'}
+                        </Button>
+                    )}
+                </div>
             )}
             {data.metadata && (
                 <div className="flex flex-wrap gap-4 text-xs text-gray-500">
