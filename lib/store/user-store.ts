@@ -15,6 +15,7 @@ interface UserStore {
   isLoading: boolean
   fetchProfile: () => Promise<void>
   setProfile: (profile: UserProfile) => void
+  clearProfile: () => void
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
@@ -95,5 +96,6 @@ export const useUserStore = create<UserStore>((set, get) => ({
       set({ isLoading: false })
     }
   },
-  setProfile: (profile) => set({ profile })
+  setProfile: (profile) => set({ profile }),
+  clearProfile: () => set({ profile: null, isLoading: false })
 }))

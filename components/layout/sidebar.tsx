@@ -24,8 +24,11 @@ import {
   Star,
   Trash2,
   Pencil,
-  CheckSquare
+  CheckSquare,
+  LogOut
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useUserStore } from "@/lib/store/user-store"
 import { Button } from "@/components/ui/button"
 import { Conversation, aiService } from "@/lib/api/client"
 import { useNewLeadsCount, useConversations } from "@/lib/hooks/use-dashboard-data"
@@ -302,6 +305,17 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const clearProfile = useUserStore((s) => s.clearProfile)
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    clearProfile()
+    queryClient.clear()
+    router.push('/login')
+    router.refresh()
+  }
 
   // Use TanStack Query for data fetching (replaces manual cache)
   const { data: leadsData } = useNewLeadsCount()
@@ -437,6 +451,14 @@ export function Sidebar({ className }: { className?: string }) {
                     <p className="truncate text-[13px] font-medium text-slate-700 dark:text-slate-200">Settings</p>
                 </div>
             </Link>
+            <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out"
+                className="flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-md border border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400"
+            >
+                <LogOut className="h-4 w-4" />
+            </button>
         </div>
       </div>
     </div>
