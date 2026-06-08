@@ -61,21 +61,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
         return
       }
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-        .eq('id', user.id)
-        .maybeSingle()
+      // Display name lives on `profiles`; KAWO context lives on the
+      // owner-only `user_kawo_credentials` table (kept off `profiles` so the
+      // team-readable profile rows don't leak each user's API token).
+      const [{ data: profile }, { data: creds }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('name, email')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_kawo_credentials')
+          .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ])
 
-      if (data) {
+      if (profile || creds) {
         set({
           profile: {
-            full_name: data.full_name,
-            email: data.email || user.email || null,
-            kawo_token: data.kawo_token,
-            kawo_org_id: data.kawo_org_id,
-            kawo_brand_id: data.kawo_brand_id,
-            kawo_api_url: data.kawo_api_url
+            full_name: profile?.name ?? null,
+            email: profile?.email || user.email || null,
+            kawo_token: creds?.kawo_token ?? null,
+            kawo_org_id: creds?.kawo_org_id ?? null,
+            kawo_brand_id: creds?.kawo_brand_id ?? null,
+            kawo_api_url: creds?.kawo_api_url ?? null
           }
         })
       }
