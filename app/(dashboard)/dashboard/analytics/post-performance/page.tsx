@@ -48,10 +48,10 @@ export default function AnalyticsPage() {
         }
 
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('user_kawo_credentials')
           .select('kawo_brand_id')
-          .eq('id', user.id)
-          .single()
+          .eq('user_id', user.id)
+          .maybeSingle()
 
         if (!profile?.kawo_brand_id) {
           setError(new Error('Brand ID not found. Please configure KAWO credentials.'))

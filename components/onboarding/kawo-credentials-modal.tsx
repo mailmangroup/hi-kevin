@@ -65,10 +65,9 @@ export function KawoCredentialsModal() {
       }
 
       const { error } = await supabase
-        .from('profiles')
+        .from('user_kawo_credentials')
         .upsert({
-          id: user.id,
-          email: user.email,
+          user_id: user.id,
           ...credentials,
           updated_at: new Date().toISOString()
         })

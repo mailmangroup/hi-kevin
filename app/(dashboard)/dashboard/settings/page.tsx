@@ -67,11 +67,15 @@ export default function SettingsPage() {
 
         if (!user) return
 
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-          .eq('id', user.id)
-          .maybeSingle()
+        // Display name on `profiles`; KAWO context on `user_kawo_credentials`.
+        const [{ data: prof, error }, { data: creds }] = await Promise.all([
+          supabase.from('profiles').select('name, email').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('user_kawo_credentials')
+            .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+        ])
 
         if (error) {
           if (process.env.NODE_ENV === 'development') console.error('Error loading profile:', error)
@@ -79,34 +83,23 @@ export default function SettingsPage() {
           return
         }
 
-        if (data) {
-          setProfile({
-            full_name: data.full_name || '',
-            email: data.email || user.email || '',
-            kawo_token: data.kawo_token || '',
-            kawo_org_id: data.kawo_org_id || '',
-            kawo_brand_id: data.kawo_brand_id || '',
-            kawo_api_url: data.kawo_api_url || ''
-          })
+        setProfile({
+          full_name: prof?.name || '',
+          email: prof?.email || user.email || '',
+          kawo_token: creds?.kawo_token || '',
+          kawo_org_id: creds?.kawo_org_id || '',
+          kawo_brand_id: creds?.kawo_brand_id || '',
+          kawo_api_url: creds?.kawo_api_url || ''
+        })
 
-          setStoreProfile({
-            full_name: data.full_name,
-            email: data.email || user.email || null,
-            kawo_token: data.kawo_token,
-            kawo_org_id: data.kawo_org_id,
-            kawo_brand_id: data.kawo_brand_id,
-            kawo_api_url: data.kawo_api_url,
-          })
-        } else {
-          setProfile({
-            full_name: '',
-            email: user.email || '',
-            kawo_token: '',
-            kawo_org_id: '',
-            kawo_brand_id: '',
-            kawo_api_url: ''
-          })
-        }
+        setStoreProfile({
+          full_name: prof?.name ?? null,
+          email: prof?.email || user.email || null,
+          kawo_token: creds?.kawo_token ?? null,
+          kawo_org_id: creds?.kawo_org_id ?? null,
+          kawo_brand_id: creds?.kawo_brand_id ?? null,
+          kawo_api_url: creds?.kawo_api_url ?? null,
+        })
       } catch (e) {
         if (process.env.NODE_ENV === 'development') console.error('Unexpected error:', e)
         setError('An unexpected error occurred.')
@@ -140,12 +133,19 @@ export default function SettingsPage() {
         return
       }
 
-      const { error: updateError } = await supabase
+      const { error: nameError } = await supabase
         .from('profiles')
+        .update({ name: profile.full_name })
+        .eq('id', user.id)
+
+      if (nameError) {
+        throw nameError
+      }
+
+      const { error: updateError } = await supabase
+        .from('user_kawo_credentials')
         .upsert({
-          id: user.id,
-          email: profile.email || user.email,
-          full_name: profile.full_name,
+          user_id: user.id,
           kawo_token: profile.kawo_token,
           kawo_org_id: profile.kawo_org_id,
           kawo_brand_id: profile.kawo_brand_id,

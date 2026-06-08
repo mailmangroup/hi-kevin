@@ -67,7 +67,7 @@ export function ReportParametersDialog({
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
-          const { data } = await supabase.from('profiles').select('kawo_org_id, kawo_brand_id').eq('id', session.user.id).single()
+          const { data } = await supabase.from('user_kawo_credentials').select('kawo_org_id, kawo_brand_id').eq('user_id', session.user.id).maybeSingle()
           if (data) {
             setCredentials({
               orgId: data.kawo_org_id,
