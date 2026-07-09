@@ -11,6 +11,11 @@ const ANALYTICS_CARDS = [
     title: "Comment Analysis",
     description: "Explore comment sentiment, themes, and community insights.",
     href: "/dashboard/analytics/comment-analysis"
+  },
+  {
+    title: "Batch Video Analysis",
+    description: "Audit dealer short-video transcripts and generate compliance reports.",
+    href: "/dashboard/analytics/batch-video-analysis"
   }
 ]
 

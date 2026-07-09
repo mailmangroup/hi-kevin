@@ -8,6 +8,7 @@ export const ROUTES = {
   analytics: '/dashboard/analytics',
   analyticsPostPerformance: '/dashboard/analytics/post-performance',
   analyticsCommentAnalysis: '/dashboard/analytics/comment-analysis',
+  analyticsBatchVideoAnalysis: '/dashboard/analytics/batch-video-analysis',
   analyticsReports: '/dashboard/analytics/reports',
   research: '/dashboard/research',
   researchKols: '/dashboard/research/kols',
