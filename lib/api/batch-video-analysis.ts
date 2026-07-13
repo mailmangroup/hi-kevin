@@ -24,6 +24,9 @@ export async function createBatchVideoAnalysisJob(payload: {
   audit_categories?: { name: string; description: string }[]
   analysis_target?: string
   judgment_rules?: string[]
+  account_summary_prompt?: string
+  issue_remediation_prompt?: string
+  final_recommendations_prompt?: string
   limit?: number
   thinking_enabled?: boolean
 }): Promise<{ job_id: string; source_id?: string }> {
