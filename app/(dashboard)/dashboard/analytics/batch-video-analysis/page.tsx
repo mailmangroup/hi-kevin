@@ -314,6 +314,7 @@ export default function BatchVideoAnalysisPage() {
   const [auditCategories, setAuditCategories] = useState<AuditCategory[]>(DEFAULT_AUDIT_CATEGORIES)
   const [analysisTarget, setAnalysisTarget] = useState(DEFAULT_ANALYSIS_TARGET)
   const [judgmentRules, setJudgmentRules] = useState(DEFAULT_JUDGMENT_RULES.join("\n"))
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [accountFilter, setAccountFilter] = useState("all")
   const [keywordFilter, setKeywordFilter] = useState("")
   const [supplementaryAccountFilter, setSupplementaryAccountFilter] = useState("all")
@@ -430,6 +431,7 @@ export default function BatchVideoAnalysisPage() {
         analysis_target: target,
         judgment_rules: rules,
         limit: videoLimit === "" ? undefined : videoLimit,
+        thinking_enabled: thinkingEnabled,
       })
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
@@ -888,6 +890,21 @@ export default function BatchVideoAnalysisPage() {
                 placeholder="Video limit (leave empty for no limit)"
               />
             </div>
+            <label className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <span>
+                <span className="block text-sm font-medium">Enable thinking</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Allows more reasoning time for video auditing and report synthesis.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={thinkingEnabled}
+                onChange={(event) => setThinkingEnabled(event.target.checked)}
+                disabled={isAnalyzing}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+            </label>
             <div className="rounded-md border p-3">
               <div className="mb-3 text-sm font-medium">风险分类</div>
               <div className="space-y-3">
