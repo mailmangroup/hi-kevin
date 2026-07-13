@@ -33,10 +33,18 @@ import {
 
 type Violation = {
   violation_type: string
-  risk_level: "高" | "中" | "低" | string
+  risk_level: "高"
   evidence: string
   reason: string
   remediation: string
+}
+
+type RiskReminder = {
+  risk_level: "低"
+  category: string
+  evidence: string
+  reason: string
+  remediation?: string
 }
 
 type AuditCategory = {
@@ -54,6 +62,7 @@ type VideoResult = {
   publish_time?: string
   transcript?: string
   status: "compliant" | "violating" | "not_reviewable"
+  absolute_expression: boolean
   violations: Violation[]
 }
 
@@ -91,6 +100,14 @@ type BatchVideoReport = {
     examples: { account_name?: string; item_id?: string; evidence?: string; risk_level?: string }[]
   }[]
   recommendations?: { title: string; description: string }[]
+  appendix?: {
+    compliant_accounts_note?: string
+    supplementary_risk_reminders?: (RiskReminder & {
+      account_name?: string
+      item_id?: string
+      post_title?: string
+    })[]
+  }
 }
 
 type AccountSummary = NonNullable<BatchVideoReport["account_summaries"]>[number]
@@ -99,16 +116,12 @@ const POLL_INTERVAL_MS = 5000
 const ISSUE_EXAMPLE_LIMIT = 3
 const DEFAULT_AUDIT_CATEGORIES: AuditCategory[] = [
   {
-    name: "宣传话术违规",
-    description: "绝对化、最低价/最安全/百分百等承诺，标题党博眼球，诋毁品牌以突显专业，虚假或夸大宣传，促销条件不清。",
+    name: "通用红线违规",
+    description: "违反法律、公序良俗或价值观的明确文本内容：违法不良行为，政治/宗教/种族/地域/领土/国家政策/民族歧视/灾难营销等敏感议题，制造恐慌或煽动对立，粗俗淫秽、侮辱攻击、无依据贬低诽谤，文化冒犯，以及可由文本本身确认的虚假事实或产品功效承诺。不能仅因出现绝对化用语或输入中未附证明材料而判定为本类违规。",
   },
   {
-    name: "内容红线违规",
-    description: "违反法律要求、社会公序良俗及价值观；展示或鼓励危险行为及价值违背内容，包括暴力、吸烟/吸毒、酗酒、危险驾驶、色情、赌博和博彩；涉及政治、宗教、种族、地域、领土、政策、宗教符号、民族歧视或灾难营销等敏感议题；可能引发社会恐慌、煽动对立情绪、破坏社会稳定；使用粗俗、淫秽、侮辱性、攻击性语言，故意戏谑、恶搞、讽刺、挖苦他人，或无事实依据地贬低、诽谤、污名化攻击；使用可能引起当地文化误解的不当手势或标志性动作表达。",
-  },
-  {
-    name: "品牌资产违规",
-    description: "未经依据的官方推荐/官方指定/品牌授权/米其林官方背书等表达；损害品牌形象；对比同品牌产品；诋毁品牌以突显专业。",
+    name: "品牌营销违规",
+    description: "恶意诋毁米其林或反向踩品牌引流，刻意捏造极端产品优劣落差并恶意抹黑全系产品，或使用纯负面、全盘否定品牌的标题和文案恶意引流。",
   },
 ]
 
@@ -130,8 +143,7 @@ function formatDate(value?: string) {
 
 function riskClass(level?: string) {
   if (level === "高" || level === "重度违规") return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-900/50"
-  if (level === "中" || level === "中度违规") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900/50"
-  return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900/50"
+  return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900/50"
 }
 
 function formatPercent(numerator?: number, denominator?: number) {
@@ -164,7 +176,9 @@ function detailRowSearchText(row: VideoResult) {
 
 function buildDisplayAccountSummaries(report: BatchVideoReport): AccountSummary[] {
   const existingSummaries = report.account_summaries || []
-  if (!report.video_results?.length) return existingSummaries
+  if (!report.video_results?.length) {
+    return existingSummaries.filter((account) => account.violation_count > 0)
+  }
 
   const existingByAccount = new Map(existingSummaries.map((account) => [account.account_name, account]))
   const accounts = new Map<string, AccountSummary>()
@@ -191,7 +205,7 @@ function buildDisplayAccountSummaries(report: BatchVideoReport): AccountSummary[
     accounts.set(accountName, account)
   })
 
-  return Array.from(accounts.values())
+  return Array.from(accounts.values()).filter((account) => account.violation_count > 0)
 }
 
 function buildHtmlReport(report: BatchVideoReport) {
@@ -245,15 +259,20 @@ function buildHtmlReport(report: BatchVideoReport) {
       </article>
     `).join("")
 
+  const supplementaryCards = (report.appendix?.supplementary_risk_reminders || []).map((reminder) => `
+    <div class="issue"><h3>低风险补充 · ${escapeHtml(reminder.category)}</h3><p><b>${escapeHtml(reminder.account_name)}</b>${reminder.post_title ? ` · ${escapeHtml(reminder.post_title)}` : ""}</p>${reminder.evidence ? `<div class="quote">${escapeHtml(reminder.evidence)}</div>` : ""}${reminder.reason ? `<p>${escapeHtml(reminder.reason)}</p>` : ""}${reminder.remediation ? `<p><b>建议：</b>${escapeHtml(reminder.remediation)}</p>` : ""}</div>
+  `).join("")
+
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escapeHtml(report.filename || "Batch Video Analysis")}</title><style>
     body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;background:#eef3fb;color:#101828;line-height:1.5}header{position:sticky;top:0;background:rgba(255,255,255,.94);border-bottom:1px solid #e4e7ec}main,.topbar{max-width:1280px;margin:0 auto}.topbar{padding:14px 28px;font-weight:800;color:#123f86}main{padding:28px}.hero{background:#123f86;color:white;border-radius:20px;padding:32px}.hero h1{margin:0 0 10px;font-size:32px}.pill{display:inline-flex;margin:8px 8px 0 0;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.13);font-size:13px}section{margin-top:24px;background:white;border:1px solid #e4e7ec;border-radius:16px;overflow:visible}.head{padding:20px 24px;border-bottom:1px solid #e4e7ec}.head h2{margin:0;color:#123f86}.content{padding:24px}.grid{display:grid;gap:16px}.cols4{grid-template-columns:repeat(4,1fr)}.card{border:1px solid #e4e7ec;border-radius:14px;padding:18px}.label{color:#667085;font-size:13px}.value{font-size:32px;font-weight:800}.bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin:12px 0}.bar-bg{height:12px;background:#f2f4f7;border-radius:999px;overflow:hidden}.bar{height:100%;background:#0b63ce}.tag{display:inline-flex;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#123f86;font-size:12px;font-weight:700}.issue-list{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.issue{border:1px solid #e4e7ec;border-left:5px solid #0b63ce;border-radius:14px;padding:16px}.quote-title{margin-top:12px;color:#667085;font-size:12px;font-weight:800}.quote{margin-top:8px;padding:10px;background:#f9fafb;border-radius:10px;font-size:13px}.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.step{border:1px solid #e4e7ec;border-radius:14px;padding:16px}.num{width:28px;height:28px;border-radius:50%;background:#123f86;color:white;display:flex;align-items:center;justify-content:center;font-weight:800}.search{margin-bottom:14px;width:min(420px,100%);box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:10px 12px;font-size:14px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e4e7ec;padding:12px;text-align:left;font-size:13px;vertical-align:top}th{background:#f8fafc}.detail-list{display:grid;gap:16px}.detail-card{border:1px solid #e4e7ec;border-radius:14px;padding:18px}.detail-head{display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,.7fr);gap:18px}.detail-account{font-weight:800}.detail-title{display:inline-block;margin-top:6px;color:#0b63ce;font-weight:700}.detail-desc{margin-top:6px;color:#667085;font-size:13px}.detail-tags{display:flex;align-content:flex-start;align-items:flex-start;flex-wrap:wrap;gap:6px}.violation-list{display:grid;gap:12px;margin-top:16px}.violation{border:1px solid #edf0f5;border-radius:12px;padding:14px;background:#fbfcff}.violation h3{margin:0 0 10px;font-size:15px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.detail-grid b{font-size:12px;color:#667085}.detail-grid p{margin:4px 0 0}.transcript{margin-top:12px;color:#667085;font-size:13px}.transcript p{white-space:pre-wrap}.tooltip-container{position:relative;display:inline-block}.tooltip-container .tooltip-text{visibility:hidden;width:240px;background-color:#fff;color:#101828;text-align:left;border:1px solid #e4e7ec;border-radius:8px;padding:8px 12px;position:absolute;z-index:1;bottom:125%;left:0;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1),0 2px 4px -2px rgb(0 0 0 / 0.1);opacity:0;transition:opacity 0.1s;font-size:13px;font-weight:normal;text-decoration:none;white-space:normal}.tooltip-container:hover .tooltip-text{visibility:visible;opacity:1}@media(max-width:920px){.cols4,.issue-list,.timeline,.detail-head,.detail-grid{grid-template-columns:1fr}.bar-row{grid-template-columns:1fr}}</style></head><body>
     <header><div class="topbar">MICHELIN Dealer Video Compliance Audit</div></header><main>
     <div class="hero"><h1>${escapeHtml(report.filename || "米其林经销商短视频音频合规审核报告")}</h1><p>基于帖子标题、描述与口播文字进行合规审核。</p><span class="pill">审核周期：${escapeHtml(report.audit_period || "未填写")}</span><span class="pill">审核量：${stats?.total_videos || 0} 条</span></div>
-    <section><div class="head"><h2>审核整体概况 & 数据统计</h2></div><div class="content"><div class="grid cols4"><div class="card"><div class="label">总审核视频数量</div><div class="value">${stats?.total_videos || 0}</div></div><div class="card"><div class="label">可审核视频数</div><div class="value">${stats?.reviewable_videos || 0}</div></div><div class="card"><div class="label">违规视频数</div><div class="value">${stats?.violating_videos || 0}</div></div><div class="card"><div class="label">整体违规率</div><div class="value">${stats?.violation_rate || 0}%</div></div></div><div class="card" style="margin-top:16px"><h3>违规大类分布</h3>${categoryRows || "<p>暂无违规分类。</p>"}</div><div class="card">${escapeHtml(report.summary?.overall_conclusion)}</div></div></section>
-    <section><div class="head"><h2>账号审核明细</h2></div><div class="content"><table><tr><th style="white-space:nowrap">账号名称</th><th style="white-space:nowrap">审核视频数</th><th style="white-space:nowrap">违规视频条数</th><th style="white-space:nowrap">违规率</th><th>账号问题摘要</th></tr>${accountRows}</table></div></section>
+    <section><div class="head"><h2>审核整体概况 & 数据统计</h2></div><div class="content"><div class="grid cols4"><div class="card"><div class="label">总审核视频数量</div><div class="value">${stats?.total_videos || 0}</div></div><div class="card"><div class="label">可审核视频数</div><div class="value">${stats?.reviewable_videos || 0}</div></div><div class="card"><div class="label">高风险违规视频数</div><div class="value">${stats?.violating_videos || 0}</div></div><div class="card"><div class="label">高风险违规率</div><div class="value">${stats?.violation_rate || 0}%</div></div></div><div class="card" style="margin-top:16px"><h3>高风险违规大类分布</h3>${categoryRows || "<p>暂无高风险违规分类。</p>"}</div><div class="card">${escapeHtml(report.summary?.overall_conclusion)}</div></div></section>
+    <section><div class="head"><h2>账号审核明细</h2></div><div class="content"><table><tr><th style="white-space:nowrap">账号名称</th><th style="white-space:nowrap">审核视频数</th><th style="white-space:nowrap">高风险违规条数</th><th style="white-space:nowrap">高风险违规率</th><th>账号问题摘要</th></tr>${accountRows}</table>${report.appendix?.compliant_accounts_note ? `<p>${escapeHtml(report.appendix.compliant_accounts_note)}</p>` : ""}</div></section>
     <section><div class="head"><h2>核心违规问题汇总 + 整改改进方案</h2></div><div class="content"><div class="issue-list">${issueCards || "<p>暂无核心违规问题。</p>"}</div></div></section>
     <section><div class="head"><h2>后续落地执行建议</h2></div><div class="content"><div class="timeline">${recs}</div></div></section>
-    <section><div class="head"><h2>附录：完整违规明细</h2></div><div class="content"><input class="search" id="detail-search" type="search" placeholder="Search account, title, transcript, evidence..."><div class="detail-list" id="detail-list">${violationCards}</div></div></section>
+    <section><div class="head"><h2>附录 A：高风险违规明细</h2></div><div class="content"><input class="search" id="detail-search" type="search" placeholder="Search account, title, transcript, evidence..."><div class="detail-list" id="detail-list">${violationCards || "<p>暂无高风险违规。</p>"}</div></div></section>
+    <section><div class="head"><h2>附录 B：低风险补充提醒</h2></div><div class="content"><div class="issue-list">${supplementaryCards || "<p>暂无低风险补充提醒。</p>"}</div></div></section>
     </main><script>const input=document.getElementById("detail-search");const rows=[...document.querySelectorAll("#detail-list [data-search]")];input?.addEventListener("input",()=>{const q=input.value.trim().toLowerCase();rows.forEach((row)=>{row.style.display=!q||row.dataset.search.includes(q)?"":"none"})});</script></body></html>`
 }
 
@@ -283,6 +302,7 @@ export default function BatchVideoAnalysisPage() {
   const [auditCategories, setAuditCategories] = useState<AuditCategory[]>(DEFAULT_AUDIT_CATEGORIES)
   const [accountFilter, setAccountFilter] = useState("all")
   const [keywordFilter, setKeywordFilter] = useState("")
+  const [supplementaryAccountFilter, setSupplementaryAccountFilter] = useState("all")
   const [isLoadingSources, setIsLoadingSources] = useState(false)
   const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isParsing, setIsParsing] = useState(false)
@@ -430,6 +450,24 @@ export default function BatchVideoAnalysisPage() {
     return Array.from(new Set((report?.video_results || []).filter((row) => row.status === "violating").map((row) => row.account_name || "未知账号")))
   }, [report?.video_results])
 
+  const supplementaryReminders = useMemo(
+    () => report?.appendix?.supplementary_risk_reminders || [],
+    [report?.appendix?.supplementary_risk_reminders],
+  )
+  const supplementaryAccounts = useMemo(() => {
+    return Array.from(new Set(supplementaryReminders.map((reminder) => reminder.account_name || "未命名账号")))
+  }, [supplementaryReminders])
+  const filteredSupplementaryReminders = supplementaryReminders.filter((reminder) => (
+    supplementaryAccountFilter === "all"
+    || (reminder.account_name || "未命名账号") === supplementaryAccountFilter
+  ))
+
+  useEffect(() => {
+    if (supplementaryAccountFilter !== "all" && !supplementaryAccounts.includes(supplementaryAccountFilter)) {
+      setSupplementaryAccountFilter("all")
+    }
+  }, [supplementaryAccountFilter, supplementaryAccounts])
+
   const stats = report?.stats
 
   return (
@@ -525,7 +563,7 @@ export default function BatchVideoAnalysisPage() {
                     </div>
                     <div className="flex gap-4 border-t pt-4 text-sm text-muted-foreground">
                       <span>{source.video_count || 0} videos</span>
-                      <span>{source.violation_count || 0} violations</span>
+                      <span>{source.violation_count || 0} high-risk violations</span>
                     </div>
                   </div>
                 ))}
@@ -559,8 +597,8 @@ export default function BatchVideoAnalysisPage() {
                   {[
                     ["总审核视频数量", stats.total_videos],
                     ["可审核视频数", stats.reviewable_videos],
-                    ["违规视频数", stats.violating_videos],
-                    ["整体违规率", `${stats.violation_rate}%`],
+                    ["高风险违规视频数", stats.violating_videos],
+                    ["高风险违规率", `${stats.violation_rate}%`],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg border p-4 dark:border-slate-800">
                       <div className="text-xs text-muted-foreground">{label}</div>
@@ -569,7 +607,7 @@ export default function BatchVideoAnalysisPage() {
                   ))}
                 </div>
                 <div className="mt-5 rounded-lg border p-4 dark:border-slate-800">
-                  <h3 className="font-semibold">违规大类分布</h3>
+                  <h3 className="font-semibold">高风险违规大类分布</h3>
                   <div className="mt-3 space-y-3">
                     {Object.entries(stats.category_counts).filter(([, count]) => count > 0).map(([category, count]) => {
                       const totalCategoryCount = Object.values(stats.category_counts).reduce((sum, value) => sum + value, 0)
@@ -594,7 +632,7 @@ export default function BatchVideoAnalysisPage() {
                 <div className="mt-4 overflow-auto">
                   <table className="w-full min-w-[760px] text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                      <tr><th className="p-3 text-left whitespace-nowrap">账号名称</th><th className="p-3 text-left whitespace-nowrap">审核视频数</th><th className="p-3 text-left whitespace-nowrap">违规视频条数</th><th className="p-3 text-left whitespace-nowrap">违规率</th><th className="p-3 text-left">账号问题摘要</th></tr>
+                      <tr><th className="p-3 text-left whitespace-nowrap">账号名称</th><th className="p-3 text-left whitespace-nowrap">审核视频数</th><th className="p-3 text-left whitespace-nowrap">高风险违规条数</th><th className="p-3 text-left whitespace-nowrap">高风险违规率</th><th className="p-3 text-left">账号问题摘要</th></tr>
                     </thead>
                     <tbody>
                       {accountSummaries.map((account) => (
@@ -626,6 +664,9 @@ export default function BatchVideoAnalysisPage() {
                     </tbody>
                   </table>
                 </div>
+                {report.appendix?.compliant_accounts_note && (
+                  <p className="mt-3 text-sm text-muted-foreground">{report.appendix.compliant_accounts_note}</p>
+                )}
               </section>
 
               <section className="rounded-lg border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -665,7 +706,7 @@ export default function BatchVideoAnalysisPage() {
 
               <section className="rounded-lg border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-xl font-semibold text-[#123f86] dark:text-blue-400">附录：完整违规明细</h2>
+                  <h2 className="text-xl font-semibold text-[#123f86] dark:text-blue-400">附录 A：高风险违规明细</h2>
                   <div className="flex flex-wrap gap-2">
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -723,7 +764,42 @@ export default function BatchVideoAnalysisPage() {
                       )}
                     </article>
                   ))}
-                  {!detailRows.length && <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">No matching violations.</div>}
+                  {!detailRows.length && <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">No matching high-risk violations.</div>}
+                </div>
+              </section>
+
+              <section className="rounded-lg border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-[#123f86] dark:text-blue-400">附录 B：低风险补充提醒</h2>
+                  <select
+                    value={supplementaryAccountFilter}
+                    onChange={(event) => setSupplementaryAccountFilter(event.target.value)}
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                    aria-label="按账号筛选低风险补充提醒"
+                  >
+                    <option value="all">全部账号</option>
+                    {supplementaryAccounts.map((accountName) => (
+                      <option key={accountName} value={accountName}>{accountName}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">以下内容不计入违规统计，仅供发布前复核。</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {filteredSupplementaryReminders.map((reminder, index) => (
+                    <div key={`${reminder.item_id}-${reminder.evidence}-${index}`} className="rounded-lg border border-l-4 border-l-amber-400 p-4 dark:border-slate-800 dark:border-l-amber-500">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold">{reminder.category}</h3>
+                        <Badge className={riskClass(reminder.risk_level)}>低风险补充</Badge>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{reminder.account_name}{reminder.post_title ? ` · ${reminder.post_title}` : ""}</p>
+                      {reminder.evidence && <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">{reminder.evidence}</p>}
+                      {reminder.reason && <p className="mt-2 text-sm text-muted-foreground">{reminder.reason}</p>}
+                      {reminder.remediation && <p className="mt-2 text-sm"><span className="font-medium">建议：</span>{reminder.remediation}</p>}
+                    </div>
+                  ))}
+                  {!filteredSupplementaryReminders.length && (
+                    <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">当前筛选下暂无低风险补充提醒。</div>
+                  )}
                 </div>
               </section>
             </>
