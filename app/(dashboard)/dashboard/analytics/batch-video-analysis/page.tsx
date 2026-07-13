@@ -71,6 +71,8 @@ type BatchVideoReport = {
   analysis_date?: string
   audit_period?: string
   audit_categories?: AuditCategory[]
+  analysis_target?: string
+  judgment_rules?: string[]
   stats?: {
     total_videos: number
     reviewable_videos: number
@@ -114,6 +116,16 @@ type AccountSummary = NonNullable<BatchVideoReport["account_summaries"]>[number]
 
 const POLL_INTERVAL_MS = 5000
 const ISSUE_EXAMPLE_LIMIT = 3
+const DEFAULT_ANALYSIS_TARGET = "米其林短视频"
+const DEFAULT_JUDGMENT_RULES = [
+  "以下均不违规：竞品或同品牌新旧款客观对比；数据、第三方背书、行业参数或测评；促销、优惠、抽奖；产品别称或简称；正常账号名包含“米其林”。“未提供依据”本身不等于虚假。",
+  "absolute_expression 只判断文本是否出现“最好”“第一”“百分百”“100%”“最安全”等绝对化表述。绝对化表述本身不改变风险等级、不算违规，也不得仅以“缺少第三方报告、专利证明或其他依据”为由放入 violations。",
+  "反例：“100%独研active+胶料”应输出 violations=[]、absolute_expression=true；不得判为高风险虚假宣传。只有严重损害米其林品牌整体形象时，才可另外输出 violation。",
+  "先判断是否违规；不违规时 violations=[]。违规时才写 category、severity、evidence、reason 和 remediation。",
+  "severity 只使用“高”或“低”，由你根据违规严重程度判断；不要输出“中”。",
+  "transcript 是口播转写，可能出现识别错误或错别字；不要把 transcript 中疑似错别字、同音误写、断句错误或转写不顺当本身判为违规。",
+  "evidence 必须是原文短证据，reason 和 remediation 不得为空。",
+]
 const DEFAULT_AUDIT_CATEGORIES: AuditCategory[] = [
   {
     name: "通用红线违规",
@@ -300,6 +312,8 @@ export default function BatchVideoAnalysisPage() {
   const [auditPeriod, setAuditPeriod] = useState("")
   const [videoLimit, setVideoLimit] = useState<number | "">("")
   const [auditCategories, setAuditCategories] = useState<AuditCategory[]>(DEFAULT_AUDIT_CATEGORIES)
+  const [analysisTarget, setAnalysisTarget] = useState(DEFAULT_ANALYSIS_TARGET)
+  const [judgmentRules, setJudgmentRules] = useState(DEFAULT_JUDGMENT_RULES.join("\n"))
   const [accountFilter, setAccountFilter] = useState("all")
   const [keywordFilter, setKeywordFilter] = useState("")
   const [supplementaryAccountFilter, setSupplementaryAccountFilter] = useState("all")
@@ -400,11 +414,21 @@ export default function BatchVideoAnalysisPage() {
       if (!categories.length) {
         throw new Error("At least one risk category with name and description is required.")
       }
+      const target = analysisTarget.trim()
+      const rules = judgmentRules.split("\n").map((rule) => rule.trim().replace(/^-\s*/, "")).filter(Boolean)
+      if (!target) {
+        throw new Error("Analysis target is required.")
+      }
+      if (!rules.length) {
+        throw new Error("At least one judgment rule is required.")
+      }
       const { job_id } = await createBatchVideoAnalysisJob({
         records: parsed.records,
         name,
         audit_period: auditPeriod,
         audit_categories: categories,
+        analysis_target: target,
+        judgment_rules: rules,
         limit: videoLimit === "" ? undefined : videoLimit,
       })
       while (true) {
@@ -822,6 +846,31 @@ export default function BatchVideoAnalysisPage() {
           <div className="space-y-3">
             <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Report name" />
             <Input value={auditPeriod} onChange={(event) => setAuditPeriod(event.target.value)} placeholder="Audit period (Only for Report UI)" />
+            <div className="rounded-md border p-3">
+              <div className="text-sm font-medium">审核设置</div>
+              <p className="mt-1 text-xs text-muted-foreground">目标会用于审核员角色；判断规则每行一条，提交时自动整理为列表。</p>
+              <div className="mt-3 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="batch-video-analysis-target">分析目标</label>
+                  <Input
+                    id="batch-video-analysis-target"
+                    value={analysisTarget}
+                    onChange={(event) => setAnalysisTarget(event.target.value)}
+                    placeholder="例如：米其林短视频"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="batch-video-judgment-rules">判断规则</label>
+                  <Textarea
+                    id="batch-video-judgment-rules"
+                    value={judgmentRules}
+                    onChange={(event) => setJudgmentRules(event.target.value)}
+                    placeholder="每行一条判断规则"
+                    rows={8}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="space-y-1">
               <div className="text-sm font-medium">Video limit</div>
               <Input

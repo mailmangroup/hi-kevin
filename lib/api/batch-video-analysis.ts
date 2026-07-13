@@ -22,6 +22,8 @@ export async function createBatchVideoAnalysisJob(payload: {
   name?: string
   audit_period?: string
   audit_categories?: { name: string; description: string }[]
+  analysis_target?: string
+  judgment_rules?: string[]
   limit?: number
 }): Promise<{ job_id: string; source_id?: string }> {
   return directApiCall("batch-video-analysis/jobs", {
