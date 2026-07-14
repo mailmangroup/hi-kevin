@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { PlatformBreakdown } from "@/components/analytics/platform-breakdown"
 import { TrendAnalysis } from "@/components/analytics/trend-analysis"
 import { ReportGenerator } from "@/components/analytics/report-generator"
@@ -102,6 +104,10 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8 p-8 pt-6">
       <div>
+        <Link href="/dashboard/analytics" className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          Analytics
+        </Link>
         <h1 className="text-3xl font-bold text-foreground">Post Performance Analysis</h1>
         <p className="text-muted-foreground mt-2">
           Track performance across platforms and discover new growth opportunities.

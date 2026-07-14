@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, BarChart3, ChevronDown, Clock, Download, FileJson, Loader2, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react"
+import { ArrowLeft, BarChart3, CheckCircle2, Clock, Download, FileJson, Loader2, Plus, RotateCcw, Search, Settings2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,9 +23,12 @@ import { useUserStore } from "@/lib/store/user-store"
 import {
   createBatchVideoAnalysisJob,
   deleteBatchVideoAnalysisSource,
+  getBatchVideoAnalysisPreferences,
   getBatchVideoAnalysisReport,
   listBatchVideoAnalysisSources,
   pollBatchVideoAnalysisJob,
+  updateBatchVideoAnalysisPreferences,
+  type BatchVideoAnalysisPreferences,
   type BatchVideoAnalysisSource,
 } from "@/lib/api/batch-video-analysis"
 import {
@@ -121,29 +124,7 @@ type AccountSummary = NonNullable<BatchVideoReport["account_summaries"]>[number]
 
 const POLL_INTERVAL_MS = 5000
 const ISSUE_EXAMPLE_LIMIT = 3
-const DEFAULT_ANALYSIS_TARGET = "米其林短视频"
-const DEFAULT_ACCOUNT_SUMMARY_PROMPT = "简短、直接、可执行；不新增逐条审核结果中没有依据的风险；如果该账号没有违规，说明保持当前口径并持续复核。"
-const DEFAULT_ISSUE_REMEDIATION_PROMPT = "简短、直接、可执行；不新增聚合证据中没有依据的风险；将整改建议写成可落地的审核或改稿标准。"
-const DEFAULT_FINAL_RECOMMENDATIONS_PROMPT = "面向管理层总结跨账号共性问题和主要风险类型；不新增输入中没有依据的风险；给出明确、可落地且有优先级的行动建议。"
-const DEFAULT_JUDGMENT_RULES = [
-  "以下均不违规：竞品或同品牌新旧款客观对比；数据、第三方背书、行业参数或测评；促销、优惠、抽奖；产品别称或简称；正常账号名包含“米其林”。“未提供依据”本身不等于虚假。",
-  "absolute_expression 只判断文本是否出现“最好”“第一”“百分百”“100%”“最安全”等绝对化表述。绝对化表述本身不改变风险等级、不算违规，也不得仅以“缺少第三方报告、专利证明或其他依据”为由放入 violations。",
-  "反例：“100%独研active+胶料”应输出 violations=[]、absolute_expression=true；不得判为高风险虚假宣传。只有严重损害米其林品牌整体形象时，才可另外输出 violation。",
-  "先判断是否违规；不违规时 violations=[]。违规时才写 category、severity、evidence、reason 和 remediation。",
-  "severity 只使用“高”或“低”，由你根据违规严重程度判断；不要输出“中”。",
-  "transcript 是口播转写，可能出现识别错误或错别字；不要把 transcript 中疑似错别字、同音误写、断句错误或转写不顺当本身判为违规。",
-  "evidence 必须是原文短证据，reason 和 remediation 不得为空。",
-]
-const DEFAULT_AUDIT_CATEGORIES: AuditCategory[] = [
-  {
-    name: "通用红线违规",
-    description: "违反法律、公序良俗或价值观的明确文本内容：违法不良行为，政治/宗教/种族/地域/领土/国家政策/民族歧视/灾难营销等敏感议题，制造恐慌或煽动对立，粗俗淫秽、侮辱攻击、无依据贬低诽谤，文化冒犯，以及可由文本本身确认的虚假事实或产品功效承诺。不能仅因出现绝对化用语或输入中未附证明材料而判定为本类违规。",
-  },
-  {
-    name: "品牌营销违规",
-    description: "恶意诋毁米其林或反向踩品牌引流，刻意捏造极端产品优劣落差并恶意抹黑全系产品，或使用纯负面、全盘否定品牌的标题和文案恶意引流。",
-  },
-]
+const DEFAULT_ANALYSIS_TARGET = ""
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -158,7 +139,14 @@ function formatDate(value?: string) {
   if (!value) return ""
   const date = new Date(value)
   if (Number.isNaN(date.valueOf())) return value
-  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" })
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
 }
 
 function riskClass(level?: string) {
@@ -218,6 +206,35 @@ function PromptEditor({
         className="resize-y leading-relaxed"
       />
       <div className="text-right text-xs text-muted-foreground">{value.length.toLocaleString()} / 8,000</div>
+    </div>
+  )
+}
+
+function SettingsDrawerRow({
+  title,
+  description,
+  onEdit,
+  disabled,
+}: {
+  title: string
+  description: string
+  onEdit: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground shadow-sm">
+          <Settings2 className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{title}</div>
+          <div className="truncate text-xs text-muted-foreground">{description}</div>
+        </div>
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={onEdit} disabled={disabled}>
+        Edit
+      </Button>
     </div>
   )
 }
@@ -332,8 +349,8 @@ function buildHtmlReport(report: BatchVideoReport) {
 
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escapeHtml(report.filename || "Batch Video Analysis")}</title><style>
     body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;background:#eef3fb;color:#101828;line-height:1.5}header{position:sticky;top:0;background:rgba(255,255,255,.94);border-bottom:1px solid #e4e7ec}main,.topbar{max-width:1280px;margin:0 auto}.topbar{padding:14px 28px;font-weight:800;color:#123f86}main{padding:28px}.hero{background:#123f86;color:white;border-radius:20px;padding:32px}.hero h1{margin:0 0 10px;font-size:32px}.pill{display:inline-flex;margin:8px 8px 0 0;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.13);font-size:13px}section{margin-top:24px;background:white;border:1px solid #e4e7ec;border-radius:16px;overflow:visible}.head{padding:20px 24px;border-bottom:1px solid #e4e7ec}.head h2{margin:0;color:#123f86}.content{padding:24px}.grid{display:grid;gap:16px}.cols4{grid-template-columns:repeat(4,1fr)}.card{border:1px solid #e4e7ec;border-radius:14px;padding:18px}.label{color:#667085;font-size:13px}.value{font-size:32px;font-weight:800}.bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin:12px 0}.bar-bg{height:12px;background:#f2f4f7;border-radius:999px;overflow:hidden}.bar{height:100%;background:#0b63ce}.tag{display:inline-flex;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#123f86;font-size:12px;font-weight:700}.issue-list{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.issue{border:1px solid #e4e7ec;border-left:5px solid #0b63ce;border-radius:14px;padding:16px}.quote-title{margin-top:12px;color:#667085;font-size:12px;font-weight:800}.quote{margin-top:8px;padding:10px;background:#f9fafb;border-radius:10px;font-size:13px}.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.step{border:1px solid #e4e7ec;border-radius:14px;padding:16px}.num{width:28px;height:28px;border-radius:50%;background:#123f86;color:white;display:flex;align-items:center;justify-content:center;font-weight:800}.search{margin-bottom:14px;width:min(420px,100%);box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:10px 12px;font-size:14px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e4e7ec;padding:12px;text-align:left;font-size:13px;vertical-align:top}th{background:#f8fafc}.detail-list{display:grid;gap:16px}.detail-card{border:1px solid #e4e7ec;border-radius:14px;padding:18px}.detail-head{display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,.7fr);gap:18px}.detail-account{font-weight:800}.detail-title{display:inline-block;margin-top:6px;color:#0b63ce;font-weight:700}.detail-desc{margin-top:6px;color:#667085;font-size:13px}.detail-tags{display:flex;align-content:flex-start;align-items:flex-start;flex-wrap:wrap;gap:6px}.violation-list{display:grid;gap:12px;margin-top:16px}.violation{border:1px solid #edf0f5;border-radius:12px;padding:14px;background:#fbfcff}.violation h3{margin:0 0 10px;font-size:15px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.detail-grid b{font-size:12px;color:#667085}.detail-grid p{margin:4px 0 0}.transcript{margin-top:12px;color:#667085;font-size:13px}.transcript p{white-space:pre-wrap}.tooltip-container{position:relative;display:inline-block}.tooltip-container .tooltip-text{visibility:hidden;width:240px;background-color:#fff;color:#101828;text-align:left;border:1px solid #e4e7ec;border-radius:8px;padding:8px 12px;position:absolute;z-index:1;bottom:125%;left:0;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1),0 2px 4px -2px rgb(0 0 0 / 0.1);opacity:0;transition:opacity 0.1s;font-size:13px;font-weight:normal;text-decoration:none;white-space:normal}.tooltip-container:hover .tooltip-text{visibility:visible;opacity:1}@media(max-width:920px){.cols4,.issue-list,.timeline,.detail-head,.detail-grid{grid-template-columns:1fr}.bar-row{grid-template-columns:1fr}}</style></head><body>
-    <header><div class="topbar">MICHELIN Dealer Video Compliance Audit</div></header><main>
-    <div class="hero"><h1>${escapeHtml(report.filename || "米其林经销商短视频音频合规审核报告")}</h1><p>基于帖子标题、描述与口播文字进行合规审核。</p><span class="pill">审核周期：${escapeHtml(report.audit_period || "未填写")}</span><span class="pill">审核量：${stats?.total_videos || 0} 条</span></div>
+    <header><div class="topbar">Batch Video Analysis</div></header><main>
+    <div class="hero"><h1>${escapeHtml(report.filename || "未命名报告")}</h1>${report.audit_period ? `<p>${escapeHtml(report.audit_period)}</p>` : ""}<p>基于帖子标题、描述与口播文字进行合规审核。</p><span class="pill">审核量：${stats?.total_videos || 0} 条</span></div>
     <section><div class="head"><h2>审核整体概况 & 数据统计</h2></div><div class="content"><div class="grid cols4"><div class="card"><div class="label">总审核视频数量</div><div class="value">${stats?.total_videos || 0}</div></div><div class="card"><div class="label">可审核视频数</div><div class="value">${stats?.reviewable_videos || 0}</div></div><div class="card"><div class="label">高风险违规视频数</div><div class="value">${stats?.violating_videos || 0}</div></div><div class="card"><div class="label">高风险违规率</div><div class="value">${stats?.violation_rate || 0}%</div></div></div><div class="card" style="margin-top:16px"><h3>高风险违规大类分布</h3>${categoryRows || "<p>暂无高风险违规分类。</p>"}</div><div class="card">${escapeHtml(report.summary?.overall_conclusion)}</div></div></section>
     <section><div class="head"><h2>账号审核明细</h2></div><div class="content"><table><tr><th style="white-space:nowrap">账号名称</th><th style="white-space:nowrap">审核视频数</th><th style="white-space:nowrap">高风险违规条数</th><th style="white-space:nowrap">高风险违规率</th><th>账号问题摘要</th></tr>${accountRows}</table>${report.appendix?.compliant_accounts_note ? `<p>${escapeHtml(report.appendix.compliant_accounts_note)}</p>` : ""}</div></section>
     <section><div class="head"><h2>核心违规问题汇总 + 整改改进方案</h2></div><div class="content"><div class="issue-list">${issueCards || "<p>暂无核心违规问题。</p>"}</div></div></section>
@@ -363,15 +380,14 @@ export default function BatchVideoAnalysisPage() {
   const [fileA, setFileA] = useState<File | null>(null)
   const [fileB, setFileB] = useState<File | null>(null)
   const [parseResult, setParseResult] = useState<BatchVideoParseResult | null>(null)
-  const [name, setName] = useState("米其林经销商短视频音频合规审核报告")
-  const [auditPeriod, setAuditPeriod] = useState("")
+  const [subtitle, setSubtitle] = useState("")
   const [videoLimit, setVideoLimit] = useState<number | "">("")
-  const [auditCategories, setAuditCategories] = useState<AuditCategory[]>(DEFAULT_AUDIT_CATEGORIES)
+  const [auditCategories, setAuditCategories] = useState<AuditCategory[]>([])
   const [analysisTarget, setAnalysisTarget] = useState(DEFAULT_ANALYSIS_TARGET)
-  const [judgmentRules, setJudgmentRules] = useState(DEFAULT_JUDGMENT_RULES.join("\n"))
-  const [accountSummaryPrompt, setAccountSummaryPrompt] = useState(DEFAULT_ACCOUNT_SUMMARY_PROMPT)
-  const [issueRemediationPrompt, setIssueRemediationPrompt] = useState(DEFAULT_ISSUE_REMEDIATION_PROMPT)
-  const [finalRecommendationsPrompt, setFinalRecommendationsPrompt] = useState(DEFAULT_FINAL_RECOMMENDATIONS_PROMPT)
+  const [auditRules, setAuditRules] = useState<string[]>([])
+  const [accountSummaryPrompt, setAccountSummaryPrompt] = useState("")
+  const [issueRemediationPrompt, setIssueRemediationPrompt] = useState("")
+  const [finalRecommendationsPrompt, setFinalRecommendationsPrompt] = useState("")
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [accountFilter, setAccountFilter] = useState("all")
   const [keywordFilter, setKeywordFilter] = useState("")
@@ -380,8 +396,14 @@ export default function BatchVideoAnalysisPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false)
   const [isParsing, setIsParsing] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(false)
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false)
+  const [savedPreferences, setSavedPreferences] = useState<BatchVideoAnalysisPreferences | null>(null)
   const [analysisMessage, setAnalysisMessage] = useState("")
   const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
+  const [showRiskCategoriesSheet, setShowRiskCategoriesSheet] = useState(false)
+  const [showAuditRulesSheet, setShowAuditRulesSheet] = useState(false)
   const [showSynthesisSheet, setShowSynthesisSheet] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -399,6 +421,32 @@ export default function BatchVideoAnalysisPage() {
 
   useEffect(() => {
     if (profile?.kawo_token) refreshSources()
+  }, [profile?.kawo_token])
+
+  useEffect(() => {
+    if (!profile?.kawo_token) return
+    let mounted = true
+    setIsLoadingPreferences(true)
+    getBatchVideoAnalysisPreferences()
+      .then((preferences) => {
+        if (!mounted) return
+        setSavedPreferences(preferences)
+        setAuditCategories(preferences.audit_categories)
+        setAnalysisTarget(preferences.analysis_target)
+        setAuditRules(preferences.judgment_rules)
+        setAccountSummaryPrompt(preferences.account_summary_prompt)
+        setIssueRemediationPrompt(preferences.issue_remediation_prompt)
+        setFinalRecommendationsPrompt(preferences.final_recommendations_prompt)
+      })
+      .catch((err) => {
+        if (mounted) setError(err instanceof Error ? err : new Error("Failed to load report defaults"))
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingPreferences(false)
+      })
+    return () => {
+      mounted = false
+    }
   }, [profile?.kawo_token])
 
   useEffect(() => {
@@ -467,6 +515,10 @@ export default function BatchVideoAnalysisPage() {
         throw new Error("No matching videos found between the DyItem links JSON and DyItemTask analysis JSON.")
       }
       setAnalysisMessage("Starting batch video analysis...")
+      const target = analysisTarget.trim()
+      if (!target) {
+        throw new Error("Analysis target is required.")
+      }
       const categories = auditCategories.map((category) => ({
         name: category.name.trim(),
         description: category.description.trim(),
@@ -474,23 +526,21 @@ export default function BatchVideoAnalysisPage() {
       if (!categories.length) {
         throw new Error("At least one risk category with name and description is required.")
       }
-      const target = analysisTarget.trim()
-      const rules = judgmentRules.split("\n").map((rule) => rule.trim().replace(/^-\s*/, "")).filter(Boolean)
-      if (!target) {
-        throw new Error("Analysis target is required.")
-      }
+      const rules = auditRules.map((rule) => rule.trim().replace(/^-\s*/, "")).filter(Boolean)
       if (!rules.length) {
         throw new Error("At least one judgment rule is required.")
       }
       const synthesisPrompts = [accountSummaryPrompt, issueRemediationPrompt, finalRecommendationsPrompt].map((prompt) => prompt.trim())
       if (synthesisPrompts.some((prompt) => !prompt)) {
-        throw new Error("All three synthesis prompts are required.")
+        throw new Error("All three synthesis rules are required.")
       }
+      setShowRiskCategoriesSheet(false)
+      setShowAuditRulesSheet(false)
       setShowSynthesisSheet(false)
       const { job_id } = await createBatchVideoAnalysisJob({
         records: parsed.records,
-        name,
-        audit_period: auditPeriod,
+        name: target,
+        audit_period: subtitle.trim(),
         audit_categories: categories,
         analysis_target: target,
         judgment_rules: rules,
@@ -519,6 +569,45 @@ export default function BatchVideoAnalysisPage() {
       setError(err instanceof Error ? err : new Error("Batch video analysis failed"))
       setIsAnalyzing(false)
     }
+  }
+
+  async function savePreferences() {
+    setIsSavingPreferences(true)
+    setError(null)
+    try {
+      const categories = auditCategories.map((category) => ({
+        name: category.name.trim(),
+        description: category.description.trim(),
+      })).filter((category) => category.name && category.description)
+      const rules = auditRules.map((rule) => rule.trim().replace(/^-\s*/, "")).filter(Boolean)
+      const preferences = await updateBatchVideoAnalysisPreferences({
+        audit_categories: categories,
+        analysis_target: analysisTarget.trim(),
+        judgment_rules: rules,
+        account_summary_prompt: accountSummaryPrompt.trim(),
+        issue_remediation_prompt: issueRemediationPrompt.trim(),
+        final_recommendations_prompt: finalRecommendationsPrompt.trim(),
+      })
+      setSavedPreferences(preferences)
+      setAuditCategories(preferences.audit_categories)
+      setAnalysisTarget(preferences.analysis_target)
+      setAuditRules(preferences.judgment_rules)
+      setAccountSummaryPrompt(preferences.account_summary_prompt)
+      setIssueRemediationPrompt(preferences.issue_remediation_prompt)
+      setFinalRecommendationsPrompt(preferences.final_recommendations_prompt)
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to save report defaults"))
+      return false
+    } finally {
+      setIsSavingPreferences(false)
+    }
+  }
+
+  async function handleSavePreferenceChoice(save: boolean) {
+    if (save && !(await savePreferences())) return
+    setShowSaveConfirmation(false)
+    await submitAnalysis()
   }
 
   async function handleDelete(sourceId: string) {
@@ -572,7 +661,6 @@ export default function BatchVideoAnalysisPage() {
             Analytics
           </Link>
           <h1 className="text-3xl font-bold text-foreground">Batch Video Analysis</h1>
-          <p className="mt-2 text-muted-foreground">米其林经销商短视频音频合规审核</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {selectedSourceId && (
@@ -581,10 +669,6 @@ export default function BatchVideoAnalysisPage() {
               History
             </Button>
           )}
-          <Button onClick={() => setShowUploadDialog(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Report
-          </Button>
           {report && (
             <Button variant="outline" onClick={() => downloadHTMLReport(report)} className="gap-2">
               <Download className="h-4 w-4" />
@@ -649,6 +733,9 @@ export default function BatchVideoAnalysisPage() {
                     </div>
                     <div>
                       <h3 className="line-clamp-2 text-lg font-semibold">{source.name}</h3>
+                      {source.audit_period ? (
+                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{source.audit_period}</p>
+                      ) : null}
                       <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         {formatDate(source.updated_at)}
@@ -676,10 +763,12 @@ export default function BatchVideoAnalysisPage() {
           ) : report && stats ? (
             <>
               <section className="overflow-hidden rounded-2xl bg-[#123f86] p-8 text-white shadow-sm">
-                <h2 className="text-3xl font-bold">{report.filename || "米其林经销商短视频音频合规审核报告"}</h2>
+                <h2 className="text-3xl font-bold">{report.filename || "未命名报告"}</h2>
+                {report.audit_period ? (
+                  <p className="mt-2 text-lg text-blue-50">{report.audit_period}</p>
+                ) : null}
                 <p className="mt-2 text-blue-100">基于帖子标题、描述与口播文字进行合规审核。</p>
                 <div className="mt-5 flex flex-wrap gap-2 text-sm">
-                  <span className="rounded-full bg-white/15 px-3 py-1">审核周期：{report.audit_period || "未填写"}</span>
                   <span className="rounded-full bg-white/15 px-3 py-1">审核量：{stats.total_videos} 条</span>
                 </div>
               </section>
@@ -912,141 +1001,119 @@ export default function BatchVideoAnalysisPage() {
               Upload the Qingbo DyItem links JSON and DyItemTask analysis JSON.
             </DialogDescription>
           </DialogHeader>
+          {isAnalyzing ? (
+            <div className="flex min-h-[390px] flex-col items-center justify-center px-4 py-10 text-center">
+              <div className="w-full max-w-md rounded-xl border border-blue-200 bg-blue-50/70 p-6 shadow-sm dark:border-blue-900/70 dark:bg-blue-950/30">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">Analysis in progress</h3>
+                <p className="mt-2 min-h-10 text-sm text-muted-foreground" aria-live="polite">{analysisMessage || "Preparing your batch video report..."}</p>
+                <div className="mt-5 h-2 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950">
+                  <div className="h-full w-2/3 animate-pulse rounded-full bg-blue-600" />
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">This can take a few minutes. Keep this window open while we prepare the report.</p>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-3">
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Report name" />
-            <Input value={auditPeriod} onChange={(event) => setAuditPeriod(event.target.value)} placeholder="Audit period (Only for Report UI)" />
-            <details className="group rounded-md border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 marker:content-none">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-50 text-muted-foreground dark:bg-slate-900">
-                    <Settings2 className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">Audit rules</div>
-                    <div className="truncate text-xs text-muted-foreground">{analysisTarget} · {judgmentRules.split("\n").filter((rule) => rule.trim()).length} rules</div>
-                  </div>
-                </div>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-3 border-t p-3">
-                <p className="text-xs text-muted-foreground">目标会用于审核员角色；判断规则每行一条，提交时自动整理为列表。</p>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium" htmlFor="batch-video-analysis-target">分析目标</label>
-                  <Input
-                    id="batch-video-analysis-target"
-                    value={analysisTarget}
-                    onChange={(event) => setAnalysisTarget(event.target.value)}
-                    placeholder="例如：米其林短视频"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium" htmlFor="batch-video-judgment-rules">判断规则</label>
-                  <Textarea
-                    id="batch-video-judgment-rules"
-                    value={judgmentRules}
-                    onChange={(event) => setJudgmentRules(event.target.value)}
-                    placeholder="每行一条判断规则"
-                    rows={8}
-                  />
-                </div>
+            <div className="space-y-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <label className="text-sm font-medium" htmlFor="batch-video-analysis-target">分析目标</label>
+                <span className="text-xs text-muted-foreground">Used as the report title and in the prompt</span>
               </div>
-            </details>
-            <div className="flex items-center justify-between gap-3 rounded-md border bg-slate-50/60 p-3 dark:bg-slate-900/40">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground shadow-sm">
-                  <Settings2 className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">Synthesis prompts</div>
-                  <div className="truncate text-xs text-muted-foreground">3 stages configured · account, issues, final report</div>
-                </div>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowSynthesisSheet(true)} disabled={isAnalyzing}>
-                Edit
-              </Button>
+              <Input
+                id="batch-video-analysis-target"
+                value={analysisTarget}
+                onChange={(event) => setAnalysisTarget(event.target.value)}
+                placeholder="例如：经销商短视频"
+                required
+              />
             </div>
             <div className="space-y-1">
-              <div className="text-sm font-medium">Video limit</div>
+              <label className="text-sm font-medium" htmlFor="batch-video-subtitle">Subtitle</label>
               <Input
-                type="number"
-                min={1}
-                value={videoLimit}
-                onChange={(event) => {
-                  const val = event.target.value
-                  if (val === "") {
-                    setVideoLimit("")
-                  } else {
-                    setVideoLimit(Math.max(1, Number(val)))
-                  }
-                }}
-                placeholder="Video limit (leave empty for no limit)"
+                id="batch-video-subtitle"
+                value={subtitle}
+                onChange={(event) => setSubtitle(event.target.value)}
+                placeholder="Subtitle (optional)"
               />
             </div>
-            <label className="flex items-center justify-between gap-4 rounded-md border p-3">
-              <span>
-                <span className="block text-sm font-medium">Enable thinking</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Allows more reasoning time for video auditing and report synthesis.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={thinkingEnabled}
-                onChange={(event) => setThinkingEnabled(event.target.checked)}
+            <div className="overflow-hidden rounded-md border bg-slate-50/60 dark:bg-slate-900/40">
+              <SettingsDrawerRow
+                title="Risk categories"
+                description={`${auditCategories.length} categories configured`}
+                onEdit={() => setShowRiskCategoriesSheet(true)}
                 disabled={isAnalyzing}
-                className="h-4 w-4 rounded border-slate-300"
               />
-            </label>
-            <details className="group rounded-md border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 marker:content-none">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-50 text-muted-foreground dark:bg-slate-900">
-                    <Settings2 className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">Risk categories</div>
-                    <div className="truncate text-xs text-muted-foreground">{auditCategories.length} categories configured</div>
-                  </div>
-                </div>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-3 border-t p-3">
-                {auditCategories.map((category, index) => (
-                  <div key={index} className="space-y-2 rounded-md bg-slate-50 p-3 dark:bg-slate-900">
-                    <Input
-                      value={category.name}
-                      onChange={(event) => {
-                        const next = [...auditCategories]
-                        next[index] = { ...next[index], name: event.target.value }
-                        setAuditCategories(next)
-                      }}
-                      placeholder="Category name"
-                    />
-                    <Textarea
-                      value={category.description}
-                      onChange={(event) => {
-                        const next = [...auditCategories]
-                        next[index] = { ...next[index], description: event.target.value }
-                        setAuditCategories(next)
-                      }}
-                      placeholder="Category definition"
-                      rows={3}
-                    />
-                  </div>
-                ))}
+              <div className="border-t" />
+              <SettingsDrawerRow
+                title="Audit rules"
+                description={`${auditRules.filter((rule) => rule.trim()).length} rules · applied per post`}
+                onEdit={() => setShowAuditRulesSheet(true)}
+                disabled={isAnalyzing}
+              />
+              <div className="border-t" />
+              <SettingsDrawerRow
+                title="Synthesis rules"
+                description="3 stages configured · account, issues, final report"
+                onEdit={() => setShowSynthesisSheet(true)}
+                disabled={isAnalyzing}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="batch-video-limit">Video limit</label>
+                <Input
+                  id="batch-video-limit"
+                  type="number"
+                  min={1}
+                  value={videoLimit}
+                  onChange={(event) => {
+                    const val = event.target.value
+                    if (val === "") {
+                      setVideoLimit("")
+                    } else {
+                      setVideoLimit(Math.max(1, Number(val)))
+                    }
+                  }}
+                  placeholder="No limit"
+                  disabled={isAnalyzing}
+                />
               </div>
-            </details>
-            <p className="text-xs text-muted-foreground">Upload one DyItem links JSON and one DyItemTask analysis JSON. Either file can go in either slot.</p>
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm">
-              <FileJson className="h-4 w-4" />
-              <span className="truncate">{fileA?.name || "Choose first JSON file"}</span>
-              <input type="file" accept=".json,application/json" className="hidden" onChange={(event) => setFileA(event.target.files?.[0] || null)} />
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed p-3 text-sm">
-              <FileJson className="h-4 w-4" />
-              <span className="truncate">{fileB?.name || "Choose second JSON file"}</span>
-              <input type="file" accept=".json,application/json" className="hidden" onChange={(event) => setFileB(event.target.files?.[0] || null)} />
-            </label>
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="batch-video-thinking">Enable thinking</label>
+                <label
+                  htmlFor="batch-video-thinking"
+                  className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-[8px] border border-input bg-background px-3 text-sm"
+                >
+                  <span className="text-muted-foreground">More reasoning time</span>
+                  <input
+                    id="batch-video-thinking"
+                    type="checkbox"
+                    checked={thinkingEnabled}
+                    onChange={(event) => setThinkingEnabled(event.target.checked)}
+                    disabled={isAnalyzing}
+                    className="h-4 w-4 shrink-0 rounded border-slate-300"
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Upload one DyItem links JSON and one DyItemTask analysis JSON. Either file can go in either slot.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-3 py-3 text-center text-sm transition hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/40">
+                  <FileJson className="h-4 w-4 text-muted-foreground" />
+                  <span className="line-clamp-2 break-all text-xs">{fileA?.name || "Choose first JSON"}</span>
+                  <input type="file" accept=".json,application/json" className="hidden" onChange={(event) => setFileA(event.target.files?.[0] || null)} />
+                </label>
+                <label className="flex min-h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-3 py-3 text-center text-sm transition hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/40">
+                  <FileJson className="h-4 w-4 text-muted-foreground" />
+                  <span className="line-clamp-2 break-all text-xs">{fileB?.name || "Choose second JSON"}</span>
+                  <input type="file" accept=".json,application/json" className="hidden" onChange={(event) => setFileB(event.target.files?.[0] || null)} />
+                </label>
+              </div>
+            </div>
             {isParsing && (
               <div className="flex items-center gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -1063,23 +1130,159 @@ export default function BatchVideoAnalysisPage() {
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" disabled={isAnalyzing} onClick={() => setShowUploadDialog(false)}>
+              <Button variant="ghost" disabled={isSavingPreferences} onClick={() => setShowUploadDialog(false)}>
                 Cancel
               </Button>
-              <Button disabled={!fileA || !fileB || isAnalyzing} onClick={submitAnalysis}>
-                {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button disabled={!analysisTarget.trim() || !fileA || !fileB || isLoadingPreferences || isSavingPreferences} onClick={() => setShowSaveConfirmation(true)}>
                 Run Analysis
               </Button>
             </div>
-            {isAnalyzing && <p className="text-xs text-muted-foreground">{analysisMessage}</p>}
+          </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSaveConfirmation} onOpenChange={(open) => !isSavingPreferences && setShowSaveConfirmation(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save these settings for future reports?</DialogTitle>
+            <DialogDescription>
+              Save the 分析目标 and report prompts as your defaults before running this analysis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" disabled={isSavingPreferences} onClick={() => handleSavePreferenceChoice(false)}>
+              No, just run analysis
+            </Button>
+            <Button disabled={isSavingPreferences} onClick={() => handleSavePreferenceChoice(true)}>
+              {isSavingPreferences ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              Yes, save and run
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      <Sheet open={showRiskCategoriesSheet} onOpenChange={(open) => !isAnalyzing && setShowRiskCategoriesSheet(open)}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader className="border-b pr-10">
+            <SheetTitle>Risk categories</SheetTitle>
+            <SheetDescription>Define the risk categories used when auditing each post.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-3 px-4 py-4">
+            {auditCategories.map((category, index) => (
+              <div key={index} className="space-y-2 rounded-md border bg-slate-50 p-3 dark:bg-slate-900">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Category {index + 1}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2 text-destructive hover:text-destructive"
+                    onClick={() => setAuditCategories((categories) => categories.filter((_, categoryIndex) => categoryIndex !== index))}
+                    disabled={isAnalyzing}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove
+                  </Button>
+                </div>
+                <Input
+                  value={category.name}
+                  onChange={(event) => {
+                    const next = [...auditCategories]
+                    next[index] = { ...next[index], name: event.target.value }
+                    setAuditCategories(next)
+                  }}
+                  placeholder="Category name"
+                  disabled={isAnalyzing}
+                />
+                <Textarea
+                  value={category.description}
+                  onChange={(event) => {
+                    const next = [...auditCategories]
+                    next[index] = { ...next[index], description: event.target.value }
+                    setAuditCategories(next)
+                  }}
+                  placeholder="Category definition"
+                  rows={3}
+                  disabled={isAnalyzing}
+                />
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed"
+              onClick={() => setAuditCategories((categories) => [...categories, { name: "", description: "" }])}
+              disabled={isAnalyzing}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add risk category
+            </Button>
+          </div>
+          <SheetFooter className="border-t">
+            <Button type="button" onClick={() => setShowRiskCategoriesSheet(false)} disabled={isAnalyzing}>Done</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showAuditRulesSheet} onOpenChange={(open) => !isAnalyzing && setShowAuditRulesSheet(open)}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader className="border-b pr-10">
+            <SheetTitle>Audit rules</SheetTitle>
+            <SheetDescription>These rules are applied per post. Add, remove, and edit each rule independently.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-3 px-4 py-4">
+            {auditRules.map((rule, index) => (
+              <div key={index} className="space-y-2 rounded-md border bg-slate-50 p-3 dark:bg-slate-900">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium text-muted-foreground" htmlFor={`batch-video-audit-rule-${index}`}>Rule {index + 1}</label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2 text-destructive hover:text-destructive"
+                    onClick={() => setAuditRules((rules) => rules.filter((_, ruleIndex) => ruleIndex !== index))}
+                    disabled={isAnalyzing}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove
+                  </Button>
+                </div>
+                <Textarea
+                  id={`batch-video-audit-rule-${index}`}
+                  value={rule}
+                  onChange={(event) => setAuditRules((rules) => rules.map((currentRule, ruleIndex) => ruleIndex === index ? event.target.value : currentRule))}
+                  placeholder="Describe how this should be evaluated"
+                  rows={4}
+                  disabled={isAnalyzing}
+                  className="resize-y leading-relaxed"
+                />
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed"
+              onClick={() => setAuditRules((rules) => [...rules, ""])}
+              disabled={isAnalyzing}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add audit rule
+            </Button>
+            <div className="text-right text-xs text-muted-foreground">
+              {auditRules.filter((rule) => rule.trim()).length} rules
+            </div>
+          </div>
+          <SheetFooter className="border-t">
+            <Button type="button" onClick={() => setShowAuditRulesSheet(false)} disabled={isAnalyzing}>Done</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
       <Sheet open={showSynthesisSheet} onOpenChange={(open) => !isAnalyzing && setShowSynthesisSheet(open)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader className="border-b pr-10">
-            <SheetTitle>Synthesis prompts</SheetTitle>
+            <SheetTitle>Synthesis rules</SheetTitle>
             <SheetDescription>Edit each report-writing stage independently. Output formats and source-grounding safeguards remain fixed.</SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="account" className="flex-1 px-4">
@@ -1093,9 +1296,9 @@ export default function BatchVideoAnalysisPage() {
                 title="Account summaries"
                 description="Controls the note generated for each account with violations."
                 value={accountSummaryPrompt}
-                defaultValue={DEFAULT_ACCOUNT_SUMMARY_PROMPT}
+                defaultValue={savedPreferences?.account_summary_prompt || ""}
                 onChange={setAccountSummaryPrompt}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !savedPreferences}
               />
             </TabsContent>
             <TabsContent value="issues" className="space-y-3 pt-3">
@@ -1103,9 +1306,9 @@ export default function BatchVideoAnalysisPage() {
                 title="Issue remediation"
                 description="Controls the remediation standard generated for each risk category."
                 value={issueRemediationPrompt}
-                defaultValue={DEFAULT_ISSUE_REMEDIATION_PROMPT}
+                defaultValue={savedPreferences?.issue_remediation_prompt || ""}
                 onChange={setIssueRemediationPrompt}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !savedPreferences}
               />
             </TabsContent>
             <TabsContent value="final" className="space-y-3 pt-3">
@@ -1113,9 +1316,9 @@ export default function BatchVideoAnalysisPage() {
                 title="Final recommendations"
                 description="Controls the management summary and recommended actions."
                 value={finalRecommendationsPrompt}
-                defaultValue={DEFAULT_FINAL_RECOMMENDATIONS_PROMPT}
+                defaultValue={savedPreferences?.final_recommendations_prompt || ""}
                 onChange={setFinalRecommendationsPrompt}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !savedPreferences}
               />
             </TabsContent>
           </Tabs>

@@ -11,10 +11,41 @@ export type BatchVideoJobStatus = {
 export type BatchVideoAnalysisSource = {
   id: string
   name: string
+  audit_period?: string
   updated_at?: string
   video_count?: number
   reviewable_count?: number
   violation_count?: number
+}
+
+export type BatchVideoAnalysisPreferences = {
+  audit_categories: { name: string; description: string }[]
+  analysis_target: string
+  judgment_rules: string[]
+  account_summary_prompt: string
+  issue_remediation_prompt: string
+  final_recommendations_prompt: string
+  updated_at?: string
+}
+
+export type BatchVideoAnalysisPreferencesUpdate = Partial<
+  Omit<BatchVideoAnalysisPreferences, "updated_at">
+>
+
+export async function getBatchVideoAnalysisPreferences(): Promise<BatchVideoAnalysisPreferences> {
+  return directApiCall("batch-video-analysis/preferences", {
+    includeOrgBrandHeaders: false,
+  })
+}
+
+export async function updateBatchVideoAnalysisPreferences(
+  payload: BatchVideoAnalysisPreferencesUpdate,
+): Promise<BatchVideoAnalysisPreferences> {
+  return directApiCall("batch-video-analysis/preferences", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    includeOrgBrandHeaders: false,
+  })
 }
 
 export async function createBatchVideoAnalysisJob(payload: {

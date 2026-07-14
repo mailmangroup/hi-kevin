@@ -6,6 +6,7 @@ import { directApiCall } from "@/lib/api/client"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { LoadingState } from "@/components/ui/loading"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Plus, ArrowLeft, FileText, Calendar, MessageSquare, BarChart3, Clock, Trash2, Download, Database, Layers, X } from "lucide-react"
 import {
   Select,
@@ -1357,6 +1358,10 @@ export default function CommentAnalysisPage() {
         <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
           <header className="flex items-center justify-between pb-6 border-b border-indigo-100 dark:border-indigo-800">
             <div>
+              <Link href="/dashboard/analytics" className="mb-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
+                <ArrowLeft className="h-4 w-4" />
+                Analytics
+              </Link>
               <h1 className="font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Comment Analysis
               </h1>
@@ -1541,6 +1546,10 @@ export default function CommentAnalysisPage() {
   // Header for other views
   const renderHeader = () => (
     <header className="border-b border-indigo-100 dark:border-indigo-800 pb-6 mb-8">
+      <Link href="/dashboard/analytics" className="mb-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
+        <ArrowLeft className="h-4 w-4" />
+        Analytics
+      </Link>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {selectedSourceId && !isAnalyzing && !showUploader && (
@@ -1622,6 +1631,10 @@ export default function CommentAnalysisPage() {
       <div className="relative min-h-screen text-slate-900 dark:text-slate-100">
         <div className="relative mx-auto max-w-6xl space-y-12 px-6 py-10">
           <header className="border-b border-indigo-100 dark:border-indigo-800 pb-6 mb-8">
+            <Link href="/dashboard/analytics" className="mb-3 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
+              <ArrowLeft className="h-4 w-4" />
+              Analytics
+            </Link>
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
