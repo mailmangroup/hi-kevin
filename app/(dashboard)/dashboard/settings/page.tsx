@@ -2,27 +2,32 @@
 
 import { useState, useEffect, type ComponentType } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useTheme } from 'next-themes'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Save, Bell, Globe, User, Key, CheckCircle, Loader2, Brain } from "lucide-react"
+import { Save, Bell, Globe, User, Key, CheckCircle, Loader2, Brain, Zap } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { ErrorBanner } from "@/components/ui/error-banner"
 import { useUserStore } from "@/lib/store/user-store"
 import { directApiCall } from "@/lib/api/client"
 import { cn } from "@/lib/utils/cn"
 import { UserMemorySection } from "@/components/settings/user-memory-section"
+import { SkillsSection } from "@/components/settings/skills-section"
 
-type SettingsPageKey = 'general' | 'connection' | 'memory'
+type SettingsPageKey = 'general' | 'connection' | 'memory' | 'skills'
 
 const SETTINGS_PAGES: { key: SettingsPageKey; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { key: 'general', label: 'General', icon: User },
   { key: 'connection', label: 'Connection', icon: Key },
   { key: 'memory', label: 'Memory', icon: Brain },
+  { key: 'skills', label: 'Skills', icon: Zap },
 ]
 
 export default function SettingsPage() {
   const { toast } = useToast()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [activePage, setActivePage] = useState<SettingsPageKey>('general')
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -38,6 +43,10 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { profile: storeProfile, setProfile: setStoreProfile } = useUserStore()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (storeProfile) {
@@ -58,11 +67,15 @@ export default function SettingsPage() {
 
         if (!user) return
 
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-          .eq('id', user.id)
-          .maybeSingle()
+        // Display name on `profiles`; KAWO context on `user_kawo_credentials`.
+        const [{ data: prof, error }, { data: creds }] = await Promise.all([
+          supabase.from('profiles').select('name, email').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('user_kawo_credentials')
+            .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+        ])
 
         if (error) {
           if (process.env.NODE_ENV === 'development') console.error('Error loading profile:', error)
@@ -70,30 +83,23 @@ export default function SettingsPage() {
           return
         }
 
-        if (data) {
-          setProfile({
-            full_name: data.full_name || '',
-            email: data.email || user.email || '',
-            kawo_token: data.kawo_token || '',
-            kawo_org_id: data.kawo_org_id || '',
-            kawo_brand_id: data.kawo_brand_id || '',
-            kawo_api_url: data.kawo_api_url || ''
-          })
+        setProfile({
+          full_name: prof?.name || '',
+          email: prof?.email || user.email || '',
+          kawo_token: creds?.kawo_token || '',
+          kawo_org_id: creds?.kawo_org_id || '',
+          kawo_brand_id: creds?.kawo_brand_id || '',
+          kawo_api_url: creds?.kawo_api_url || ''
+        })
 
-          setStoreProfile({
-            full_name: data.full_name,
-            email: data.email || user.email || null
-          })
-        } else {
-          setProfile({
-            full_name: '',
-            email: user.email || '',
-            kawo_token: '',
-            kawo_org_id: '',
-            kawo_brand_id: '',
-            kawo_api_url: ''
-          })
-        }
+        setStoreProfile({
+          full_name: prof?.name ?? null,
+          email: prof?.email || user.email || null,
+          kawo_token: creds?.kawo_token ?? null,
+          kawo_org_id: creds?.kawo_org_id ?? null,
+          kawo_brand_id: creds?.kawo_brand_id ?? null,
+          kawo_api_url: creds?.kawo_api_url ?? null,
+        })
       } catch (e) {
         if (process.env.NODE_ENV === 'development') console.error('Unexpected error:', e)
         setError('An unexpected error occurred.')
@@ -127,12 +133,19 @@ export default function SettingsPage() {
         return
       }
 
-      const { error: updateError } = await supabase
+      const { error: nameError } = await supabase
         .from('profiles')
+        .update({ name: profile.full_name })
+        .eq('id', user.id)
+
+      if (nameError) {
+        throw nameError
+      }
+
+      const { error: updateError } = await supabase
+        .from('user_kawo_credentials')
         .upsert({
-          id: user.id,
-          email: profile.email || user.email,
-          full_name: profile.full_name,
+          user_id: user.id,
           kawo_token: profile.kawo_token,
           kawo_org_id: profile.kawo_org_id,
           kawo_brand_id: profile.kawo_brand_id,
@@ -152,7 +165,11 @@ export default function SettingsPage() {
 
       setStoreProfile({
         full_name: profile.full_name,
-        email: profile.email || null
+        email: profile.email || null,
+        kawo_token: profile.kawo_token,
+        kawo_org_id: profile.kawo_org_id,
+        kawo_brand_id: profile.kawo_brand_id,
+        kawo_api_url: profile.kawo_api_url,
       })
     } catch (e: any) {
       if (process.env.NODE_ENV === 'development') console.error('Save error:', e)
@@ -172,7 +189,7 @@ export default function SettingsPage() {
     setConnectionStatus(null)
 
     try {
-      await directApiCall('users/current')
+      await directApiCall('me')
 
       setConnectionStatus('success')
       toast({
@@ -291,6 +308,21 @@ export default function SettingsPage() {
                   <h2 className="text-xl font-semibold">Preferences</h2>
                 </div>
                 <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="theme" className="text-sm font-medium text-foreground">
+                      Appearance (Dark Mode)
+                    </label>
+                    <select
+                      id="theme"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={mounted ? theme : "system"}
+                      onChange={(e) => setTheme(e.target.value)}
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="system">Auto (System)</option>
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <label htmlFor="language" className="text-sm font-medium text-foreground">
                       Language
@@ -428,7 +460,7 @@ export default function SettingsPage() {
                   <Input
                     id="kawo_api_url"
                     type="text"
-                    placeholder="https://api.kawo.com"
+                    placeholder="https://staging-kevin.kawo.com/"
                     value={profile.kawo_api_url}
                     onChange={handleChange}
                   />
@@ -470,6 +502,8 @@ export default function SettingsPage() {
           )}
 
           {activePage === 'memory' && <UserMemorySection />}
+
+          {activePage === 'skills' && <SkillsSection />}
         </div>
       </div>
     </div>

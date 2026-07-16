@@ -4,7 +4,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { MessageSquare, Clock, MoreHorizontal, Pencil, Star, Trash2 } from "lucide-react"
+import { Clock, MoreHorizontal, Pencil, Star, Trash2, Check, Copy } from "lucide-react"
 import { Conversation, aiService } from "@/lib/api/client"
 import { cn } from "@/lib/utils/cn"
 import {
@@ -31,9 +31,19 @@ import { useRouter } from "next/navigation"
 
 interface ConversationListItemProps {
   conversation: Conversation
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: () => void
+  onEnterSelectionMode?: () => void
 }
 
-export function ConversationListItem({ conversation }: ConversationListItemProps) {
+export function ConversationListItem({ 
+  conversation,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelect,
+  onEnterSelectionMode
+}: ConversationListItemProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -112,81 +122,126 @@ export function ConversationListItem({ conversation }: ConversationListItemProps
     }
   }
 
-  const lastMessageIsTimestamp = conversation.last_message && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(conversation.last_message)
+  const handleItemClick = (e: React.MouseEvent) => {
+    if (selectionMode && onToggleSelect) {
+      e.preventDefault()
+      e.stopPropagation()
+      onToggleSelect()
+    }
+    // Otherwise let Link handle navigation
+  }
+
+  const conversationPath = conversation.conversation_mode === "deep_agent"
+    ? `/chat/deep-agent/${conversation.id}`
+    : `/chat/agent/${conversation.id}`
 
   return (
     <>
-      <Link href={`/chat/${conversation.id}`} className="block group relative">
+      <Link 
+        href={conversationPath}
+        className="block group relative"
+        onClick={handleItemClick}
+      >
         <div className={cn(
-          "flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-300",
+          "flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-300",
           // Glass/Aura Effect
-          "bg-white/40 hover:bg-white/70 backdrop-blur-sm border border-white/40 hover:border-white/60",
+          isSelected
+            ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40"
+            : "bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 backdrop-blur-sm border border-white/40 dark:border-white/10 hover:border-white/60 dark:hover:border-white/20",
           // Shadow/Hover
           "shadow-sm hover:shadow-md hover:-translate-y-[1px]"
         )}>
+          {selectionMode && (
+            <div className="mr-3 flex-shrink-0">
+              <div className={cn(
+                "h-5 w-5 rounded border flex items-center justify-center transition-all",
+                isSelected ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-slate-600 bg-white dark:bg-white/10"
+              )}>
+                {isSelected && <Check className="h-3.5 w-3.5" />}
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 min-w-0 mr-4">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-slate-800 truncate group-hover:text-primary transition-colors">
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate group-hover:text-primary transition-colors">
                 {conversation.title || "New Conversation"}
               </h3>
+              {conversation.conversation_mode === "deep_agent" && (
+                <span className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                  Lobster
+                </span>
+              )}
               {conversation.is_favorite && (
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-yellow-100 text-[9px] text-yellow-600">★</span>
               )}
             </div>
-            {!lastMessageIsTimestamp && (
-              <p className="text-xs text-slate-500 truncate max-w-[500px] font-normal">
-                {conversation.last_message || "No messages yet."}
+            {conversation.last_message && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(conversation.last_message) && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[500px] font-normal mt-0.5">
+                {conversation.last_message}
               </p>
             )}
           </div>
           
-          <div className="flex items-center gap-4 text-xs font-medium text-slate-400 whitespace-nowrap">
-            <div className="flex items-center gap-1.5" title="Message count">
-              <MessageSquare className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
-              <span className="group-hover:text-slate-600 transition-colors text-[10px] leading-none">{conversation.message_count}</span>
-            </div>
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
             <div className="flex items-center gap-1.5 min-w-[80px] justify-end" title="Last updated">
               <Clock className="h-3 w-3 opacity-60 group-hover:text-primary/60 transition-colors" />
-              <span className="group-hover:text-slate-600 transition-colors text-[10px] leading-none" suppressHydrationWarning>
+              <span className="group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors text-[10px] leading-none" suppressHydrationWarning>
                 {conversation.updated_at 
                   ? formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true })
                   : 'Just now'}
               </span>
             </div>
 
-            {/* Menu Button - Only visible on hover */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.preventDefault()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-7 w-7 rounded-full hover:bg-slate-200/50 -mr-2"
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5 text-slate-500" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation()
-                      setNewTitle(conversation.title || "New Conversation")
-                      setIsRenameOpen(true)
-                  }}>
-                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleFavorite}>
-                    <Star className={cn("mr-2 h-3.5 w-3.5", conversation.is_favorite ? "fill-yellow-500 text-yellow-500" : "")} />
-                    {conversation.is_favorite ? "Unfavorite" : "Favorite"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
-                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            {/* Menu Button - Always visible now for better discoverability */}
+            {!selectionMode && (
+              <div onClick={(e) => e.preventDefault()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-full hover:bg-slate-200/50 dark:hover:bg-white/10 -mr-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 opacity-70 hover:opacity-100 transition-all"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation()
+                        setNewTitle(conversation.title || "New Conversation")
+                        setIsRenameOpen(true)
+                    }}>
+                      <Pencil className="mr-2 h-3.5 w-3.5" />
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleFavorite}>
+                      <Star className={cn("mr-2 h-3.5 w-3.5", conversation.is_favorite ? "fill-yellow-500 text-yellow-500" : "")} />
+                      {conversation.is_favorite ? "Unfavorite" : "Favorite"}
+                    </DropdownMenuItem>
+                    
+                    {onEnterSelectionMode && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          onEnterSelectionMode()
+                        }}>
+                          <Check className="mr-2 h-3.5 w-3.5" />
+                          Select Multiple
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
+                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
         </div>
       </Link>

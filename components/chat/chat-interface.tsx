@@ -16,9 +16,11 @@ import { MessageContent } from "@/components/chat/message-content"
 import { ThinkingDisplay } from "@/components/chat/thinking-display"
 import { ToolCallDisplay, ToolCallList } from "@/components/chat/tool-call-display"
 import { ArtifactSnippet } from "@/components/chat/artifact-snippet"
-import { DeepAgentDisplay, DeepAgentData } from "@/components/chat/deep-agent-display"
+import { DeepAgentDisplay, TodoList } from "@/components/chat/deep-agent-display"
+import { useDeepAgentStream } from "@/lib/hooks/use-deep-agent-stream"
+import type { DeepAgentStreamState } from "@/lib/hooks/use-deep-agent-stream"
 import { MessageActions } from "@/components/chat/message-actions"
-import { formatFileSize, getFileTypeDisplay, getFileColor, truncateFilename } from "@/lib/utils/file-helpers"
+import { formatFileSize, getFileTypeDisplay, getMimeTypeDisplay, truncateFilename } from "@/lib/utils/file-helpers"
 import { parseSubContentList } from "@/lib/utils/parse-sub-content"
 import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
 import {
@@ -46,7 +48,7 @@ export interface ContentPart {
   type: "text" | "thinking" | "tool" | "deep_agent"
   content?: string
   tool?: ToolCall
-  deepAgent?: DeepAgentData
+  deepAgent?: DeepAgentStreamState
 }
 
 export interface ToolCall {
@@ -56,6 +58,7 @@ export interface ToolCall {
   output?: any
   state: 'running' | 'completed' | 'failed'
   artifact?: any
+  executeStatus?: "executing" | "done" | "error"
 }
 
 export interface Message {
@@ -64,9 +67,9 @@ export interface Message {
   content: string
   timestamp: Date
   toolCalls?: ToolCall[]
-  images?: string[]
+  images?: Array<{ image_url: string; filename?: string; file_type?: string }>
   documents?: any[]
-  contentParts?: ContentPart[]
+  parts?: ContentPart[]
   thinking?: string
   report?: any
   isStreaming?: boolean
@@ -77,7 +80,7 @@ export interface Message {
  * Extract fields from a partial JSON string being streamed as tool call args.
  * Handles incomplete JSON where the content value may still be streaming.
  */
-function extractPartialArtifactArgs(partial: string): {
+function extractPartialArtifactArgs(partial: string, toolName: string): {
   title: string | null
   content: string | null
   artifact_type: string | null
@@ -86,11 +89,16 @@ function extractPartialArtifactArgs(partial: string): {
   // Try full parse first
   try {
     const obj = JSON.parse(partial)
+    const filePath = obj.file_path
+    let language = obj.language
+    if (toolName === "write_file" && !language && filePath) {
+      language = filePath.split('.').pop()
+    }
     return {
-      title: obj.title ?? null,
+      title: obj.title ?? (toolName === "write_file" && filePath ? filePath.split('/').pop() : null),
       content: obj.content ?? null,
-      artifact_type: obj.artifact_type ?? null,
-      language: obj.language ?? null,
+      artifact_type: obj.artifact_type ?? (toolName === "write_file" ? "code" : null),
+      language: language ?? null,
     }
   } catch {
     // Fall through to partial extraction
@@ -123,11 +131,22 @@ function extractPartialArtifactArgs(partial: string): {
     return result
   }
 
+  const title = extractField('title')
+  const filePath = extractField('file_path')
+  const content = extractField('content')
+  const artifactType = extractField('artifact_type')
+  let language = extractField('language')
+
+  if (toolName === "write_file" && !language && filePath) {
+    const ext = filePath.split('.').pop()
+    if (ext) language = ext
+  }
+
   return {
-    title: extractField('title'),
-    content: extractField('content'),
-    artifact_type: extractField('artifact_type'),
-    language: extractField('language'),
+    title: title || (toolName === "write_file" && filePath ? filePath.split('/').pop() || filePath : null),
+    content,
+    artifact_type: artifactType || (toolName === "write_file" ? "code" : null),
+    language,
   }
 }
 
@@ -135,17 +154,23 @@ interface ChatInterfaceProps {
   initialMessage?: string
   chatId?: string
   projectId?: string
+  conversationMode?: "agent" | "deep_agent"
 }
 
-export function ChatInterface({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
+export function ChatInterface({ initialMessage, chatId, projectId, conversationMode }: ChatInterfaceProps) {
   return (
     <ArtifactProvider>
-      <ChatInterfaceInner initialMessage={initialMessage} chatId={chatId} projectId={projectId} />
+      <ChatInterfaceInner
+        initialMessage={initialMessage}
+        chatId={chatId}
+        projectId={projectId}
+        conversationMode={conversationMode}
+      />
     </ArtifactProvider>
   )
 }
 
-function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterfaceProps) {
+function ChatInterfaceInner({ initialMessage, chatId, projectId, conversationMode }: ChatInterfaceProps) {
   const { openArtifact, updateArtifactContent, isPanelOpen, reportNavigation, selectedArtifact } = useArtifact()
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -170,7 +195,18 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     return initialMessage ?? searchParams?.get('q') ?? undefined
   }, [initialMessage, searchParams])
 
+  // Consume pending auto-send message from sessionStorage.
+  const pendingMessageRef = React.useRef<string | null>(null)
+  if (typeof window !== 'undefined' && !chatId && pendingMessageRef.current === null) {
+      const msg = sessionStorage.getItem('pending_chat_message')
+      if (msg !== null) {
+          pendingMessageRef.current = msg
+          sessionStorage.removeItem('pending_chat_message')
+      }
+  }
+
   const { profile, isLoading: isProfileLoading } = useUserStore()
+  const { state: deepAgentState, processEvent: processDeepAgentEvent, reset: resetDeepAgent, hydrate: hydrateDeepAgent, getState: getDeepAgentState } = useDeepAgentStream()
 
   const credentials = React.useMemo(() => ({
     orgId: profile?.kawo_org_id || undefined,
@@ -225,6 +261,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     return param === 'false' ? false : true
   })
   const [deepAgent, setDeepAgent] = React.useState(() => {
+    if (conversationMode) return conversationMode === "deep_agent"
     const param = searchParams?.get('deepAgent')
     return param === 'true' ? true : false
   })
@@ -239,6 +276,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     return searchParams?.get('fastPath') || undefined
   })
 
+  const effectiveConversationMode: "agent" | "deep_agent" = conversationMode || (deepAgent ? "deep_agent" : "agent")
+  const effectiveDeepAgent = effectiveConversationMode === "deep_agent"
+  const lockConversationMode = Boolean(conversationMode)
+
   // Image upload
   const [selectedImages, setSelectedImages] = React.useState<UploadedImage[]>([])
 
@@ -247,6 +288,62 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
   // Report context (for chatting with reports)
   const [reportId, setReportId] = React.useState<string | undefined>()
+
+  const getStreamConversationId = (chunk: any): string | undefined => {
+    if (typeof chunk?.conversation_id === "string" && chunk.conversation_id) {
+      return chunk.conversation_id
+    }
+    if (typeof chunk?.new_conversation?.conversation_id === "string" && chunk.new_conversation.conversation_id) {
+      return chunk.new_conversation.conversation_id
+    }
+    if (typeof chunk?.conversation?.id === "string" && chunk.conversation.id) {
+      return chunk.conversation.id
+    }
+    return undefined
+  }
+
+  const getConversationPath = React.useCallback((id: string, mode: "agent" | "deep_agent") => {
+    return mode === "deep_agent" ? `/chat/deep-agent/${id}` : `/chat/agent/${id}`
+  }, [])
+
+  const hydrateDeepAgentFromMessages = React.useCallback((nextMessages: Message[]) => {
+    if (!effectiveDeepAgent) {
+      resetDeepAgent()
+      return
+    }
+
+    for (let messageIndex = nextMessages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+      const msgParts = nextMessages[messageIndex].parts
+      if (!msgParts?.length) continue
+
+      for (let partIndex = msgParts.length - 1; partIndex >= 0; partIndex -= 1) {
+        const part = msgParts[partIndex]
+        if (part.type === "deep_agent" && part.deepAgent) {
+          hydrateDeepAgent(part.deepAgent)
+          return
+        }
+      }
+    }
+
+    resetDeepAgent()
+  }, [effectiveDeepAgent, hydrateDeepAgent, resetDeepAgent])
+
+  React.useEffect(() => {
+    if (!chatId || !conversationMode) return
+    let mounted = true
+
+    aiService.getConversation(chatId)
+      .then(conv => {
+        if (!mounted) return
+        const actualMode: "agent" | "deep_agent" = conv.conversation_mode === "deep_agent" ? "deep_agent" : "agent"
+        if (actualMode !== conversationMode) {
+          router.replace(getConversationPath(chatId, actualMode))
+        }
+      })
+      .catch(() => {})
+
+    return () => { mounted = false }
+  }, [chatId, conversationMode, router, getConversationPath])
 
   React.useEffect(() => {
     if (chatId) {
@@ -260,30 +357,48 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       // navigated away and came back mid-stream), subscribe to the registry
       // and sync state from the buffered snapshot instead of loading history.
       const session = streamRegistry.getSession(chatId)
-      if (session?.isStreaming) {
+
+      // Always restore from session if available (even if finished) to avoid
+      // race conditions where backend hasn't indexed the new messages yet.
+      if (session) {
         setConversationId(chatId)
         setMessages([...session.messages])
-        setIsThinking(true)
+        hydrateDeepAgentFromMessages(session.messages)
         if (session.lastArtifact) {
           openArtifact(session.lastArtifact as ArtifactData)
         }
-        const unsubscribe = streamRegistry.subscribe(chatId, () => {
-          const s = streamRegistry.getSession(chatId)
-          if (!s) return
-          setMessages([...s.messages])
-          setIsThinking(s.isStreaming)
-          if (!s.isStreaming) {
-            // Stream finished while we were away — load the authoritative title
-            loadConversationTitle(chatId)
-          }
-        })
-        return unsubscribe
+
+        // If still streaming, subscribe to updates
+        if (session.isStreaming) {
+          setIsThinking(true)
+          const unsubscribe = streamRegistry.subscribe(chatId, () => {
+            const s = streamRegistry.getSession(chatId)
+            if (!s) return
+            setMessages([...s.messages])
+            hydrateDeepAgentFromMessages(s.messages)
+            setIsThinking(s.isStreaming)
+            if (!s.isStreaming) {
+              // Stream finished while we were away — load the authoritative title
+              loadConversationTitle(chatId)
+            }
+          })
+          return unsubscribe
+        }
       }
 
       setConversationId(chatId)
       // Load history and title in parallel
       loadHistory(chatId)
       loadConversationTitle(chatId)
+    } else {
+      // Navigated to "new" chat — reset all state
+      setConversationId(undefined)
+      setMessages([])
+      setConversationTitle("")
+      setIsThinking(false)
+      setIsFavorite(false)
+      justCreatedConversationId.current = null
+      initialized.current = false
     }
   }, [chatId])
 
@@ -346,25 +461,29 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
   const loadHistory = async (id: string) => {
       try {
           const { messages: history } = await aiService.getMessages(id)
-          const formattedMessages: Message[] = history.map((msg: ApiMessage) => {
+          const formattedMessages: Message[] = history.map((msg: ApiMessage, index: number) => {
               // Parse sub_content_list if available
-              const { toolCalls, content: parsedContent, images, documents, contentParts } = parseSubContentList(msg.sub_content_list)
+              const { toolCalls, content: parsedContent, images, documents, parts } = parseSubContentList(msg.sub_content_list)
 
               return {
                   id: msg.id,
                   role: msg.role,
                   // Use parsed content from sub_content_list if available, otherwise fall back to msg.content
                   content: parsedContent || msg.content || "",
-                  timestamp: new Date(msg.created_at),
+                  // Use created_at if available, otherwise use index to preserve API order
+                  timestamp: msg.created_at ? new Date(msg.created_at) : new Date(index),
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   images: images.length > 0 ? images : undefined,
                   documents: documents.length > 0 ? documents : undefined,
-                  contentParts: contentParts.length > 0 ? contentParts : undefined,
+                  parts: parts.length > 0 ? parts : undefined,
                   report: msg.report
               }
           })
           // Sort by timestamp ascending (oldest first)
+          // API returns messages in order; sort preserves that for messages with
+          // real timestamps and uses index-based fallback for checkpointer messages.
           formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+          hydrateDeepAgentFromMessages(formattedMessages)
           
           setMessages(prev => {
               // Create a Set of IDs from the fetched history for O(1) lookup
@@ -465,15 +584,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     // If we have content to send (text or files)
     // Check initialMessage !== undefined to allow empty string (for file-only messages)
     // Skip auto-send if chatId is present — this is an existing chat (e.g. page refresh)
-    if (!chatId && (initialQuery !== undefined || images.length > 0 || documents.length > 0)) {
+    const hasInitialContent = pendingMessageRef.current !== null || initialQuery !== undefined || images.length > 0 || documents.length > 0
+    
+    if (!conversationId && !chatId && hasInitialContent) {
+        if (credentialsLoading) return
+        if (initialized.current) return
         initialized.current = true
-        
-        if (initialQuery) {
-            setInput(initialQuery)
+
+        const textToSend = pendingMessageRef.current ?? initialQuery ?? ""
+        if (textToSend) {
+            setInput(textToSend)
         }
 
         // Automatically send the message
-        handleSend(initialQuery || "", images, documents)
+        handleSend(textToSend, images, documents)
+        pendingMessageRef.current = null
     }
   }, [initialQuery, chatId, credentialsLoading, credentials.orgId])
 
@@ -559,7 +684,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         title: "Conversation deleted",
         type: "success"
       })
-      router.push('/chat/new')
+      router.push(effectiveConversationMode === "deep_agent" ? "/chat/deep-agent/new" : "/chat/agent/new")
     } catch (error) {
       toast({
         title: "Failed to delete conversation",
@@ -616,7 +741,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       role: "user",
       content: text,
       timestamp: new Date(),
-      images: validImages.length > 0 ? validImages.map(img => img.url) : undefined,
+      images: validImages.length > 0 ? validImages.map(img => ({ image_url: img.url, filename: img.filename, file_type: img.fileType })) : undefined,
       documents: validDocuments.length > 0 ? validDocuments.map(doc => ({
         id: doc.documentId!,
         filename: doc.filename,
@@ -649,50 +774,25 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     let thinkingContent = ""
     let followUpQuestions: string[] | undefined
     let newConversationId: string | undefined
-    // Track content parts in order for proper rendering
-    let contentParts: ContentPart[] = []
+    // All content parts in arrival order — thinking, tool calls, deep agent, text
+    let parts: ContentPart[] = []
     let currentTextContent = ""  // Track current text segment
     let lastPartWasText = false  // Track if the last part was text (for appending)
     let currentThinkingContent = "" // Track current thinking segment
     let lastPartWasThinking = false // Track if the last part was thinking
 
-    // Deep research tracking
-    let deepAgentData: DeepAgentData | null = null
+    // Reset deep agent hook state for this new stream
+    resetDeepAgent()
 
     // Artifact streaming accumulator (for create_artifact tool input streaming)
     const artifactStreamAccum: Record<number, { name: string; args: string }> = {}
     let artifactPanelOpened = false
 
-    let activeConversationId = conversationId;
+    let activeConversationId = conversationId || chatId;
     // Hoisted so the finally block can reference it even if the try throws early
     let currentSessionKey = conversationId || "new"
 
     try {
-      // Ensure conversation exists and documents are attached
-      // We attach even if processing, so the backend knows about them
-      const validDocuments = documents.filter(doc => doc.documentId && doc.processingStatus !== 'failed')
-      
-      if (validDocuments.length > 0) {
-          if (!activeConversationId) {
-              // Create new conversation explicitly to attach documents
-              const resp = await aiService.createConversation(credentials.orgId, credentials.brandId);
-              activeConversationId = resp.conversation_id;
-              setConversationId(activeConversationId);
-              
-              // Update URL without reloading
-              window.history.replaceState(window.history.state, '', `/chat/${activeConversationId}`);
-              
-              // Notify sidebar
-              window.dispatchEvent(new Event('chat-created'));
-          }
-          
-          // Attach documents
-          await aiService.attachDocuments(
-              activeConversationId,
-              validDocuments.map(doc => doc.documentId!)
-          );
-      }
-
       const stream = aiService.chatStream(text, {
         conversationId: activeConversationId,
         projectId: projectId,
@@ -700,10 +800,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
         brandId: credentials.brandId,
         thinkingEnabled,
         includeWebSearch,
-        deepAgent,
+        deepAgent: effectiveDeepAgent,
         sqlEnabled,
         model,
-        images: validImages.map(img => img.key!), // Only send OSS keys
+        images: validImages.map(img => ({ image_url: img.key!, filename: img.filename, file_type: img.fileType })),
         documentIds: validDocuments.map(doc => doc.documentId!), // Send document IDs
         reportContext: reportId ? {
             report_id: reportId,
@@ -735,8 +835,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           timestamp: new Date(),
           isStreaming: true,
           thinking: thinkingContent || undefined,
-          contentParts: contentParts.length > 0 ? [...contentParts] : undefined,
-          toolCalls: contentParts.filter(p => p.type === "tool" && p.tool).map(p => p.tool!),
+          parts: parts.length > 0 ? [...parts] : undefined,
+          toolCalls: parts.filter(p => p.type === "tool" && p.tool).map(p => p.tool!),
           report: localReport,
         }
         streamRegistry.update(currentSessionKey, s => {
@@ -745,31 +845,24 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       }
       // --- end registry setup ---
 
-      // Helper to update deep agent content part in message
-      const updateDeepAgentMessage = () => {
-        if (!deepAgentData) return
-
-        const snapshot: DeepAgentData = {
-          tasks: { ...deepAgentData.tasks },
-          taskOrder: [...deepAgentData.taskOrder],
-          isComplete: deepAgentData.isComplete,
-        }
-
-        const drPartIndex = contentParts.findIndex((p) => p.type === "deep_agent")
+      // Helper to flush latest deep agent hook state into the message content parts
+      const updateDeepAgentMessage = (latestState: DeepAgentStreamState) => {
+        const drPartIndex = parts.findIndex((p) => p.type === "deep_agent")
         if (drPartIndex >= 0) {
-          contentParts[drPartIndex] = { type: "deep_agent", deepAgent: snapshot }
+          parts[drPartIndex] = { type: "deep_agent", deepAgent: latestState }
         } else {
-          contentParts.push({ type: "deep_agent", deepAgent: snapshot })
+          parts.push({ type: "deep_agent", deepAgent: latestState })
         }
 
         lastPartWasText = false
         lastPartWasThinking = false
         currentTextContent = ""
+        currentThinkingContent = ""
 
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
-              ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+              ? { ...msg, content: fullContent, parts: [...parts] }
               : msg
           )
         )
@@ -779,71 +872,76 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
       for await (const chunk of stream) {
           // Handle different event types
           if (chunk.new_conversation) {
-              newConversationId = chunk.conversation_id
-              justCreatedConversationId.current = newConversationId || null
-              setConversationId(newConversationId)
-              // Update URL without reloading
-              window.history.replaceState(window.history.state, '', `/chat/${newConversationId}`)
+              newConversationId = getStreamConversationId(chunk)
 
-              // Notify sidebar to refresh chat history
-              window.dispatchEvent(new Event('chat-created'))
+              if (newConversationId) {
+                // Move the registry session from "new" to the real conversation ID
+                // so that navigating back to /chat/{id} can reconnect to it
+                if (currentSessionKey !== newConversationId) {
+                  streamRegistry.renameKey(currentSessionKey, newConversationId)
+                  currentSessionKey = newConversationId
+                }
 
-              // Move the registry session from "new" to the real conversation ID
-              // so that navigating back to /chat/{id} can reconnect to it
-              if (newConversationId && currentSessionKey !== newConversationId) {
-                streamRegistry.renameKey(currentSessionKey, newConversationId)
-                currentSessionKey = newConversationId
+                justCreatedConversationId.current = newConversationId
+                setConversationId(newConversationId)
+
+                // Update the browser URL without triggering a Next.js navigation.
+                // router.replace() would unmount/remount ChatInterface because
+                // /chat/new and /chat/[id] are different route segments, causing
+                // a visible flash. window.history.replaceState avoids this.
+                window.history.replaceState(null, '', getConversationPath(newConversationId, effectiveConversationMode))
+
+                // Notify sidebar to refresh chat history
+                window.dispatchEvent(new Event('chat-created'))
               }
           }
 
-          // Handle thinking chunks - accumulate them and add to contentParts
-          if (chunk.thinking !== undefined && chunk.thinking !== null) {
-              thinkingContent += chunk.thinking || ""
-              currentThinkingContent += chunk.thinking || ""
+          const chunkThinking = chunk?.type === "coordinator_thinking" ? chunk.content : (!chunk?.type ? chunk.thinking : undefined)
+          const chunkContent = chunk?.type === "coordinator_token" ? chunk.content : (!chunk?.type ? chunk.content : undefined)
 
-              // Update contentParts - append to last thinking part or create new one
-              if (lastPartWasThinking && contentParts.length > 0) {
-                  // Replace the last thinking part with a new object to ensure React detects the change
-                  const lastPart = contentParts[contentParts.length - 1]
+          // Handle thinking chunks — appended to parts in arrival order.
+          if (chunkThinking !== undefined && chunkThinking !== null) {
+              thinkingContent += chunkThinking || ""
+              currentThinkingContent += chunkThinking || ""
+
+              if (lastPartWasThinking && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
                   if (lastPart.type === "thinking") {
-                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentThinkingContent }
+                      parts[parts.length - 1] = { ...lastPart, content: currentThinkingContent }
                   }
               } else {
-                  // Create a new thinking part
-                  contentParts.push({ type: "thinking", content: currentThinkingContent })
+                  parts.push({ type: "thinking", content: currentThinkingContent })
                   lastPartWasThinking = true
                   lastPartWasText = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, thinking: thinkingContent, contentParts: [...contentParts] }
+                      ? { ...msg, thinking: thinkingContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
           }
 
-          if (chunk.content) {
-              fullContent += chunk.content
-              currentTextContent += chunk.content
+          if (chunkContent) {
+              fullContent += chunkContent
+              currentTextContent += chunkContent
 
-              // Update contentParts - append to last text part or create new one
-              if (lastPartWasText && contentParts.length > 0) {
-                  // Replace the last text part with a new object to ensure React detects the change
-                  const lastPart = contentParts[contentParts.length - 1]
+              // Append to last text part or create new one
+              if (lastPartWasText && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
                   if (lastPart.type === "text") {
-                      contentParts[contentParts.length - 1] = { ...lastPart, content: currentTextContent }
+                      parts[parts.length - 1] = { ...lastPart, content: currentTextContent }
                   }
               } else {
-                  // Create a new text part
-                  contentParts.push({ type: "text", content: currentTextContent })
+                  parts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
                   lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+                      ? { ...msg, content: fullContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
@@ -851,6 +949,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
           if (chunk.follow_up_questions) {
               followUpQuestions = chunk.follow_up_questions
+              // Content is done — enable send button immediately without waiting for stream to close
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, followUpQuestions }
+                      : msg
+              ))
           }
 
           if (chunk.tool_start) {
@@ -865,19 +970,18 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   state: 'running' as const
               }
 
-              // Add tool to contentParts and reset text tracking
-              contentParts.push({ type: "tool", tool: newTool })
+              parts.push({ type: "tool", tool: newTool })
               lastPartWasText = false
               lastPartWasThinking = false
-              currentTextContent = ""  // Reset for any text that comes after this tool
-              currentThinkingContent = "" // Reset for any thinking that comes after this tool
+              currentTextContent = ""
+              currentThinkingContent = ""
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
                       ? {
                           ...msg,
                           toolCalls: [...(msg.toolCalls || []), newTool],
-                          contentParts: [...contentParts]
+                          parts: [...parts],
                         }
                       : msg
               ))
@@ -889,31 +993,24 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               const toolOutput = chunk.tool_end.output
               const toolArtifact = chunk.tool_end.artifact
 
-              // Update both toolCalls array and the tool in contentParts
+              // Update parts synchronously so subsequent setMessages calls use the updated state.
+              parts = parts.map((part): ContentPart => {
+                  if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
+                      return {
+                          ...part,
+                          tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
+                      }
+                  }
+                  return part
+              })
+
+              const completedToolCalls = parts
+                  .filter(p => p.type === "tool" && p.tool)
+                  .map(p => p.tool!)
+
               setMessages((prev) => prev.map(msg => {
                   if (msg.id !== assistantMsgId) return msg
-
-                  const updatedToolCalls = (msg.toolCalls || []).map(tc =>
-                      tc.name === toolName && tc.state === 'running'
-                          ? { ...tc, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
-                          : tc
-                  )
-
-                  // Also update the tool in contentParts (they share the same reference)
-                  const updatedContentParts = (msg.contentParts || []).map((part): ContentPart => {
-                      if (part.type === "tool" && part.tool && part.tool.name === toolName && part.tool.state === 'running') {
-                          return {
-                              ...part,
-                              tool: { ...part.tool, output: toolOutput, artifact: toolArtifact, state: 'completed' as const }
-                          }
-                      }
-                      return part
-                  })
-
-                  // Update our local contentParts reference too
-                  contentParts = updatedContentParts
-
-                  return { ...msg, toolCalls: updatedToolCalls, contentParts: updatedContentParts }
+                  return { ...msg, toolCalls: completedToolCalls, parts: [...parts] }
               }))
 
               pushToRegistry()
@@ -931,7 +1028,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                   isStreaming: false,
                 }
                 // If we already opened the panel during streaming, update content + mark complete
-                if (artifactPanelOpened && toolName === 'create_artifact') {
+                if (artifactPanelOpened && (toolName === 'create_artifact' || toolName === 'write_file')) {
                   updateArtifactContent(artifactData.data, {
                     title: artifactData.title,
                     isStreaming: false,
@@ -941,6 +1038,36 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 }
                 streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
               }
+          }
+
+          // Handle execute_status events — update the running execute tool with sandbox status
+          if (chunk.type === "execute_status") {
+              const execStatus = chunk.status as string
+              parts = parts.map((part): ContentPart => {
+                  if (part.type === "tool" && part.tool && part.tool.name === "execute" && part.tool.state === "running") {
+                      return {
+                          ...part,
+                          tool: {
+                              ...part.tool,
+                              executeStatus: execStatus === "started" ? "executing" as const
+                                  : execStatus === "completed" ? "done" as const
+                                  : execStatus === "error" ? "error" as const
+                                  : undefined,
+                          },
+                      }
+                  }
+                  return part
+              })
+
+              const updatedToolCalls = parts
+                  .filter(p => p.type === "tool" && p.tool)
+                  .map(p => p.tool!)
+
+              setMessages((prev) => prev.map(msg => {
+                  if (msg.id !== assistantMsgId) return msg
+                  return { ...msg, toolCalls: updatedToolCalls, parts: [...parts] }
+              }))
+              pushToRegistry()
           }
 
           // Handle streaming tool input args (for create_artifact content preview)
@@ -954,8 +1081,8 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               artifactStreamAccum[idx].args += args_chunk
 
               const acc = artifactStreamAccum[idx]
-              if (acc.name === 'create_artifact') {
-                  const parsed = extractPartialArtifactArgs(acc.args)
+              if (acc.name === 'create_artifact' || acc.name === 'write_file') {
+                  const parsed = extractPartialArtifactArgs(acc.args, acc.name)
                   if (parsed.content !== null) {
                       const artifactType = (parsed.artifact_type || 'code') as ArtifactData['type']
                       const artifactData: ArtifactData = {
@@ -1013,75 +1140,68 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               streamRegistry.update(currentSessionKey, s => { s.lastArtifact = reportArtifact })
           }
 
-          // Deep Agent task lifecycle events
-
-          if (chunk.type === "task_started") {
-              const taskId = chunk.task_id
-              const description = chunk.description || taskId
-              if (!deepAgentData) {
-                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
+          // Deep-agent typed events are consumed by the dedicated stream adapter.
+          if (effectiveDeepAgent && chunk.type) {
+              const handled = processDeepAgentEvent(chunk)
+              if (handled) {
+                updateDeepAgentMessage(getDeepAgentState())
               }
-              deepAgentData.tasks[taskId] = { id: taskId, description, status: "in_progress" }
-              deepAgentData.taskOrder.push(taskId)
-              updateDeepAgentMessage()
-          }
 
-          if (chunk.type === "task_running") {
-              const taskId = chunk.task_id
-              if (!deepAgentData) {
-                deepAgentData = { tasks: {}, taskOrder: [], isComplete: false }
-              }
-              const existing = deepAgentData.tasks[taskId]
-              if (existing) {
-                deepAgentData.tasks[taskId] = { ...existing, latestMessage: chunk.message }
-              }
-              updateDeepAgentMessage()
-          }
-
-          if (chunk.type === "task_completed") {
-              const taskId = chunk.task_id
-              if (deepAgentData?.tasks[taskId]) {
-                deepAgentData.tasks[taskId] = {
-                  ...deepAgentData.tasks[taskId],
-                  status: "completed",
-                  result: chunk.result,
+              // Auto-open artifact panel for subagent artifacts
+              if (chunk.type === "subagent_tool_end" && chunk.artifact && typeof chunk.artifact === "object" && Object.keys(chunk.artifact).length > 0) {
+                const subArtifact = chunk.artifact
+                const artifactData: ArtifactData = {
+                  id: `${chunk.tool}-${Date.now()}`,
+                  type: determineArtifactType(subArtifact, chunk.tool),
+                  title: subArtifact.title || getToolDisplayName(chunk.tool),
+                  data: subArtifact.type === "artifact" ? subArtifact : (subArtifact.content ?? subArtifact.data ?? subArtifact),
+                  toolName: chunk.tool,
+                  isStreaming: false,
                 }
+                openArtifact(artifactData)
+                streamRegistry.update(currentSessionKey, s => { s.lastArtifact = artifactData })
               }
-              updateDeepAgentMessage()
           }
 
-          if (chunk.type === "task_failed" || chunk.type === "task_timed_out") {
-              const taskId = chunk.task_id
-              if (deepAgentData?.tasks[taskId]) {
-                deepAgentData.tasks[taskId] = {
-                  ...deepAgentData.tasks[taskId],
-                  status: chunk.type === "task_timed_out" ? "timed_out" : "failed",
-                  error: chunk.error,
-                }
-              }
-              updateDeepAgentMessage()
+          // Backend sends {"done": true} as the final chunk — re-enable send button
+          // immediately. This covers deep agent mode where follow_up_questions is skipped.
+          if (chunk.done) {
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, isStreaming: false }
+                      : msg
+              ))
           }
 
-
+          // Backend sends {"stopped": true} when the user cancels a deep agent run.
+          if (chunk.stopped) {
+              setIsThinking(false)
+              setMessages((prev) => prev.map(msg =>
+                  msg.id === assistantMsgId
+                      ? { ...msg, isStreaming: false }
+                      : msg
+              ))
+          }
 
           if (chunk.error) {
               fullContent += `\n[Error: ${chunk.error}]`
               currentTextContent += `\n[Error: ${chunk.error}]`
 
-              if (lastPartWasText && contentParts.length > 0) {
-                  const lastPart = contentParts[contentParts.length - 1]
+              if (lastPartWasText && parts.length > 0) {
+                  const lastPart = parts[parts.length - 1]
                   if (lastPart.type === "text") {
                       lastPart.content = currentTextContent
                   }
               } else {
-                  contentParts.push({ type: "text", content: currentTextContent })
+                  parts.push({ type: "text", content: currentTextContent })
                   lastPartWasText = true
                   lastPartWasThinking = false
               }
 
               setMessages((prev) => prev.map(msg =>
                   msg.id === assistantMsgId
-                      ? { ...msg, content: fullContent, contentParts: [...contentParts] }
+                      ? { ...msg, content: fullContent, parts: [...parts] }
                       : msg
               ))
               pushToRegistry()
@@ -1201,7 +1321,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
           onScroll={handleScroll}
           className="flex-1 min-h-0 overflow-y-auto p-4 md:p-8 pb-6"
         >
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="mx-auto w-full max-w-3xl space-y-6">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -1213,12 +1333,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
               {/* Assistant Avatar */}
               {message.role !== "user" && (
                 <div className="flex-shrink-0 mt-1">
-                   <Image 
-                     src="/kevin-icon.svg" 
-                     alt="Kevin" 
-                     width={32} 
-                     height={32} 
-                     className="w-8 h-8 rounded-full shadow-sm"
+                   <Image
+                     src="/kevin-icon.svg"
+                     alt="Kevin"
+                     width={32}
+                     height={32}
+                     className={cn("w-8 h-8", message.isStreaming && "animate-kevin-pulse")}
                      unoptimized
                    />
                 </div>
@@ -1236,14 +1356,14 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       "relative text-sm leading-relaxed",
                       message.role === "user"
                         ? "bg-secondary/80 text-foreground px-5 py-3 rounded-[1.5rem] rounded-tr-sm shadow-sm"
-                        : "px-0 py-1 text-foreground"
+                        : "px-0 py-1 text-foreground w-full min-w-0"
                     )}
                 >
                     {/* Uploaded Images */}
                     {message.images && message.images.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2 justify-end">
                         {message.images.map((img, i) => (
-                          <Image key={i} src={img} alt="Uploaded" width={300} height={200} className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-border bg-muted" style={{ width: 'auto', height: 'auto' }} unoptimized />
+                          <Image key={i} src={img.image_url} alt={img.filename ?? "Uploaded"} width={300} height={200} className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-border bg-muted" style={{ width: 'auto', height: 'auto' }} unoptimized />
                         ))}
                       </div>
                     )}
@@ -1252,35 +1372,21 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                     {message.documents && message.documents.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2 justify-end">
                         {message.documents.map((doc, i) => {
-                          const fileColor = getFileColor(doc.filename)
-                          const getColorClass = (color: string) => {
-                            const colorMap: Record<string, string> = {
-                              red: 'bg-red-50 text-red-700 border-red-200',
-                              blue: 'bg-blue-50 text-blue-700 border-blue-200',
-                              orange: 'bg-orange-50 text-orange-700 border-orange-200',
-                              green: 'bg-green-50 text-green-700 border-green-200',
-                              gray: 'bg-gray-50 text-gray-700 border-gray-200',
-                              purple: 'bg-purple-50 text-purple-700 border-purple-200',
-                              yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                            }
-                            return colorMap[color] || colorMap['gray']
-                          }
-
                           return (
                             <div
                               key={i}
                               className={cn(
-                                "flex items-center gap-2 px-3 py-2 rounded-lg border",
-                                getColorClass(fileColor)
+                                "flex items-center gap-2 px-2.5 py-1.5 rounded-md border bg-background/95 shadow-sm max-w-[240px]",
+                                "text-foreground"
                               )}
                             >
-                              <FileText className="h-4 w-4 flex-shrink-0" />
+                              <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs font-medium truncate">
                                   {truncateFilename(doc.filename, 25)}
                                 </div>
-                                <div className="text-[10px] opacity-70">
-                                  {getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
+                                <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                  {doc.file_type ? getMimeTypeDisplay(doc.file_type) : getFileTypeDisplay(doc.filename)} • {formatFileSize(doc.file_size)}
                                   {doc.chunk_strategy && (
                                     <span className="ml-1">
                                       • {doc.chunk_strategy === 'full_text' ? 'Full text' : 'Vectorized'}
@@ -1289,13 +1395,13 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                 </div>
                               </div>
                               {doc.processing_status === 'completed' && (
-                                <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-3 w-3 text-emerald-500 flex-shrink-0 ml-1" />
                               )}
                               {(doc.processing_status === 'processing' || doc.processing_status === 'pending') && (
-                                <LoaderIcon className="h-3 w-3 animate-spin flex-shrink-0" />
+                                <LoaderIcon className="h-3 w-3 text-blue-500 animate-spin flex-shrink-0 ml-1" />
                               )}
                               {doc.processing_status === 'failed' && (
-                                <AlertCircle className="h-3 w-3 text-red-600 flex-shrink-0" />
+                                <AlertCircle className="h-3 w-3 text-destructive flex-shrink-0 ml-1" />
                               )}
                             </div>
                           )
@@ -1319,16 +1425,12 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                     )}
 
 
-                    {/* Content Parts - renders tool calls, thinking, and text in order */}
-                    {message.contentParts && message.contentParts.length > 0 ? (
+                    {/* Render all parts in arrival order: thinking, deep agent, tools, text */}
+                    {message.parts && message.parts.length > 0 ? (
                       <div className="space-y-4">
-                        {message.contentParts.map((part, index) => (
+                        {message.parts.map((part, index) => (
                           <React.Fragment key={index}>
-                            {part.type === "tool" ? (
-                              <div className="my-2">
-                                <ToolCallDisplay tool={part.tool!} isFirst={true} isLast={true} />
-                              </div>
-                            ) : part.type === "thinking" ? (
+                            {part.type === "thinking" ? (
                               <ThinkingDisplay
                                 content={part.content || ""}
                                 isStreaming={message.isStreaming}
@@ -1338,6 +1440,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                                 data={part.deepAgent!}
                                 isStreaming={message.isStreaming || false}
                               />
+                            ) : part.type === "tool" ? (
+                              <div className="my-2">
+                                <ToolCallDisplay tool={part.tool!} isFirst={true} isLast={true} />
+                              </div>
                             ) : (
                               <MessageContent
                                 content={part.content || ""}
@@ -1349,12 +1455,10 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {/* Fallback: Tool Calls at top (legacy behavior) */}
+                        {/* Fallback: legacy messages without parts */}
                         {message.toolCalls && message.toolCalls.length > 0 && (
                           <ToolCallList toolCalls={message.toolCalls} />
                         )}
-
-                        {/* Message Content with Markdown */}
                         {message.content && (
                           <MessageContent
                             content={message.content}
@@ -1365,7 +1469,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                     )}
 
                     {/* Streaming indicator */}
-                    {message.isStreaming && !message.content && !message.contentParts?.length && (
+                    {message.isStreaming && !message.content && !message.parts?.length && (
                       <div className="flex items-center gap-1 h-6 px-2">
                         <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                         <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -1391,7 +1495,15 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
                 
                 <div className="flex items-center gap-2 mt-1 px-1">
                    <span className="text-[10px] text-muted-foreground/60">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {message.isStreaming ? (
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="animate-pulse [animation-delay:-0.3s]">.</span>
+                          <span className="animate-pulse [animation-delay:-0.15s]">.</span>
+                          <span className="animate-pulse">.</span>
+                        </span>
+                      ) : (
+                        message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      )}
                    </span>
                    {message.role === "assistant" && !message.isStreaming && (
                       <MessageActions message={message} />
@@ -1410,10 +1522,16 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
 
       {/* Input Area */}
       <div className="flex-shrink-0 p-4 z-20 pointer-events-none">
-        <div className="mx-auto max-w-3xl pointer-events-auto">
+        <div className="mx-auto w-full max-w-3xl pointer-events-auto">
           {messages.length === 0 && (
             <div className="mb-8 text-center">
                <h2 className="text-2xl font-semibold text-foreground">How can I help you?</h2>
+            </div>
+          )}
+
+          {deepAgentState.values.todos.length > 0 && (
+            <div className="mb-3">
+              <TodoList todos={deepAgentState.values.todos} />
             </div>
           )}
 
@@ -1432,8 +1550,9 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             setThinkingEnabled={setThinkingEnabled}
             includeWebSearch={includeWebSearch}
             setIncludeWebSearch={setIncludeWebSearch}
-            deepAgent={deepAgent}
-            setDeepAgent={setDeepAgent}
+            deepAgent={effectiveDeepAgent}
+            setDeepAgent={lockConversationMode ? (() => {}) : setDeepAgent}
+            deepAgentLocked={lockConversationMode}
             sqlEnabled={sqlEnabled}
             setSqlEnabled={setSqlEnabled}
             model={model}
@@ -1443,6 +1562,7 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
             selectedDocuments={selectedDocuments}
             setSelectedDocuments={setSelectedDocuments}
             conversationId={conversationId}
+            conversationMode={effectiveConversationMode}
             placeholder={credentialsLoading ? "Loading..." : credentialsError ? "Unable to connect" : "Message Kevin..."}
             disabled={credentialsLoading || !!credentialsError || isThinking}
             isThinking={isThinking}
@@ -1502,4 +1622,3 @@ function ChatInterfaceInner({ initialMessage, chatId, projectId }: ChatInterface
     </div>
   )
 }
-

@@ -1,166 +1,317 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, CheckCircle2, XCircle, Loader2, Search } from "lucide-react"
+import { ChevronDown, Loader2, CheckCircle2, Circle, FileDown, Eye, XCircle, ListTodo } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { MessageContent } from "./message-content"
-
-// --- Types ---
-
-export interface ResearchTask {
-  id: string
-  description: string
-  status: "in_progress" | "completed" | "failed" | "timed_out"
-  latestMessage?: { content?: string; tool_calls?: Array<{ name: string; args?: Record<string, unknown> }> }
-  result?: string
-  error?: string
-}
-
-export interface DeepAgentData {
-  tasks: Record<string, ResearchTask>  // keyed by task_id for O(1) updates
-  taskOrder: string[]                   // insertion order for rendering
-  isComplete: boolean
-}
+import { useArtifact, ArtifactData } from "./artifact-context"
+import { determineArtifactType, getToolDisplayName } from "@/lib/utils/chat-helpers"
+import type { DeepAgentStreamState, TodoItem, SubagentStreamInterface } from "@/lib/hooks/use-deep-agent-stream"
 
 // --- Task Status Icon ---
 
-function TaskStatusIcon({ status }: { status: ResearchTask["status"] }) {
+function TaskStatusIcon({ status }: { status: SubagentStreamInterface["status"] }) {
   switch (status) {
-    case "completed":
+    case "complete":
       return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-    case "failed":
-    case "timed_out":
+    case "error":
       return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
-    case "in_progress":
+    case "pending":
+      return <Circle className="h-3.5 w-3.5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
+    case "running":
     default:
       return <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin flex-shrink-0" />
   }
 }
 
 // Format a tool call into a human-readable label
-function formatToolCall(toolCall: { name: string; args?: Record<string, unknown> }): string {
-  const name = toolCall.name
-  const args = toolCall.args || {}
-
+function formatToolCall(name: string, args?: Record<string, unknown>): string {
+  const a = args || {}
   if (name === "web_search" || name === "search") {
-    const query = args.query || args.q || ""
+    const query = a.query || a.q || ""
     return query ? `Searching for "${query}"` : "Searching..."
   }
-  if (name === "browse" || name === "visit_url") {
-    const url = args.url || ""
+  if (name === "browse" || name === "visit_url" || name === "crawl_url") {
+    const url = a.url || ""
     return url ? `Visiting ${url}` : "Browsing..."
   }
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// --- Tool Call Row ---
+
+function ToolCallRow({ tc, onOpenArtifact }: { tc: SubagentStreamInterface["activeTools"][number]; onOpenArtifact?: (artifact: any, toolName: string) => void }) {
+  const label = formatToolCall(tc.tool, tc.input)
+  const hasArtifact = tc.artifact && typeof tc.artifact === "object" && Object.keys(tc.artifact).length > 0
+  const isError = tc.status === "completed" && tc.executeStatus === "error"
+
+  return (
+    <div className="flex flex-col gap-1 py-1.5 px-1 group/tool">
+      <div className="flex items-center gap-2 text-xs">
+        {tc.status === "running" ? (
+          <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin flex-shrink-0" />
+        ) : isError ? (
+          <XCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+        ) : (
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+        )}
+        <span className={cn(
+          "truncate font-medium flex-1 transition-colors",
+          tc.status === "running" ? "text-foreground" : "text-muted-foreground group-hover/tool:text-foreground"
+        )}>
+          {label}
+        </span>
+        {tc.status === "running" && tc.tool === "execute" && tc.executeStatus === "executing" && (
+          <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 animate-pulse">
+            Running...
+          </span>
+        )}
+        {hasArtifact && onOpenArtifact && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenArtifact(tc.artifact, tc.tool) }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            {tc.artifact?.oss_key ? <FileDown className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+            {tc.artifact?.filename || "View"}
+          </button>
+        )}
+      </div>
+      
+      {/* Display command if available */}
+      {tc.tool === "execute" && tc.command && (
+        <div className="mt-0.5 ml-5 font-mono text-[10px] text-muted-foreground bg-background/40 px-2 py-1.5 rounded border border-border/30 overflow-x-auto whitespace-pre">
+          $ {tc.command}
+        </div>
+      )}
+      
+      {/* Display error message if execution failed */}
+      {isError && tc.errorMessage && (
+        <div className="mt-0.5 ml-5 text-[10px] text-destructive bg-destructive/5 px-2 py-1.5 rounded border border-destructive/10">
+          {tc.errorMessage}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// --- Todo List (exported for sticky rendering in chat-interface) ---
+
+export function TodoList({ todos }: { todos: TodoItem[] }) {
+  const [isExpanded, setIsExpanded] = React.useState(false)
+  const activeItem = todos.find(t => t.status === "in_progress")
+  const completedCount = todos.filter(todo => todo.status === "completed").length
+  const pendingCount = todos.length - completedCount
+
+  return (
+    <div className="mb-3 max-w-2xl rounded-lg border border-blue-200/70 bg-white/95 shadow-sm dark:border-blue-800/40 dark:bg-gray-900/90">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-blue-50/60 dark:hover:bg-blue-950/20 transition-colors"
+      >
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+          <ListTodo className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-800 dark:text-gray-100">
+            <span>Plan</span>
+            <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              {completedCount}/{todos.length}
+            </span>
+            {pendingCount > 0 && (
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                {pendingCount} left
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+            {activeItem ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-blue-500 flex-shrink-0" />
+                <span className="truncate">{activeItem.content}</span>
+              </>
+            ) : (
+              <span className="truncate">
+                {completedCount === todos.length ? "All tasks completed" : "Show task list"}
+              </span>
+            )}
+          </div>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 flex-shrink-0 text-gray-400 transition-transform dark:text-gray-500",
+            isExpanded && "rotate-180"
+          )}
+        />
+      </button>
+
+      {isExpanded && (
+        <ul className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
+          {todos.map(todo => {
+            const done = todo.status === "completed"
+            const active = todo.status === "in_progress"
+            return (
+              <li key={todo.id} className="flex items-start gap-2.5 py-1.5">
+                {done ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" />
+                ) : active ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+                ) : (
+                  <Circle className="mt-0.5 h-4 w-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                )}
+                <span className={cn(
+                  "min-w-0 text-xs leading-5",
+                  done && "line-through text-gray-400 dark:text-gray-600",
+                  active && "font-medium text-gray-800 dark:text-gray-100",
+                  !done && !active && "text-gray-500 dark:text-gray-400",
+                )}>
+                  {todo.content}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // --- Research Task Card ---
 
 function ResearchTaskCard({
-  task,
+  subagent,
   isStreaming,
+  onOpenArtifact,
 }: {
-  task: ResearchTask
+  subagent: SubagentStreamInterface
   isStreaming: boolean
+  onOpenArtifact?: (artifact: any, toolName: string) => void
 }) {
-  const [isExpanded, setIsExpanded] = React.useState(task.status === "in_progress")
+  const [isExpanded, setIsExpanded] = React.useState(subagent.status === "running")
   const [userToggled, setUserToggled] = React.useState(false)
-  const prevStatusRef = React.useRef(task.status)
+  const prevStatusRef = React.useRef(subagent.status)
 
   // Auto-collapse on completion (unless user toggled)
   React.useEffect(() => {
-    if (prevStatusRef.current === "in_progress" && task.status !== "in_progress" && !userToggled) {
+    if (prevStatusRef.current === "running" && subagent.status !== "running" && !userToggled) {
       setIsExpanded(false)
     }
-    prevStatusRef.current = task.status
-  }, [task.status, userToggled])
+    prevStatusRef.current = subagent.status
+  }, [subagent.status, userToggled])
 
   const handleToggle = () => {
     setUserToggled(true)
     setIsExpanded(!isExpanded)
   }
 
-  const isRunning = task.status === "in_progress"
-  const isFailed = task.status === "failed" || task.status === "timed_out"
+  const isRunning = subagent.status === "running"
+  const isFailed = subagent.status === "error"
 
-  const latestToolCall = task.latestMessage?.tool_calls?.[task.latestMessage.tool_calls.length - 1]
-  const toolCallLabel = latestToolCall ? formatToolCall(latestToolCall) : null
+  // Determine live activity label for collapsed header
+  const toolCalls = subagent.activeTools ?? []
+  const latestRunningTool = [...toolCalls].reverse().find(tc => tc.status === "running")
+  const latestCompletedTool = [...toolCalls].reverse().find(tc => tc.status === "completed")
+  const latestTool = latestRunningTool ?? latestCompletedTool
+
+  const activityLabel = latestTool ? formatToolCall(latestTool.tool, latestTool.input) : null
+  const latestMessage = subagent.messages[subagent.messages.length - 1]
+  const hasLiveContent = (latestMessage?.content ?? "").length > 0
+  const hasToolCalls = toolCalls.length > 0
 
   return (
     <div
       className={cn(
         "mb-2 rounded-lg border overflow-hidden",
         isRunning
-          ? "border-blue-200 bg-blue-50/50"
+          ? "border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-950/20"
           : isFailed
-            ? "border-red-200 bg-red-50/50"
-            : "border-green-200 bg-green-50/50"
+            ? "border-red-200 dark:border-red-800/40 bg-red-50/50 dark:bg-red-950/20"
+            : "border-green-200 dark:border-green-800/40 bg-green-50/50 dark:bg-green-950/20"
       )}
     >
       <button
         onClick={handleToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-black/5 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
       >
-        <TaskStatusIcon status={task.status} />
+        <TaskStatusIcon status={subagent.status} />
         <span
           className={cn(
             "text-xs font-medium flex-1 truncate",
-            isRunning ? "text-blue-700" : isFailed ? "text-red-700" : "text-green-700"
+            isRunning ? "text-blue-700 dark:text-blue-400" : isFailed ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"
           )}
         >
-          {task.description}
+          {subagent.toolCall.args.description || "Subagent task"}
         </span>
-        {!isExpanded && isRunning && toolCallLabel && (
-          <span className="text-[10px] text-blue-500 flex-shrink-0 truncate max-w-[120px]">
-            {toolCallLabel}
+        {subagent.toolCall.args.subagent_type && (
+          <span className={cn(
+            "text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium",
+            isRunning ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300" : isFailed ? "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300" : "bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-300"
+          )}>
+            {subagent.toolCall.args.subagent_type}
+          </span>
+        )}
+        {!isExpanded && isRunning && activityLabel && (
+          <span className="text-[10px] text-blue-500 dark:text-blue-400 flex-shrink-0 truncate max-w-[120px]">
+            {activityLabel}
           </span>
         )}
         <ChevronDown
           className={cn(
             "h-4 w-4 transition-transform flex-shrink-0",
-            isRunning ? "text-blue-600" : isFailed ? "text-red-500" : "text-green-600",
+            isRunning ? "text-blue-600 dark:text-blue-400" : isFailed ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400",
             isExpanded ? "rotate-180" : ""
           )}
         />
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-3 pt-1 border-t border-opacity-50">
-          {isRunning && (
+        <div className="px-4 pb-3 pt-1 border-t border-opacity-50 space-y-2">
+          {/* Live tool call list */}
+          {hasToolCalls && (
+            <div className="space-y-0.5">
+              {toolCalls.map((tc, i) => (
+                <ToolCallRow key={i} tc={tc} onOpenArtifact={onOpenArtifact} />
+              ))}
+            </div>
+          )}
+
+          {/* Live streaming content from subagent LLM */}
+          {isRunning && hasLiveContent && (
+            <div className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+              <MessageContent content={latestMessage?.content || ""} className="prose-xs" />
+              {isStreaming && <span className="animate-pulse ml-0.5">▊</span>}
+            </div>
+          )}
+
+          {isRunning && subagent.thinking && (
+            <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">
+              <MessageContent content={subagent.thinking} className="prose-xs" />
+            </div>
+          )}
+
+          {/* Idle state */}
+          {isRunning && !hasLiveContent && !hasToolCalls && !subagent.thinking && (
             <div className="text-xs text-gray-600 leading-relaxed">
-              {toolCallLabel ? (
-                <div className="flex items-center gap-1.5">
-                  <Search className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                  <span>{toolCallLabel}</span>
-                  {isStreaming && <span className="animate-pulse">▊</span>}
-                </div>
-              ) : task.latestMessage?.content ? (
-                <div>
-                  <MessageContent content={task.latestMessage.content} className="prose-xs" />
-                  {isStreaming && <span className="animate-pulse ml-1">▊</span>}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Researching...</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Executing...</span>
+              </div>
             </div>
           )}
 
-          {!isRunning && !isFailed && task.result && (
-            <div className="text-xs text-gray-700 leading-relaxed">
-              <MessageContent content={task.result} className="prose-xs" />
+          {/* Completed result */}
+          {!isRunning && !isFailed && subagent.result && (
+            <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+              <MessageContent content={subagent.result || ""} className="prose-xs" />
             </div>
           )}
 
-          {isFailed && task.error && (
-            <div className="text-xs text-red-600 leading-relaxed">{task.error}</div>
+          {/* Error */}
+          {isFailed && subagent.error && (
+            <div className="text-xs text-red-600 dark:text-red-400 leading-relaxed">{subagent.error}</div>
           )}
-
-          {isFailed && !task.error && (
-            <div className="text-xs text-red-500">
-              {task.status === "timed_out" ? "Task timed out." : "Task failed."}
-            </div>
+          {isFailed && !subagent.error && (
+            <div className="text-xs text-red-500 dark:text-red-400">Task failed.</div>
           )}
         </div>
       )}
@@ -171,22 +322,38 @@ function ResearchTaskCard({
 // --- Main Component ---
 
 interface DeepAgentDisplayProps {
-  data: DeepAgentData
+  data: DeepAgentStreamState
   isStreaming: boolean
 }
 
 export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
-  const taskCount = data.taskOrder.length
-  const completedCount = data.taskOrder.filter(
-    (id) => data.tasks[id]?.status === "completed"
-  ).length
+  const { openArtifact } = useArtifact()
+  const taskCount = data.subagentOrder.length
+  const completedCount = data.subagentOrder.filter((id) => data.subagents.get(id)?.status === "complete").length
+  const messageOrder = data.messageOrder.length > 0 ? data.messageOrder : ["coordinator"]
+
+  const handleOpenArtifact = React.useCallback((artifact: any, toolName: string) => {
+    const artifactData: ArtifactData = {
+      id: `${toolName}-${Date.now()}`,
+      type: determineArtifactType(artifact, toolName),
+      title: artifact.title || artifact.filename || getToolDisplayName(toolName),
+      data: artifact.type === "artifact" ? artifact : (artifact.content ?? artifact.data ?? artifact),
+      toolName,
+      isStreaming: false,
+    }
+    openArtifact(artifactData)
+  }, [openArtifact])
 
   if (taskCount === 0) {
+    // Only show "Starting deep agent..." while actually streaming; hide once complete.
+    if (!isStreaming) return null
     return (
-      <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden max-w-2xl">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <Loader2 className="h-4 w-4 text-blue-600 animate-spin flex-shrink-0" />
-          <span className="text-xs font-medium text-blue-700">Starting deep agent...</span>
+      <div className="space-y-1 max-w-2xl">
+        <div className="mb-3 rounded-lg border border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-950/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2">
+            <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Starting Lobster Mode...</span>
+          </div>
         </div>
       </div>
     )
@@ -194,13 +361,21 @@ export function DeepAgentDisplay({ data, isStreaming }: DeepAgentDisplayProps) {
 
   return (
     <div className="space-y-1 max-w-2xl">
-      <div className="mb-1 text-[10px] text-gray-500 font-medium px-0.5">
-        Research tasks: {completedCount}/{taskCount} completed
+      <div className="mb-1 text-[10px] text-gray-500 dark:text-gray-400 font-medium px-0.5">
+        Tasks: {completedCount}/{taskCount} completed
       </div>
-      {data.taskOrder.map((taskId) => {
-        const task = data.tasks[taskId]
-        if (!task) return null
-        return <ResearchTaskCard key={taskId} task={task} isStreaming={isStreaming} />
+      {messageOrder.map((messageId) => {
+        const subagentIds = data.subagentsByMessage[messageId] ?? []
+        if (!subagentIds.length) return null
+        return (
+          <div key={messageId} className="space-y-2">
+            {subagentIds.map((subagentId) => {
+              const subagent = data.subagents.get(subagentId)
+              if (!subagent) return null
+              return <ResearchTaskCard key={subagent.id} subagent={subagent} isStreaming={isStreaming} onOpenArtifact={handleOpenArtifact} />
+            })}
+          </div>
+        )
       })}
     </div>
   )

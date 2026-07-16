@@ -1,13 +1,17 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Onest } from "next/font/google"
 import "./globals.css"
 import { AuraBackground } from "@/components/layout/aura-background"
 import { ToastProvider } from "@/components/ui/toast"
 import { ConfirmProvider } from "@/components/providers/confirm-provider"
 import QueryProvider from "@/components/providers/query-provider"
 import { UserStoreProvider } from "@/components/providers/user-store-provider"
+import { ThemeProvider } from "@/components/theme-provider"
 
-const inter = Inter({ subsets: ["latin"] })
+const onest = Onest({
+  subsets: ["latin"],
+  variable: "--font-onest",
+})
 
 export const metadata: Metadata = {
   title: "Kevin - AI Marketing Co-pilot",
@@ -21,17 +25,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <AuraBackground />
-        <QueryProvider>
-          <UserStoreProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                {children}
-              </ConfirmProvider>
-            </ToastProvider>
-          </UserStoreProvider>
-        </QueryProvider>
+      <body className={`${onest.className} ${onest.variable}`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuraBackground />
+          <QueryProvider>
+            <UserStoreProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  {children}
+                </ConfirmProvider>
+              </ToastProvider>
+            </UserStoreProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

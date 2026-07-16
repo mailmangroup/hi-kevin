@@ -38,9 +38,12 @@ export function SuggestionsList({ suggestions }: SuggestionsListProps) {
           <CardDescription>AI-powered action items for today</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p>All caught up! No pending suggestions.</p>
-            <p className="text-sm mt-2">Kevin will notify you when there&apos;s something to review.</p>
+          <div className="flex flex-col items-center text-center py-12">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+              <Sparkles className="h-5 w-5 text-slate-500" />
+            </div>
+            <p className="text-base font-semibold text-foreground">All caught up!</p>
+            <p className="mt-2 text-sm text-muted-foreground">Kevin will notify you when there&apos;s something to review.</p>
           </div>
         </CardContent>
       </Card>

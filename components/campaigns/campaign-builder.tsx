@@ -25,19 +25,19 @@ export function CampaignBuilder() {
 
       {/* Progress Steps */}
       <div className="flex items-center justify-between mb-12 px-4 relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -z-10" />
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 dark:bg-slate-700 -z-10" />
         {STEPS.map((step) => {
           const Icon = step.icon
           const isActive = currentStep >= step.id
           const isCurrent = currentStep === step.id
 
           return (
-            <div key={step.id} className="flex flex-col items-center gap-2 bg-white px-2">
+            <div key={step.id} className="flex flex-col items-center gap-2 bg-white dark:bg-slate-900 px-2">
               <div 
                 className={`
                   h-10 w-10 rounded-full flex items-center justify-center transition-all
-                  ${isActive ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400'}
-                  ${isCurrent ? 'ring-4 ring-primary/20' : ''}
+                  ${isActive ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}
+                  ${isCurrent ? 'ring-4 ring-primary/20 dark:ring-primary/30' : ''}
                 `}
               >
                 <Icon className="h-5 w-5" />
@@ -51,9 +51,9 @@ export function CampaignBuilder() {
       </div>
 
       {/* Step Content Placeholder */}
-      <div className="min-h-[200px] border-2 border-dashed border-slate-100 rounded-lg flex flex-col items-center justify-center text-muted-foreground bg-slate-50/50 mb-8">
-        <p>Campaign Builder Form Steps</p>
-        <p className="text-sm opacity-60 mt-1">Step {currentStep}: {STEPS[currentStep-1].title} Configuration</p>
+      <div className="min-h-[200px] border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-lg flex flex-col items-center justify-center text-muted-foreground bg-slate-50/50 dark:bg-slate-800/50 mb-8">
+        <p className="text-slate-600 dark:text-slate-400">Campaign Builder Form Steps</p>
+        <p className="text-sm opacity-60 mt-1 text-slate-500 dark:text-slate-500">Step {currentStep}: {STEPS[currentStep-1].title} Configuration</p>
       </div>
 
       {/* Actions */}

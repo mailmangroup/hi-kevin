@@ -7,6 +7,7 @@ import { useEffect,
   useState
 } from "react"
 import { cn } from "@/lib/utils/cn"
+import { LobsterIcon } from "@/components/ui/lobster-icon"
 import {
   LayoutDashboard,
   FileText,
@@ -17,12 +18,17 @@ import {
   Shield,
   Settings,
   MessageSquare,
+  // BrainCircuit removed — using LobsterIcon
   FolderKanban,
   MoreHorizontal,
   Star,
   Trash2,
-  Pencil
+  Pencil,
+  CheckSquare,
+  LogOut
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useUserStore } from "@/lib/store/user-store"
 import { Button } from "@/components/ui/button"
 import { Conversation, aiService } from "@/lib/api/client"
 import { useNewLeadsCount, useConversations } from "@/lib/hooks/use-dashboard-data"
@@ -65,7 +71,7 @@ const INITIAL_NAV_ITEMS: NavItem[] = [
     title: "Projects",
     href: "/projects",
     icon: FolderKanban,
-    isBeta: true,
+    isBeta: false,
   },
   {
     title: "Content",
@@ -194,13 +200,12 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
     <>
     <div className="group/item relative flex items-center">
         <Link
-            href={`/chat/${chat.id}`}
-            prefetch={false}
+            href={chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`}
             className={cn(
-                "flex-1 flex items-center rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all pr-8", 
+                "flex-1 flex items-center rounded-lg px-3 py-2 leading-relaxed text-[13px] font-medium transition-all pr-8",
                 isActive
-                    ? "bg-white text-primary shadow-sm"
-                    : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
+                    ? "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-primary dark:text-primary-foreground shadow-sm border border-white/60 dark:border-slate-700/60"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200"
             )}
         >
             <span className="truncate flex-1 flex items-center gap-1.5" title={chat.title}>
@@ -209,29 +214,43 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
             </span>
         </Link>
         
-        <div className={cn(
-            "absolute right-1 opacity-0 transition-opacity", 
-            isActive ? "opacity-100" : "group-hover/item:opacity-100"
-        )}>
+        <div className="absolute right-1">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-slate-200">
-                        <MoreHorizontal className="h-3 w-3 text-slate-500" />
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={cn(
+                            "h-6 w-6 rounded-full transition-all",
+                            "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700",
+                            isActive ? "opacity-100 bg-slate-200/50 dark:bg-slate-700/50" : "opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                        )}
+                    >
+                        <MoreHorizontal className="h-3 w-3" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation()
                         setNewTitle(chat.title || "New Chat")
                         setIsRenameOpen(true)
                     }}>
                         <Pencil className="mr-2 h-4 w-4" />
-                        Change Title
+                        Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleFavorite}>
                         <Star className={cn("mr-2 h-4 w-4", chat.is_favorite ? "fill-yellow-500 text-yellow-500" : "")} />
                         {chat.is_favorite ? "Unfavorite" : "Favorite"}
                     </DropdownMenuItem>
+                    
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href="/chat/agent?mode=select" className="cursor-pointer w-full flex items-center">
+                            <CheckSquare className="mr-2 h-4 w-4" />
+                            Select Multiple
+                        </Link>
+                    </DropdownMenuItem>
+                    
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -286,10 +305,21 @@ function ChatHistoryItem({ chat, isActive }: { chat: Conversation, isActive: boo
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const clearProfile = useUserStore((s) => s.clearProfile)
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    clearProfile()
+    queryClient.clear()
+    router.push('/login')
+    router.refresh()
+  }
 
   // Use TanStack Query for data fetching (replaces manual cache)
   const { data: leadsData } = useNewLeadsCount()
-  const { data: conversationsData } = useConversations()
+  const { data: conversationsData } = useConversations(20, 0)
 
   const leadsCount = leadsData?.count ?? null
   const chatHistory = conversationsData?.conversations ?? []
@@ -330,12 +360,12 @@ export function Sidebar({ className }: { className?: string }) {
           className="h-8 w-8 rounded-lg shadow-sm"
           unoptimized
         />
-        <span className="text-lg font-bold text-slate-900 tracking-tight">Kevin</span>
+        <span className="text-lg font-bold text-foreground tracking-tight">Kevin</span>
       </div>
 
       {/* Navigation - fixed, no scroll */}
       <div className="flex-shrink-0 px-3">
-        <nav className="space-y-0.5">
+        <nav className="space-y-1">
             {navItems.map((item) => {
             const Icon = item.icon
             // Dashboard should only be active on exact match, not sub-routes
@@ -350,18 +380,18 @@ export function Sidebar({ className }: { className?: string }) {
                 className={cn(
                     "group flex items-center rounded-lg px-3 py-2 text-[13px] font-medium transition-all",
                     isActive
-                        ? "bg-white text-primary shadow-sm"
-                        : "text-slate-500 hover:bg-white/50 hover:text-slate-700"
+                        ? "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-primary shadow-sm border border-white/60 dark:border-slate-700/60"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200"
                 )}
                 >
                 <item.icon className={cn("mr-2 h-4 w-4 flex-shrink-0 transition-colors",
-                    isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
+                    isActive ? "text-primary dark:text-primary-foreground" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300"
                 )} />
                 <span className="flex-1 truncate">{item.title}</span>
                 <div className="ml-auto flex items-center gap-2">
-                    {item.isBeta && <div className="h-1.5 w-1.5 rounded-full bg-orange-400" />}
+                    {item.isBeta && <div className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
                     {item.badge && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-500 px-1.5 text-[10px] font-semibold text-white">
                         {item.badge}
                     </span>
                     )}
@@ -374,20 +404,24 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* Chat History Section - scrollable */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-3 mt-4">
-            <Link href="/chat" prefetch={false} className="block mb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors cursor-pointer">
+            <Link href="/chat/agent" className="block mb-1 px-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer">
                 History
             </Link>
-            <div className="space-y-0.5">
-                <Link href="/dashboard" prefetch={false}>
-                    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 transition-all hover:bg-white/50 hover:text-slate-700 text-left">
-                        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200">
-                            <MessageSquare className="h-2.5 w-2.5 text-slate-500" />
-                        </div>
-                        New Chat
-                    </button>
-                </Link>
+            <div className="space-y-1">
+                <div className="flex items-center gap-1">
+                    <Link href="/chat/agent/new" prefetch={false} className="flex-1 flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium text-slate-500 dark:text-slate-400 transition-all hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 text-left">
+                            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
+                                <MessageSquare className="h-2.5 w-2.5 text-slate-500 dark:text-slate-400" />
+                            </div>
+                            New Chat
+                    </Link>
+                    <Link href="/chat/deep-agent/new" prefetch={false} title="New Lobster Mode Chat" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-red-500 dark:text-rose-300 transition-all hover:bg-red-50 dark:hover:bg-rose-900/30 hover:text-red-700 dark:hover:text-rose-200">
+                            <LobsterIcon className="h-3.5 w-3.5" />
+                    </Link>
+                </div>
                 {chatHistory.map((chat) => {
-                    const isActive = pathname === `/chat/${chat.id}`
+                    const chatPath = chat.conversation_mode === "deep_agent" ? `/chat/deep-agent/${chat.id}` : `/chat/agent/${chat.id}`
+                    const isActive = pathname === chatPath
                     return (
                         <ChatHistoryItem key={chat.id} chat={chat} isActive={isActive} />
                     )
@@ -395,9 +429,8 @@ export function Sidebar({ className }: { className?: string }) {
             </div>
             {chatHistory.length < totalChats && (
                 <Link
-                    href="/chat"
-                    prefetch={false}
-                    className="block text-xs text-center text-muted-foreground mt-2 hover:text-foreground hover:underline transition-all py-1 cursor-pointer"
+                    href="/chat/agent"
+                    className="block text-xs text-center text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-200 hover:underline transition-all py-1 cursor-pointer"
                 >
                     Showing {chatHistory.length} of {totalChats} chats
                 </Link>
@@ -409,16 +442,23 @@ export function Sidebar({ className }: { className?: string }) {
         <div className="flex items-center gap-2">
             <Link
                 href="/dashboard/settings"
-                prefetch={false}
-                className="flex-1 flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm transition-all hover:shadow-md"
+                className="flex-1 flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 p-2 shadow-sm transition-all hover:shadow-md border border-transparent dark:border-slate-700"
             >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                     <Settings className="h-3.5 w-3.5" />
                 </div>
                 <div className="flex-1 overflow-hidden">
-                    <p className="truncate text-[13px] font-medium text-slate-700">Settings</p>
+                    <p className="truncate text-[13px] font-medium text-slate-700 dark:text-slate-200">Settings</p>
                 </div>
             </Link>
+            <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out"
+                className="flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-md border border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400"
+            >
+                <LogOut className="h-4 w-4" />
+            </button>
         </div>
       </div>
     </div>

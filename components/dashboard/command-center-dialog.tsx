@@ -75,7 +75,7 @@ export function CommandCenterDialog({
       thinking: thinkingEnabled.toString()
     })
 
-    router.push(`/chat/new?${searchParams.toString()}`)
+    router.push(`/chat/agent/new?${searchParams.toString()}`)
   }
 
   return (

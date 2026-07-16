@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { ChatInterface } from "@/components/chat/chat-interface"
+import { AgentChatInterface } from "@/components/chat/agent-chat-interface"
 import { LoadingState } from "@/components/ui/loading"
 
 export default function ChatPage({
@@ -11,7 +11,11 @@ export default function ChatPage({
 }) {
   return (
     <Suspense fallback={<LoadingState />}>
-      <ChatInterface chatId={params.id} initialMessage={searchParams.q} />
+      <AgentChatInterface
+        key={params.id}
+        chatId={params.id}
+        initialMessage={searchParams.q}
+      />
     </Suspense>
   )
 }

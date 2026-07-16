@@ -1,4 +1,5 @@
-export function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" {
+export function determineArtifactType(artifact: any, toolName?: string): "chart" | "code" | "table" | "report" | "data" | "html" | "markdown" | "mermaid" | "file" {
+  if (artifact?.oss_key && artifact?.filename) return "file"
   if (artifact?.type === "artifact" && artifact?.artifact_type) {
     return artifact.artifact_type
   }
@@ -38,6 +39,7 @@ export const TOOL_DISPLAY_NAMES: Record<string, string> = {
   generate_content: "Generated Content",
   schedule_post: "Scheduled Post",
   get_audience_data: "Audience Data",
+  write_file: "Written File",
 }
 
 export function getToolDisplayName(toolName: string): string {

@@ -6,9 +6,31 @@
  */
 
 import { useUserStore } from '@/lib/store/user-store'
+import { DEFAULT_KAWO_API_URL } from '@/lib/kawo-config'
 import type { ContentItem } from '@/types'
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
+
+const SUPPORTED_PLATFORMS = ['xiaohongshu', 'douyin', 'weibo', 'wechat'] as const
+
+function batchToContentItem(batch: any): ContentItem {
+  const firstPlatform = batch.platforms?.[0]?.platform
+  const platform = SUPPORTED_PLATFORMS.includes(firstPlatform) ? firstPlatform : 'xiaohongshu'
+  return {
+    id: batch._id || batch.id,
+    platform: platform as ContentItem['platform'],
+    type: 'post',
+    status: 'draft',
+    title: batch.inspiration_card_title || batch.query || 'Untitled',
+    body: batch.query || '',
+    mediaUrls: [],
+    hashtags: [],
+    complianceStatus: 'pending',
+    createdAt: new Date(batch.created_at),
+    updatedAt: new Date(batch.created_at),
+    createdBy: batch.user_id || '',
+  }
+}
 
 /**
  * Helper function to get KAWO configuration
@@ -20,7 +42,7 @@ export function getKawoConfig() {
   const token = process.env.NEXT_PUBLIC_KAWO_TOKEN
   const orgId = process.env.NEXT_PUBLIC_KAWO_ORG_ID
   const brandId = process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL
+  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
 
   if (token && orgId && brandId && apiUrl) {
     return {
@@ -37,7 +59,7 @@ export function getKawoConfig() {
     token: profile?.kawo_token,
     orgId: profile?.kawo_org_id,
     brandId: profile?.kawo_brand_id,
-    apiUrl: profile?.kawo_api_url,
+    apiUrl: profile?.kawo_api_url || DEFAULT_KAWO_API_URL,
   }
 }
 
@@ -49,22 +71,32 @@ const DEFAULT_TIMEOUT_MS = 30_000 // 30 seconds
 
 export async function directApiCall<T>(
   endpoint: string,
-  options?: RequestInit & { timeoutMs?: number }
+  options?: RequestInit & { timeoutMs?: number; includeOrgBrandHeaders?: boolean }
 ): Promise<T> {
   const config = getKawoConfig()
 
-  if (!config.apiUrl || !config.token || !config.orgId || !config.brandId) {
+  if (!config.apiUrl || !config.token) {
     throw new Error('KAWO credentials not configured. Please complete setup.')
+  }
+
+  if (options?.includeOrgBrandHeaders !== false && (!config.orgId || !config.brandId)) {
+    throw new Error('KAWO Organization and Brand IDs not configured. Please complete setup.')
   }
 
   const targetUrl = `${config.apiUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`
 
   // Ensure headers are properly set
   const headers = new Headers(options?.headers)
-  headers.set('Content-Type', 'application/json')
   headers.set('Authorization', `Bearer ${config.token}`)
-  headers.set('X-KAWO-Org-Id', config.orgId)
-  headers.set('X-KAWO-Brand-Id', config.brandId)
+  if (options?.includeOrgBrandHeaders !== false) {
+    headers.set('X-KAWO-Org-Id', config.orgId!)
+    headers.set('X-KAWO-Brand-Id', config.brandId!)
+  }
+
+  const hasBody = options?.body !== undefined && options?.body !== null
+  if (hasBody && !(options?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), options?.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -103,6 +135,9 @@ export async function directApiCall<T>(
     clearTimeout(timeoutId)
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(`Request to ${endpoint} timed out`)
+    }
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error(`Failed to reach ${endpoint}. This is usually a network/CORS/proxy issue, not an auth token issue.`)
     }
     throw err
   }
@@ -150,6 +185,7 @@ export interface Conversation {
   message_count: number
   last_message?: string
   is_favorite: boolean
+  conversation_mode?: "agent" | "deep_agent"
   has_report?: boolean
   project_id?: string
 }
@@ -202,6 +238,17 @@ export interface ProjectDocument {
   processed_at?: string
 }
 
+export interface Skill {
+  id: string
+  name: string
+  description: string
+  content: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+  files: string[]
+}
+
 export interface MemoryFact {
   id: string
   content: string
@@ -243,7 +290,11 @@ export const aiService = {
   /**
    * Get list of conversations
    */
-  async getConversations(limit = 20, skip = 0): Promise<{ conversations: Conversation[], total: number }> {
+  async getConversations(
+    limit = 20,
+    skip = 0,
+    conversationMode?: "agent" | "deep_agent"
+  ): Promise<{ conversations: Conversation[], total: number }> {
     if (USE_MOCK && process.env.NEXT_PUBLIC_FORCE_MOCK === 'true') {
         return {
             conversations: [
@@ -253,7 +304,14 @@ export const aiService = {
             total: 2
         }
     }
-    return directApiCall(`agent/conversations?limit=${limit}&skip=${skip}`)
+    const params = new URLSearchParams({
+      limit: String(limit),
+      skip: String(skip),
+    })
+    if (conversationMode) {
+      params.set("conversation_mode", conversationMode)
+    }
+    return directApiCall(`agent/conversations?${params.toString()}`)
   },
 
   /**
@@ -296,6 +354,37 @@ export const aiService = {
   },
 
   /**
+   * Export a report as a downloadable HTML file
+   */
+  async exportReport(reportId: string): Promise<void> {
+    const config = getKawoConfig()
+    if (!config.apiUrl || !config.token) {
+      throw new Error('KAWO credentials not configured.')
+    }
+    const url = `${config.apiUrl.replace(/\/$/, '')}/agent/reports/${reportId}/export`
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'X-KAWO-Org-Id': config.orgId ?? '',
+        'X-KAWO-Brand-Id': config.brandId ?? '',
+      },
+    })
+    if (!response.ok) {
+      throw new Error(`Export failed: ${response.statusText}`)
+    }
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i)
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : `report-${reportId}.html`
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(objectUrl)
+  },
+
+  /**
    * Update report section insights
    */
   async updateReportInsights(
@@ -313,15 +402,7 @@ export const aiService = {
     })
   },
 
-  /**
-   * Create a new conversation
-   */
-  async createConversation(orgId?: string, brandId?: string): Promise<{ conversation_id: string }> {
-      return directApiCall('agent/conversations', {
-          method: 'POST',
-          body: JSON.stringify({ org_id: orgId, brand_id: brandId })
-      })
-  },
+
 
   /**
    * Update conversation favorite status
@@ -386,7 +467,7 @@ export const aiService = {
         includeWebSearch?: boolean,
         thinkingEnabled?: boolean,
         toolSelectionEnabled?: boolean,
-        images?: string[],
+        images?: Array<{ image_url: string; filename?: string; file_type?: string }>,
         documentIds?: string[],
         reportFromTemplate?: ReportFromTemplate,
         reportContext?: {
@@ -396,7 +477,6 @@ export const aiService = {
         },
         fastPath?: string,
         deepAgent?: boolean,
-        maxResearchSteps?: number,
         sqlEnabled?: boolean
     }
   ): AsyncGenerator<any, void, unknown> {
@@ -420,15 +500,13 @@ export const aiService = {
         stream: true,
         model: model,
         include_web_search: options.includeWebSearch ?? true,
-        thinking_enabled: options.thinkingEnabled ?? false,
+        thinking_enabled: options.thinkingEnabled ?? true,
         tool_selection_enabled: options.toolSelectionEnabled ?? true,
         images: options.images,
         document_ids: options.documentIds,
         report_from_template: options.reportFromTemplate,
         report_context: options.reportContext,
         fast_path: options.fastPath,
-        deep_agent: options.deepAgent ?? false,
-        max_research_steps: options.maxResearchSteps ?? 5,
         query_database: options.sqlEnabled ?? false
     }
 
@@ -462,8 +540,10 @@ export const aiService = {
         brand_id: brandId,
         project_id: options.projectId,
         model: model,
-        max_research_steps: options.maxResearchSteps ?? 5,
+        thinking_enabled: options.thinkingEnabled ?? true,
         include_web_search: options.includeWebSearch ?? true,
+        images: options.images,
+        document_ids: options.documentIds,
       }
     }
 
@@ -606,7 +686,7 @@ export const aiService = {
   },
 
   /**
-   * Get a single content item by ID
+   * Get a single content item by ID (maps from /content/batches/{id})
    */
   async getContentItem(id: string): Promise<ContentItem | null> {
     if (USE_MOCK) {
@@ -615,14 +695,15 @@ export const aiService = {
     }
 
     try {
-      return await directApiCall<ContentItem>(`content/items/${id}`)
+      const response = await directApiCall<{ batch: any; posts_by_platform: Record<string, any[]> }>(`content/batches/${id}`)
+      return batchToContentItem(response.batch)
     } catch {
       return null
     }
   },
 
   /**
-   * Get list of content items with optional filters
+   * Get list of content items with optional filters (maps from /content/batches)
    */
   async getContentItems(filters?: { platform?: string; status?: string }): Promise<ContentItem[]> {
     if (USE_MOCK) {
@@ -630,11 +711,11 @@ export const aiService = {
       return getContentItems(filters)
     }
 
-    const params = new URLSearchParams()
-    if (filters?.platform) params.set('platform', filters.platform)
-    if (filters?.status) params.set('status', filters.status)
-    const query = params.toString()
-    return directApiCall<ContentItem[]>(`content/items${query ? `?${query}` : ''}`)
+    const response = await directApiCall<{ data: any[]; total: number }>('content/batches')
+    const items = (response.data || []).map(batchToContentItem)
+    if (filters?.platform) return items.filter(item => item.platform === filters.platform)
+    if (filters?.status) return items.filter(item => item.status === filters.status)
+    return items
   },
 
   /**
@@ -688,7 +769,7 @@ export const aiService = {
   /**
    * Sign presigned URL for document upload
    */
-  async signDocumentUpload(filename: string, filetype: string, conversationId?: string): Promise<{
+  async signDocumentUpload(filename: string, filetype: string, conversationId?: string, conversationMode?: string): Promise<{
     upload_url: string
     object_key: string
     document_id: string
@@ -701,7 +782,7 @@ export const aiService = {
     }
     return directApiCall(`documents/sign`, {
       method: 'POST',
-      body: JSON.stringify({ filename, filetype }),
+      body: JSON.stringify({ filename, filetype, conversation_mode: conversationMode }),
     })
   },
 
@@ -727,18 +808,6 @@ export const aiService = {
     })
   },
 
-  /**
-   * Attach documents to a conversation
-   */
-  async attachDocuments(conversationId: string, documentIds: string[]): Promise<{
-      success: boolean,
-      attached_count: number
-  }> {
-      return directApiCall(`conversations/${conversationId}/documents/attach`, {
-          method: 'POST',
-          body: JSON.stringify({ document_ids: documentIds })
-      })
-  },
 
   /**
    * List documents in a conversation
@@ -1010,6 +1079,49 @@ export const aiService = {
     return directApiCall('agent/simple/query', {
       method: 'POST',
       body: JSON.stringify(payload)
+    })
+  },
+
+  /**
+   * Generate Command Center analysis
+   * Uses command_center fast path for specialized workflows
+   */
+  /**
+   * Get all skills for the current user
+   */
+  async getSkills(): Promise<{ skills: Skill[] }> {
+    return directApiCall('agent/skills', { includeOrgBrandHeaders: false })
+  },
+
+  /**
+   * Create a new skill
+   */
+  async createSkill(data: { name: string; description: string; content: string }): Promise<Skill> {
+    return directApiCall('agent/skills', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      includeOrgBrandHeaders: false
+    })
+  },
+
+  /**
+   * Update a skill
+   */
+  async updateSkill(id: string, data: Partial<Pick<Skill, 'name' | 'description' | 'content' | 'is_enabled'>>): Promise<Skill> {
+    return directApiCall(`agent/skills/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      includeOrgBrandHeaders: false
+    })
+  },
+
+  /**
+   * Delete a skill
+   */
+  async deleteSkill(id: string): Promise<{ message: string }> {
+    return directApiCall(`agent/skills/${id}`, {
+      method: 'DELETE',
+      includeOrgBrandHeaders: false
     })
   },
 

@@ -65,10 +65,9 @@ export function KawoCredentialsModal() {
       }
 
       const { error } = await supabase
-        .from('profiles')
+        .from('user_kawo_credentials')
         .upsert({
-          id: user.id,
-          email: user.email,
+          user_id: user.id,
           ...credentials,
           updated_at: new Date().toISOString()
         })
@@ -123,7 +122,7 @@ export function KawoCredentialsModal() {
             <Label htmlFor="kawo_api_url">KAWO API URL (Optional)</Label>
             <Input
               id="kawo_api_url"
-              placeholder="https://api.kawo.com"
+              placeholder="https://staging-kevin.kawo.com/"
               value={credentials.kawo_api_url}
               onChange={handleChange}
             />

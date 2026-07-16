@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Microscope, Database } from "lucide-react"
+import { Brain, Globe, X, ArrowUp, Loader2, Square, FileText, CheckCircle2, AlertCircle, Image as ImageIcon, Paperclip, Database } from "lucide-react"
+import { LobsterIcon } from "@/components/ui/lobster-icon"
 import { cn } from "@/lib/utils/cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -28,6 +29,8 @@ export interface UploadedImage {
   id: string
   url: string // Preview URL (blob:...) or remote URL
   key?: string // OSS Key
+  filename?: string
+  fileType?: string
   file?: File
   uploading: boolean
   error?: boolean
@@ -57,6 +60,7 @@ export interface ChatInputAreaProps {
   setIncludeWebSearch: (enabled: boolean) => void
   deepAgent: boolean
   setDeepAgent: (enabled: boolean) => void
+  deepAgentLocked?: boolean
   model: string
   setModel: (model: string) => void
   selectedImages: UploadedImage[]
@@ -64,6 +68,7 @@ export interface ChatInputAreaProps {
   selectedDocuments?: UploadedDocument[]
   setSelectedDocuments?: (documents: UploadedDocument[] | ((prev: UploadedDocument[]) => UploadedDocument[])) => void
   conversationId?: string // Needed for document upload
+  conversationMode?: string // e.g. "deep_agent" — passed to sign endpoint for orphan uploads
   className?: string
   placeholder?: string
   disabled?: boolean
@@ -89,6 +94,7 @@ export function ChatInputArea({
   setIncludeWebSearch,
   deepAgent,
   setDeepAgent,
+  deepAgentLocked = false,
   model,
   setModel,
   selectedImages,
@@ -96,6 +102,7 @@ export function ChatInputArea({
   selectedDocuments = [],
   setSelectedDocuments,
   conversationId,
+  conversationMode,
   className,
   placeholder = "Message Kevin...",
   disabled = false,
@@ -159,8 +166,8 @@ export function ChatInputArea({
           }
 
           // 3. Update state
-          setSelectedImages(prev => prev.map(p => 
-              p.id === img.id ? { ...p, uploading: false, key: objectKey } : p
+          setSelectedImages(prev => prev.map(p =>
+              p.id === img.id ? { ...p, uploading: false, key: objectKey, filename: img.file?.name, fileType: img.file?.type } : p
           ))
       } catch (e) {
           if (process.env.NODE_ENV === 'development') console.error('Upload failed:', e)
@@ -217,7 +224,8 @@ export function ChatInputArea({
           const { upload_url, object_key, document_id } = await aiService.signDocumentUpload(
               doc.file.name,
               doc.file.type,
-              conversationId
+              conversationId,
+              conversationMode
           )
 
           // 2. Upload to OSS
@@ -350,6 +358,36 @@ export function ChatInputArea({
     }
   }
 
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imageItems = items.filter(item => item.type.startsWith('image/'))
+    if (imageItems.length === 0) return
+
+    e.preventDefault()
+    const newImages: UploadedImage[] = []
+
+    for (const item of imageItems) {
+      const file = item.getAsFile()
+      if (!file) continue
+      const id = Math.random().toString(36).substring(7)
+      const filename = file.name || `pasted-image-${Date.now()}.png`
+      const namedFile = new File([file], filename, { type: file.type })
+      const imageObj: UploadedImage = {
+        id,
+        url: URL.createObjectURL(namedFile),
+        file: namedFile,
+        uploading: true
+      }
+      newImages.push(imageObj)
+    }
+
+    if (newImages.length === 0) return
+    setSelectedImages(prev => [...prev, ...newImages])
+    for (const img of newImages) {
+      uploadImage(img)
+    }
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing || isComposing.current) {
       return
@@ -403,8 +441,12 @@ export function ChatInputArea({
   }, [selectedArtifact, reportNavigation])
 
   return (
-    <div className={cn("relative rounded-[1.5rem] bg-background border border-border/50 shadow-lg flex flex-col transition-all focus-within:ring-1 focus-within:ring-primary/20 focus-within:shadow-xl", className)}>
-      {/* Citation Context Indicator */}
+    <div className={cn("relative group", className)}>
+      {/* Glow Effect Background */}
+      <div className="absolute -inset-[1px] rounded-[1.5rem] transition-all duration-500 opacity-0 group-focus-within:opacity-100 shadow-[0_0_20px_rgba(99,102,241,0.3)] dark:shadow-[0_0_25px_rgba(99,102,241,0.4)] pointer-events-none z-0" />
+      
+      <div className="relative rounded-[1.5rem] glass-input flex flex-col transition-all duration-300 group-focus-within:border-primary/50 group-focus-within:ring-1 group-focus-within:ring-primary/50 dark:bg-slate-900/70 dark:border-slate-700/60 z-10">
+        {/* Citation Context Indicator */}
       {showCitationContext && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-center pointer-events-none">
               <div className="bg-primary/10 text-primary text-xs font-medium px-3 py-1 rounded-full backdrop-blur-sm border border-primary/20 shadow-sm flex items-center gap-1.5 max-w-[90%] truncate">
@@ -470,12 +512,17 @@ export function ChatInputArea({
             )}
             {deepAgent && (
               <div
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700 cursor-pointer hover:bg-emerald-100 transition-colors"
-                onClick={() => setDeepAgent(false)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-700 dark:bg-rose-950/50 dark:border-rose-900 dark:text-rose-400 transition-colors",
+                  deepAgentLocked ? "cursor-default" : "cursor-pointer hover:bg-red-100 dark:hover:bg-rose-950/70"
+                )}
+                onClick={() => {
+                  if (!deepAgentLocked) setDeepAgent(false)
+                }}
               >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                Deep Agent Mode
-                <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 dark:bg-rose-600"></span>
+                Lobster Mode
+                {!deepAgentLocked && <X className="h-3 w-3 ml-1 opacity-60 hover:opacity-100" />}
               </div>
             )}
           </div>
@@ -560,6 +607,7 @@ export function ChatInputArea({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
+            onPaste={handlePaste}
             onCompositionStart={() => { isComposing.current = true }}
             onCompositionEnd={() => { isComposing.current = false }}
             placeholder={placeholder}
@@ -571,22 +619,22 @@ export function ChatInputArea({
       </div>
 
       {/* Bottom Actions Row */}
-      <div className="flex items-center justify-between px-3 pb-3">
+      <div className="flex items-center justify-between gap-2 px-3 pb-3">
         {/* Left Actions: Think, Search, Model */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
             <Button
                 variant={thinkingEnabled ? "secondary" : "ghost"}
                 onClick={() => setThinkingEnabled(!thinkingEnabled)}
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 thinkingEnabled
-                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-indigo-50 dark:bg-indigo-600 text-indigo-600 dark:text-white border-indigo-200 dark:border-indigo-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
-                <Brain className="h-3.5 w-3.5 mr-1.5" />
-                Thinking
+                <Brain className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Thinking</span>
             </Button>
             <Button
                 variant={includeWebSearch ? "secondary" : "ghost"}
@@ -594,13 +642,13 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 includeWebSearch
-                    ? "bg-blue-50 text-blue-600 border-blue-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-blue-50 dark:bg-blue-600 text-blue-600 dark:text-white border-blue-200 dark:border-blue-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
-                <Globe className="h-3.5 w-3.5 mr-1.5" />
-                Search
+                <Globe className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Search</span>
             </Button>
             <Button
                 variant={sqlEnabled ? "secondary" : "ghost"}
@@ -608,13 +656,13 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 sqlEnabled
-                    ? "bg-indigo-50 text-indigo-600 border-indigo-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-indigo-50 dark:bg-indigo-600 text-indigo-600 dark:text-white border-indigo-200 dark:border-indigo-500"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
                 disabled={disabled}
             >
-                <Database className="h-3.5 w-3.5 mr-1.5" />
-                SQL
+                <Database className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">SQL</span>
             </Button>
             <Button
                 variant={deepAgent ? "secondary" : "ghost"}
@@ -622,19 +670,19 @@ export function ChatInputArea({
                 className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium transition-all border",
                 deepAgent
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                    : "border-transparent bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-red-50 dark:bg-rose-950/60 text-red-600 dark:text-rose-400 border-red-200 dark:border-rose-900"
+                    : "border-transparent bg-white/60 dark:bg-slate-800/60 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-700/80"
                 )}
-                disabled={disabled}
+                disabled={disabled || deepAgentLocked}
             >
-                <Microscope className="h-3.5 w-3.5 mr-1.5" />
-                Deep Agent
+                <LobsterIcon className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Lobster Mode</span>
             </Button>
 
             {/* Model Selection */}
             <Select value={model} onValueChange={setModel} disabled={disabled}>
                 <SelectTrigger className={cn(
-                "h-8 px-3 rounded-full text-xs font-medium border-0 bg-transparent hover:bg-muted/50 transition-all w-auto gap-1.5 text-muted-foreground"
+                "h-8 px-2.5 rounded-full text-xs font-medium border-0 bg-transparent hover:bg-muted/50 transition-all w-auto gap-1 text-muted-foreground"
                 )}>
                 <SelectValue />
                 </SelectTrigger>
@@ -649,7 +697,7 @@ export function ChatInputArea({
         </div>
 
         {/* Right Actions: Upload & Send */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* File Inputs (Hidden) */}
             <input
                 type="file"
@@ -720,6 +768,7 @@ export function ChatInputArea({
                 </Button>
             )}
         </div>
+      </div>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { aiService, type Project } from "@/lib/api/client"
+import { aiService, type Project, type Skill } from "@/lib/api/client"
 
 export function useProjects(limit = 50, offset = 0) {
   return useQuery({
@@ -108,6 +108,45 @@ export function useClearGlobalMemoryCategory() {
     mutationFn: (category: string) => aiService.clearGlobalMemoryCategory(category),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['global-memory'] })
+    },
+  })
+}
+
+export function useSkills() {
+  return useQuery({
+    queryKey: ['skills'],
+    queryFn: () => aiService.getSkills(),
+  })
+}
+
+export function useCreateSkill() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; description: string; content: string }) =>
+      aiService.createSkill(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
+    },
+  })
+}
+
+export function useUpdateSkill() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Pick<Skill, 'name' | 'description' | 'content' | 'is_enabled'>> }) =>
+      aiService.updateSkill(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
+    },
+  })
+}
+
+export function useDeleteSkill() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => aiService.deleteSkill(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
     },
   })
 }

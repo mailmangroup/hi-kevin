@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical, Eye, Loader2 } from "lucide-react"
+import { X, Copy, Check, BarChart3, Code, Table2, FileText, ChevronDown, RefreshCw, GripVertical, Eye, Loader2, Download } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useArtifact, ArtifactData } from "./artifact-context"
+import { aiService } from "@/lib/api/client"
 import { ReportOutlineSidebar } from "./report-outline-sidebar"
 import { isBrandPosts, isWebSearch, isHelpCenter, parseArtifactData } from "@/lib/utils/artifact-types"
 import { BrandPostsArtifact } from "./brand-posts-artifact"
@@ -31,17 +32,12 @@ const ARTIFACT_ICONS = {
   html: FileText,
   markdown: FileText,
   mermaid: Code,
+  file: Download,
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  get_account_insights: "Account Insights",
-  get_content_performance: "Content Performance",
   search_web: "Web Search Results",
   web_search: "Web Search Results",
-  analyze_competitors: "Competitor Analysis",
-  generate_content: "Generated Content",
-  schedule_post: "Scheduled Post",
-  get_audience_data: "Audience Data",
 }
 
 const MIN_PANEL_WIDTH = 400
@@ -110,7 +106,7 @@ export function ArtifactPanel() {
       ref={panelRef}
       style={isReportType ? undefined : { width: panelWidth }}
       className={cn(
-        "flex flex-col border-l border-border bg-white h-full max-w-full relative",
+        "flex flex-col border-l border-border bg-white dark:bg-gray-900 h-full max-w-full relative",
         isReportType ? "flex-1" : "flex-shrink-0",
         !isResizing && "transition-all duration-300"
       )}
@@ -127,19 +123,19 @@ export function ArtifactPanel() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white dark:bg-gray-900 flex-shrink-0">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Icon className="h-4 w-4 text-gray-600 flex-shrink-0" />
-          <span className="font-medium text-sm text-gray-900 flex-shrink-0">{title}</span>
+          <Icon className="h-4 w-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+          <span className="font-medium text-sm text-gray-900 dark:text-gray-100 flex-shrink-0">{title}</span>
           {(selectedArtifact.toolName || selectedArtifact.session) && (
             <div className="flex items-center gap-2 flex-wrap">
               {selectedArtifact.toolName && (
-                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
+                <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-700">
                   {selectedArtifact.toolName}
                 </span>
               )}
               {selectedArtifact.session?.date_start && selectedArtifact.session?.date_end && (
-                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">
+                <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-700">
                   {selectedArtifact.session.date_start} - {selectedArtifact.session.date_end}
                 </span>
               )}
@@ -147,7 +143,7 @@ export function ArtifactPanel() {
                 selectedArtifact.session.networks.map((network, idx) => (
                   <span
                     key={idx}
-                    className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200"
+                    className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-700"
                   >
                     {network}
                   </span>
@@ -159,33 +155,33 @@ export function ArtifactPanel() {
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={handleCopy}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Copy content"
           >
             {copied ? (
               <Check className="h-4 w-4 text-green-600" />
             ) : (
-              <Copy className="h-4 w-4 text-gray-600" />
+              <Copy className="h-4 w-4 text-gray-600 dark:text-gray-400" />
             )}
           </button>
           <button
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="More options"
           >
-            <ChevronDown className="h-4 w-4 text-gray-600" />
+            <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Refresh"
           >
-            <RefreshCw className="h-4 w-4 text-gray-600" />
+            <RefreshCw className="h-4 w-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
             onClick={closePanel}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Close"
           >
-            <X className="h-4 w-4 text-gray-600" />
+            <X className="h-4 w-4 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
       </div>
@@ -195,7 +191,7 @@ export function ArtifactPanel() {
         {isReportType && <ReportOutlineSidebar report={selectedArtifact.data} />}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
           <div className={cn("min-h-full", isReportType ? "p-8 max-w-5xl mx-auto" : "p-6")}>
             <ArtifactPanelContent artifact={selectedArtifact} />
           </div>
@@ -246,14 +242,14 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
       {/* Code / Render toggle */}
       {canToggle && (
         <div className="flex items-center gap-1 mb-3 flex-shrink-0">
-          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-0.5">
             <button
               onClick={() => setViewMode("render")}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors",
                 viewMode === "render"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               )}
             >
               <Eye className="h-3 w-3" />
@@ -264,8 +260,8 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors",
                 viewMode === "code"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               )}
             >
               <Code className="h-3 w-3" />
@@ -273,7 +269,7 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
             </button>
           </div>
           {isStreaming && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400 ml-2">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 ml-2">
               <Loader2 className="h-3 w-3 animate-spin" />
               Streaming...
             </div>
@@ -290,6 +286,225 @@ function ArtifactPanelContent({ artifact }: { artifact: ArtifactData }) {
         </div>
       ) : (
         <ArtifactRenderedContent artifact={artifact} />
+      )}
+    </div>
+  )
+}
+
+/** Detect renderable file category from filename extension */
+function getFileCategory(filename: string): "image" | "pdf" | "html" | "markdown" | "video" | "audio" | "other" {
+  const ext = (filename || "").split(".").pop()?.toLowerCase() || ""
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"].includes(ext)) return "image"
+  if (ext === "pdf") return "pdf"
+  if (["html", "htm"].includes(ext)) return "html"
+  if (["md", "markdown"].includes(ext)) return "markdown"
+  if (["mp4", "webm", "ogg", "mov"].includes(ext)) return "video"
+  if (["mp3", "wav", "ogg", "aac", "flac"].includes(ext)) return "audio"
+  return "other"
+}
+
+function FileArtifactContent({ data }: { data: any }) {
+  const [loading, setLoading] = React.useState(false)
+  const [fileUrl, setFileUrl] = React.useState<string | null>(data?.oss_url || null)
+  const [fileContent, setFileContent] = React.useState<string | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const retryCountRef = React.useRef(0)
+
+  const filename: string = data?.filename || "File"
+  const category = getFileCategory(filename)
+
+  // Fetch a fresh signed URL (handles expired pre-signed URLs)
+  const refreshUrl = React.useCallback(async () => {
+    if (!data?.document_id || !data?.conversation_id) return null
+    setLoading(true)
+    setError(null)
+    try {
+      const { document_url } = await aiService.getConversationDocumentUrl(data.conversation_id, data.document_id)
+      setFileUrl(document_url)
+
+      // For HTML and Markdown, attempt to fetch the raw text so we can render it natively
+      if (category === "html" || category === "markdown") {
+        try {
+          const res = await fetch(document_url)
+          if (res.ok) {
+            const text = await res.text()
+            setFileContent(text)
+          }
+        } catch (fetchErr) {
+          if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to fetch content text:", fetchErr)
+        }
+      }
+
+      retryCountRef.current = 0
+      return document_url
+    } catch (err) {
+      setError("Failed to load file URL")
+      if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to get URL:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [data?.document_id, data?.conversation_id, category])
+
+  // Auto-retry once on load error (e.g. expired signed URL)
+  const handleLoadError = React.useCallback(() => {
+    if (retryCountRef.current < 1 && data?.document_id) {
+      retryCountRef.current += 1
+      refreshUrl()
+    } else {
+      setError("Failed to load file — the URL may have expired")
+    }
+  }, [refreshUrl, data?.document_id])
+
+  // Auto-fetch URL on mount if we don't have one and the file is renderable
+  React.useEffect(() => {
+    if (!fileUrl && category !== "other") {
+      refreshUrl()
+    } else if (fileUrl && (category === "html" || category === "markdown") && !fileContent) {
+      // If we already have the URL but need the content for native rendering
+      fetch(fileUrl)
+        .then(res => res.ok ? res.text() : null)
+        .then(text => { if (text) setFileContent(text) })
+        .catch(err => {
+          if (process.env.NODE_ENV === "development") console.error("[FileArtifact] Failed to fetch content:", err)
+        })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDownload = async () => {
+    const url = fileUrl || (await refreshUrl())
+    if (url) window.open(url, "_blank", "noopener,noreferrer")
+  }
+
+  // --- Inline renderers by category ---
+  const renderInlinePreview = () => {
+    if (!fileUrl) return null
+
+    switch (category) {
+      case "image":
+        return (
+          <div className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[200px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fileUrl}
+              alt={data?.description || filename}
+              className="max-w-full max-h-[600px] rounded-lg object-contain"
+              onError={handleLoadError}
+            />
+          </div>
+        )
+
+      case "pdf":
+        return (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
+            <iframe
+              src={fileUrl}
+              title={filename}
+              className="w-full h-full"
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        )
+
+      case "html":
+        if (fileContent) {
+          return <HtmlContent data={fileContent} />
+        }
+        return (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
+            <iframe
+              src={fileUrl}
+              title={filename}
+              className="w-full h-full bg-white"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            />
+          </div>
+        )
+
+      case "markdown":
+        if (fileContent) {
+          return (
+            <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+              <MarkdownContent data={fileContent} />
+            </div>
+          )
+        }
+        return null
+
+      case "video":
+        return (
+          <div className="rounded-lg border border-gray-200 overflow-hidden bg-black">
+            <video controls className="w-full max-h-[500px]" preload="metadata">
+              <source src={fileUrl} />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        )
+
+      case "audio":
+        return (
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <audio controls className="w-full" preload="metadata">
+              <source src={fileUrl} />
+              Your browser does not support the audio tag.
+            </audio>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  const inlinePreview = renderInlinePreview()
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header with filename + download */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{filename}</p>
+          {data?.description && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{data.description}</p>
+          )}
+        </div>
+        <button
+          onClick={handleDownload}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Download
+        </button>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 rounded-lg px-3 py-2">
+          {error}
+          <button onClick={refreshUrl} className="ml-2 underline hover:no-underline">Retry</button>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && !inlinePreview && (
+        <div className="flex items-center justify-center py-12 gap-2 text-gray-400 dark:text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Loading preview...</span>
+        </div>
+      )}
+
+      {/* Inline preview */}
+      {inlinePreview}
+
+      {/* Fallback for non-previewable files */}
+      {!inlinePreview && !loading && !error && (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-900">
+            <Download className="h-6 w-6 text-blue-500" />
+          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Preview not available for this file type</p>
+        </div>
       )}
     </div>
   )
@@ -317,6 +532,8 @@ function ArtifactRenderedContent({ artifact }: { artifact: ArtifactData }) {
       return <MarkdownContent data={artifact.data} />
     case "mermaid":
       return <MermaidContent data={artifact.data} />
+    case "file":
+      return <FileArtifactContent data={artifact.data} />
     default:
       return <DataContent data={artifact.data} />
   }

@@ -1,20 +1,10 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="76 76 360 360" fill="none">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="grad" x1="96" y1="416" x2="416" y2="96" gradientUnits="userSpaceOnUse">
       <stop stop-color="#6366F1"/>
       <stop offset="1" stop-color="#8B5CF6"/>
     </linearGradient>
   </defs>
-  <!-- Rounded square background with gradient -->
-  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
-  <!-- K vertical stem -->
-  <path d="M156 128V384" stroke="white" stroke-width="48" stroke-linecap="round"/>
-  <!-- K upper arm -->
-  <path d="M188 264L320 136" stroke="white" stroke-width="48" stroke-linecap="round"/>
-  <!-- K lower arm -->
-  <path d="M188 264L320 388" stroke="white" stroke-width="48" stroke-linecap="round"/>
-  <!-- AI sparkle (large) -->
-  <path d="M382 84L391 114L421 123L391 132L382 162L373 132L343 123L373 114Z" fill="white"/>
-  <!-- AI sparkle (small) -->
-  <path d="M416 170L420 184L434 188L420 192L416 206L412 192L398 188L412 184Z" fill="white" opacity="0.6"/>
+  <path d="M256 96 C256 196 316 256 416 256 C316 256 256 316 256 416 C256 316 196 256 96 256 C196 256 256 196 256 96 Z"
+        fill="url(#grad)"/>
 </svg>

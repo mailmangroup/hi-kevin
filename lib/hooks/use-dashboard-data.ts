@@ -18,10 +18,14 @@ export function useNewLeadsCount() {
   })
 }
 
-export function useConversations(limit = 20, skip = 0) {
+export function useConversations(
+  limit = 20,
+  skip = 0,
+  conversationMode?: "agent" | "deep_agent"
+) {
   return useQuery({
-    queryKey: ['conversations', limit, skip],
-    queryFn: () => aiService.getConversations(limit, skip),
+    queryKey: ['conversations', limit, skip, conversationMode || 'all'],
+    queryFn: () => aiService.getConversations(limit, skip, conversationMode),
     staleTime: 30 * 1000, // 30 seconds — matches the old sidebar cache duration
   })
 }

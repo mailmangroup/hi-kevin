@@ -4,6 +4,7 @@ import { memo, useMemo } from "react"
 import { marked } from "marked"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkBreaks from "remark-breaks"
 import type { Components } from "react-markdown"
 
 /**
@@ -26,7 +27,7 @@ function parseMarkdownIntoBlocks(markdown: string): string[] {
 const MemoizedMarkdownBlock = memo(
   ({ content, components }: { content: string; components?: Components }) => {
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
         {content}
       </ReactMarkdown>
     )

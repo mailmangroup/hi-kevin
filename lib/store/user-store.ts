@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_KAWO_API_URL } from '@/lib/kawo-config'
 
 interface UserProfile {
   full_name: string | null
@@ -15,6 +16,7 @@ interface UserStore {
   isLoading: boolean
   fetchProfile: () => Promise<void>
   setProfile: (profile: UserProfile) => void
+  clearProfile: () => void
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
@@ -32,7 +34,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const token = process.env.KAWO_TOKEN || process.env.NEXT_PUBLIC_KAWO_TOKEN
       const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
       const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL
+      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
       
       const hasLocalEnv = token && orgId && brandId
 
@@ -61,21 +63,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
         return
       }
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, email, kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
-        .eq('id', user.id)
-        .maybeSingle()
+      // Display name lives on `profiles`; KAWO context lives on the
+      // owner-only `user_kawo_credentials` table (kept off `profiles` so the
+      // team-readable profile rows don't leak each user's API token).
+      const [{ data: profile }, { data: creds }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('name, email')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_kawo_credentials')
+          .select('kawo_token, kawo_org_id, kawo_brand_id, kawo_api_url')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ])
 
-      if (data) {
+      if (profile || creds) {
         set({
           profile: {
-            full_name: data.full_name,
-            email: data.email || user.email || null,
-            kawo_token: data.kawo_token,
-            kawo_org_id: data.kawo_org_id,
-            kawo_brand_id: data.kawo_brand_id,
-            kawo_api_url: data.kawo_api_url
+            full_name: profile?.name ?? null,
+            email: profile?.email || user.email || null,
+            kawo_token: creds?.kawo_token ?? null,
+            kawo_org_id: creds?.kawo_org_id ?? null,
+            kawo_brand_id: creds?.kawo_brand_id ?? null,
+            kawo_api_url: creds?.kawo_api_url || DEFAULT_KAWO_API_URL
           }
         })
       }
@@ -85,5 +97,6 @@ export const useUserStore = create<UserStore>((set, get) => ({
       set({ isLoading: false })
     }
   },
-  setProfile: (profile) => set({ profile })
+  setProfile: (profile) => set({ profile }),
+  clearProfile: () => set({ profile: null, isLoading: false })
 }))

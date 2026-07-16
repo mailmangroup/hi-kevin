@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChatInputArea, UploadedImage, UploadedDocument } from "@/components/chat/chat-input-area"
@@ -109,7 +109,8 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     }
 
     setIsNavigating(true)
-    router.push(`/chat/new?${params.toString()}`)
+    const basePath = deepAgent ? "/chat/deep-agent/new" : "/chat/agent/new"
+    router.push(`${basePath}?${params.toString()}`)
   }
 
 
@@ -124,11 +125,23 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
     setDeepAgent(enabled)
   }
 
-  const greeting = projectName
+  const fullGreeting = projectName
     ? projectName
     : fullName
       ? `Hi ${fullName}, how can I help you today?`
       : "How can I help you today?"
+
+  const [displayedGreeting, setDisplayedGreeting] = useState("")
+  useEffect(() => {
+    setDisplayedGreeting("")
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setDisplayedGreeting(fullGreeting.slice(0, i))
+      if (i >= fullGreeting.length) clearInterval(timer)
+    }, 10)
+    return () => clearInterval(timer)
+  }, [fullGreeting])
 
   const handleAnalyzeVideo = () => activateFastPath("analyze_video")
   const handleGetHelp = () => activateFastPath("helpcenter")
@@ -176,7 +189,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
         ) : (
           // Dashboard layout
           <>
-            <h1 className="text-4xl font-semibold text-foreground text-center">{greeting}</h1>
+            <h1 className="text-4xl font-semibold tracking-[-0.02em] text-foreground text-center">{displayedGreeting}</h1>
 
             <div className="w-full max-w-3xl relative">
               <ChatInputArea
@@ -210,7 +223,7 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                      className="bg-none rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border border-white/60 dark:border-slate-700/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 dark:hover:bg-slate-800/90 text-foreground transition-all"
                     >
                       Analyze Media <ChevronDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -233,21 +246,21 @@ export function ChatInput({ projectId, projectName, hideActions = false }: ChatI
 
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                  className="bg-none rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border border-white/60 dark:border-slate-700/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 dark:hover:bg-slate-800/90 text-foreground transition-all"
                   onClick={handleGetHelp}
                 >
                   Get Help
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-200 transition-all"
+                  className="bg-none rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border border-white/60 dark:border-slate-700/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 dark:hover:bg-slate-800/90 text-foreground transition-all"
                   onClick={handleCreateReport}
                 >
                   Create Report
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-full bg-white/80 backdrop-blur-sm border-transparent shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:border-indigo-200 transition-all"
+                  className="bg-none rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border border-white/60 dark:border-slate-700/60 shadow-sm hover:shadow-md hover:shadow-indigo-500/10 hover:bg-white/90 dark:hover:bg-slate-800/90 text-foreground transition-all"
                   onClick={handleCommandCenter}
                 >
                   Command Center
