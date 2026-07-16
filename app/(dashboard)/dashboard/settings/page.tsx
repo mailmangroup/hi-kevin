@@ -460,7 +460,7 @@ export default function SettingsPage() {
                   <Input
                     id="kawo_api_url"
                     type="text"
-                    placeholder="https://api.kawo.com"
+                    placeholder="https://staging-kevin.kawo.com/"
                     value={profile.kawo_api_url}
                     onChange={handleChange}
                   />

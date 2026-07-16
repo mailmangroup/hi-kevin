@@ -6,6 +6,7 @@
  */
 
 import { useUserStore } from '@/lib/store/user-store'
+import { DEFAULT_KAWO_API_URL } from '@/lib/kawo-config'
 import type { ContentItem } from '@/types'
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true'
@@ -41,7 +42,7 @@ export function getKawoConfig() {
   const token = process.env.NEXT_PUBLIC_KAWO_TOKEN
   const orgId = process.env.NEXT_PUBLIC_KAWO_ORG_ID
   const brandId = process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL
+  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
 
   if (token && orgId && brandId && apiUrl) {
     return {
@@ -58,7 +59,7 @@ export function getKawoConfig() {
     token: profile?.kawo_token,
     orgId: profile?.kawo_org_id,
     brandId: profile?.kawo_brand_id,
-    apiUrl: profile?.kawo_api_url,
+    apiUrl: profile?.kawo_api_url || DEFAULT_KAWO_API_URL,
   }
 }
 

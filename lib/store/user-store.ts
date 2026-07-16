@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_KAWO_API_URL } from '@/lib/kawo-config'
 
 interface UserProfile {
   full_name: string | null
@@ -33,7 +34,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const token = process.env.KAWO_TOKEN || process.env.NEXT_PUBLIC_KAWO_TOKEN
       const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
       const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL
+      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
       
       const hasLocalEnv = token && orgId && brandId
 
@@ -86,7 +87,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
             kawo_token: creds?.kawo_token ?? null,
             kawo_org_id: creds?.kawo_org_id ?? null,
             kawo_brand_id: creds?.kawo_brand_id ?? null,
-            kawo_api_url: creds?.kawo_api_url ?? null
+            kawo_api_url: creds?.kawo_api_url || DEFAULT_KAWO_API_URL
           }
         })
       }

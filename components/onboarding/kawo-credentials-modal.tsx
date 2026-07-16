@@ -122,7 +122,7 @@ export function KawoCredentialsModal() {
             <Label htmlFor="kawo_api_url">KAWO API URL (Optional)</Label>
             <Input
               id="kawo_api_url"
-              placeholder="https://api.kawo.com"
+              placeholder="https://staging-kevin.kawo.com/"
               value={credentials.kawo_api_url}
               onChange={handleChange}
             />
