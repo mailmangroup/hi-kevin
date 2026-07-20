@@ -39,7 +39,7 @@ export interface DashboardData {
  * Frost/HubSpot Service
  *
  * All endpoints call the KAWO backend API directly with:
- * 1. KAWO credentials from Supabase profiles table (or env vars in dev)
+ * 1. KAWO credentials from the owner-only Supabase user_kawo_credentials table
  * 2. Proper Authorization and X-KAWO headers
  * 3. Backend uses HUBSPOT_KEY from its environment to access HubSpot
  */
