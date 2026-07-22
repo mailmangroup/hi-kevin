@@ -16,6 +16,11 @@ const ANALYTICS_CARDS = [
     title: "Batch Video Analysis",
     description: "Audit dealer short-video transcripts and generate compliance reports.",
     href: "/dashboard/analytics/batch-video-analysis"
+  },
+  {
+    title: "AI Tagging Onboarding Analysis",
+    description: "Assess taxonomy readiness, AI tagging agreement, and the safest path to a pilot.",
+    href: "/dashboard/analytics/ai-tagging-onboarding"
   }
 ]
 

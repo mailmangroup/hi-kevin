@@ -34,26 +34,11 @@ function batchToContentItem(batch: any): ContentItem {
 
 /**
  * Helper function to get KAWO configuration
- * Checks NEXT_PUBLIC_* env vars first (works in browser)
- * Falls back to Supabase profile (production)
+ * The user store is the single credential source:
+ * - development: `.env.local` when a complete local override is configured
+ * - production: the signed-in user's Supabase `user_kawo_credentials` row
  */
 export function getKawoConfig() {
-  // Check browser-accessible env vars first
-  const token = process.env.NEXT_PUBLIC_KAWO_TOKEN
-  const orgId = process.env.NEXT_PUBLIC_KAWO_ORG_ID
-  const brandId = process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-  const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
-
-  if (token && orgId && brandId && apiUrl) {
-    return {
-      token,
-      orgId,
-      brandId,
-      apiUrl,
-    }
-  }
-
-  // Fallback to user profile from Supabase
   const { profile } = useUserStore.getState()
   return {
     token: profile?.kawo_token,

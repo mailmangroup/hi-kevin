@@ -9,6 +9,7 @@ export const ROUTES = {
   analyticsPostPerformance: '/dashboard/analytics/post-performance',
   analyticsCommentAnalysis: '/dashboard/analytics/comment-analysis',
   analyticsBatchVideoAnalysis: '/dashboard/analytics/batch-video-analysis',
+  analyticsAiTaggingOnboarding: '/dashboard/analytics/ai-tagging-onboarding',
   analyticsReports: '/dashboard/analytics/reports',
   research: '/dashboard/research',
   researchKols: '/dashboard/research/kols',

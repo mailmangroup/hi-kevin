@@ -36,6 +36,7 @@ const TabsList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
+    role="tablist"
     className={cn(
       "inline-flex h-10 items-center justify-center rounded-[8px] bg-muted p-1 text-muted-foreground",
       className
@@ -56,6 +57,9 @@ const TabsTrigger = React.forwardRef<
     <button
       ref={ref}
       type="button"
+      role="tab"
+      aria-selected={context.value === value}
+      data-state={context.value === value ? "active" : "inactive"}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-[8px] px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         context.value === value
@@ -72,16 +76,19 @@ TabsTrigger.displayName = "TabsTrigger"
 
 const TabsContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { value: string }
->(({ className, value, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { value: string; forceMount?: boolean }
+>(({ className, value, forceMount = false, ...props }, ref) => {
   const context = React.useContext(TabsContext)
   if (!context) throw new Error("TabsContent must be used within Tabs")
 
-  if (context.value !== value) return null
+  const isActive = context.value === value
+  if (!isActive && !forceMount) return null
 
   return (
     <div
       ref={ref}
+      role="tabpanel"
+      hidden={!isActive}
       className={cn(
         "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className
