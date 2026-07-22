@@ -28,24 +28,23 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
     set({ isLoading: true })
     try {
-      // In development mode with local env vars, ALWAYS use local env instead of Supabase
+      // Local development uses browser-accessible values from `.env.local`.
+      // Production always loads the signed-in user's Supabase credentials below.
       const isDev = process.env.NODE_ENV === 'development'
-      // Check both standard and NEXT_PUBLIC_ variants
-      const token = process.env.KAWO_TOKEN || process.env.NEXT_PUBLIC_KAWO_TOKEN
-      const orgId = process.env.KAWO_ORG_ID || process.env.NEXT_PUBLIC_KAWO_ORG_ID
-      const brandId = process.env.KAWO_BRAND_ID || process.env.NEXT_PUBLIC_KAWO_BRAND_ID
-      const apiUrl = process.env.KAWO_API_URL || process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
-      
-      const hasLocalEnv = token && orgId && brandId
 
-      if (isDev && hasLocalEnv) {
+      if (isDev) {
+        const token = process.env.NEXT_PUBLIC_KAWO_TOKEN
+        const orgId = process.env.NEXT_PUBLIC_KAWO_ORG_ID
+        const brandId = process.env.NEXT_PUBLIC_KAWO_BRAND_ID
+        const apiUrl = process.env.NEXT_PUBLIC_KAWO_API_URL || DEFAULT_KAWO_API_URL
+
         set({
           profile: {
             full_name: process.env.NEXT_PUBLIC_DEV_USER_NAME || 'Developer',
             email: process.env.NEXT_PUBLIC_DEV_USER_EMAIL || 'dev@localhost',
-            kawo_token: token,
-            kawo_org_id: orgId,
-            kawo_brand_id: brandId,
+            kawo_token: token ?? null,
+            kawo_org_id: orgId ?? null,
+            kawo_brand_id: brandId ?? null,
             kawo_api_url: apiUrl
           },
           isLoading: false
@@ -53,7 +52,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
         return
       }
 
-      // Production mode: fetch from Supabase
+      // Production: fetch credentials from Supabase.
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user

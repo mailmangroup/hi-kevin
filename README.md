@@ -2,7 +2,7 @@
 
 Kevin is an AI-driven Marketing Co-pilot that helps solo marketers manage entire marketing teams' workloads. 
 
-This repository contains the **Frontend Application** for Kevin, built with Next.js. It connects to a separate Python (FastAPI) backend service via a secure API Proxy.
+This repository contains the **Frontend Application** for Kevin, built with Next.js. It connects directly to a separate Python (FastAPI) backend service.
 
 The application uses a hybrid architecture:
 - **Frontend**: Next.js 14 (App Router), React, Tailwind CSS.
@@ -44,8 +44,6 @@ kevin-demo/
 │   ├── (dashboard)/       # Main application layout & pages
 │   │   ├── dashboard/     # Dashboard views (Analytics, Content, Leads, etc.)
 │   │   └── chat/          # Chat interface pages
-│   ├── api/               # API Routes
-│   │   └── proxy/         # Backend API Proxy
 │   └── login/             # Authentication page
 ├── components/
 │   ├── analytics/         # Analytics specific components
@@ -125,30 +123,38 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_USE_MOCK=true
 NEXT_PUBLIC_FORCE_MOCK=false
 
-# Backend Configuration (Optional if set in user profile)
-KAWO_API_URL=your_backend_api_url
+# Local-development KAWO credentials (required when mock mode is disabled)
+# These values are used only when NODE_ENV=development. Do not set them in Vercel.
+NEXT_PUBLIC_KAWO_TOKEN=your_kawo_token
+NEXT_PUBLIC_KAWO_ORG_ID=your_kawo_org_id
+NEXT_PUBLIC_KAWO_BRAND_ID=your_kawo_brand_id
+NEXT_PUBLIC_KAWO_API_URL=http://localhost:8005
 ```
 
 ## Architecture
 
-### 1. API Proxy Pattern
-The application implements a secure proxy pattern to handle authentication with the external backend:
+### 1. KAWO Credential Sources
+
+Credential loading intentionally differs by environment:
+
+- **Local development:** the app reads `NEXT_PUBLIC_KAWO_TOKEN`, `NEXT_PUBLIC_KAWO_ORG_ID`, and `NEXT_PUBLIC_KAWO_BRAND_ID` from `.env.local`; it does not load KAWO credentials from Supabase. `NEXT_PUBLIC_KAWO_API_URL` is optional and falls back to `DEFAULT_KAWO_API_URL`.
+- **Production:** KAWO environment overrides are ignored. The app reads the signed-in user's `kawo_token`, `kawo_org_id`, `kawo_brand_id`, and `kawo_api_url` from the owner-only Supabase `user_kawo_credentials` table. A blank API URL falls back to `DEFAULT_KAWO_API_URL`.
+- **Vercel:** do not configure `NEXT_PUBLIC_KAWO_TOKEN`, `NEXT_PUBLIC_KAWO_ORG_ID`, `NEXT_PUBLIC_KAWO_BRAND_ID`, or `NEXT_PUBLIC_KAWO_API_URL`. Production credentials are managed per user through Supabase.
+
+### 2. Backend Requests
 
 1. **Frontend Login**: User logs in via Supabase Auth.
-2. **Request Interception**: Frontend requests are sent to Next.js API Proxy (`/api/proxy/...`).
-3. **Credential Injection**:
-   - The proxy middleware validates the Supabase session.
-   - It fetches the user's KAWO credentials (`kawo_token`, `kawo_org_id`, `kawo_brand_id`, `kawo_api_url`) from the Supabase `profiles` table.
-   - The `Authorization` header (Bearer token) and `X-KAWO-Org-Id` / `X-KAWO-Brand-Id` headers are injected into the request.
-4. **Forwarding**: The request is forwarded to the configured backend API URL.
+2. **Credential Loading**: The user store selects the development or production source described above.
+3. **Direct Request**: The browser calls the configured KAWO API URL directly.
+4. **Authentication Headers**: The API client injects the Bearer token and the `X-KAWO-Org-Id` / `X-KAWO-Brand-Id` headers.
 
-### 2. State Management & Data Fetching
+### 3. State Management & Data Fetching
 - **TanStack Query (React Query)**: Manages server state, caching, and polling.
 - **Zustand**: Manages global client UI state.
 - **Mock vs Real Data**: 
   - `lib/api/client.ts` contains a `USE_MOCK` flag (controlled by `NEXT_PUBLIC_USE_MOCK`).
   - When enabled, it returns mock data immediately.
-  - When disabled, it routes requests through `/api/proxy`.
+  - When disabled, it calls the KAWO backend directly.
 
 ## External Backend Architecture
 
@@ -161,7 +167,7 @@ The external backend service (managed in a separate repository) handles:
 
 This section tracks the migration status of API endpoints from Mock Data to Real Backend.
 
-| Feature Category | Feature | Status | Backend Endpoint (via Proxy) |
+| Feature Category | Feature | Status | Backend Endpoint |
 |-----------------|----------|--------|-----------------|
 | **Content** | `aiService.generateContent` | ✅ Integrated | `POST /content/write` |
 | | `aiService.localizeContent` | 🟡 Partial | `POST /ai/localize` (with mock fallback) |
@@ -212,4 +218,3 @@ This section tracks the migration status of API endpoints from Mock Data to Real
 - **Update Insights:** `aiService.updateReportInsights()` → `PUT /agent/reports/{reportId}/pages/{page}/sections/{section}/insights`
 - **Components:** `report-content.tsx`, `report-outline-sidebar.tsx`
 - **Features:** Editable insights, outline-based navigation, real-time content updates.
-

@@ -198,14 +198,15 @@ const [conversationTitle, setConversationTitle] = useState<string>("New Conversa
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/proxy/agent/conversations/{id}` | Get conversation details |
-| GET | `/proxy/agent/conversations/{id}/messages` | Get message history |
-| POST | `/proxy/agent/chat` | Stream chat response (SSE) |
+| GET | `/agent/conversations/{id}` | Get conversation details |
+| GET | `/agent/conversations/{id}/messages` | Get message history |
+| POST | `/agent/query` | Stream chat response (SSE) |
 
 ### Authentication
 
-- Credentials (orgId, brandId) are loaded from Supabase user profile
-- Passed to API via proxy headers
+- In development, credentials are loaded from `.env.local`
+- In production, credentials are loaded from the signed-in user's owner-only Supabase `user_kawo_credentials` row
+- The API client sends the Bearer token and KAWO organization/brand headers directly to the backend
 
 ## Error Handling
 
@@ -235,5 +236,4 @@ import { ChatInterface } from "@/components/chat"
 
 - **Main component**: `components/chat/chat-interface.tsx`
 - **API client**: `lib/api/client.ts`
-- **Proxy route**: `app/api/proxy/[...path]/route.ts`
 - **Chat pages**: `app/(dashboard)/chat/[id]/page.tsx`, `app/(dashboard)/chat/new/page.tsx`
