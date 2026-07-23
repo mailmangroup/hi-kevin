@@ -1,220 +1,41 @@
 # Kevin - AI Marketing Co-pilot
 
-Kevin is an AI-driven Marketing Co-pilot that helps solo marketers manage entire marketing teams' workloads. 
+Kevin helps solo marketers run analytics, content, leads, and campaigns from one AI co-pilot.
 
-This repository contains the **Frontend Application** for Kevin, built with Next.js. It connects directly to a separate Python (FastAPI) backend service.
+This repo is the **Next.js frontend**. It talks to a separate Python FastAPI (KAWO) backend. Auth is Supabase.
 
-The application uses a hybrid architecture:
-- **Frontend**: Next.js 14 (App Router), React, Tailwind CSS.
-- **Backend Service**: External Python FastAPI service.
-- **Authentication**: Supabase (Frontend) + Custom Token Injection (Backend).
-
-## Overview
-
-Kevin transforms how single marketers handle multiple roles:
-- **Data Analyst** - Automated analytics and competitor tracking
-- **Content Creator** - AI-powered content generation and localization
-- **SDR** - Lead scoring and automated follow-up suggestions
-- **PMM** - Campaign management and market insights
-
-### Key Benefits
-
-- **Efficiency**: Compress 8-10 hours of work into 4-5 hours
-- **Capability Extension**: One person handles multiple marketing functions
-- **Language Bridge**: Manage Chinese social media without fluency
-
-## Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS + shadcn/ui
-- **State Management**: 
-  - Server: TanStack Query (React Query)
-  - Client: Zustand
-- **Authentication & User Data**: Supabase
-- **Visualizations**: Recharts
-- **Forms**: React Hook Form + Zod
-- **Internationalization**: next-intl
-
-## Project Structure
-
-```
-kevin-demo/
-├── app/                    # Next.js App Router
-│   ├── (dashboard)/       # Main application layout & pages
-│   │   ├── dashboard/     # Dashboard views (Analytics, Content, Leads, etc.)
-│   │   └── chat/          # Chat interface pages
-│   └── login/             # Authentication page
-├── components/
-│   ├── analytics/         # Analytics specific components
-│   ├── brand-safety/      # Brand Safety components
-│   ├── campaigns/         # Campaign management components
-│   ├── chat/              # Chat interface components
-│   ├── content/           # Content generation & workspace
-│   ├── dashboard/         # Main dashboard widgets
-│   ├── landing/           # Landing page components
-│   ├── layout/            # Sidebar, Header, etc.
-│   ├── leads/             # Leads & CRM components
-│   └── ui/                # Shared UI components (shadcn/ui)
-├── lib/
-│   ├── api/               # API clients (Analytics, Frost, Chat)
-│   ├── hooks/             # Custom React hooks
-│   ├── mock/              # Mock data for demo mode
-│   ├── supabase/          # Supabase client configuration
-│   └── utils/             # Helper functions
-├── types/                 # TypeScript type definitions
-└── public/                # Static assets
-```
+Agent/architecture notes (credentials, mock mode, API status): see [CLAUDE.md](./CLAUDE.md).
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-
-### Installation
-
-#### Using Makefile (Recommended)
+**Prerequisites:** Node.js 18+, npm or yarn.
 
 ```bash
-# See all available commands
-make help
-
-# Install dependencies
+make help      # list commands
 make install
-
-# Run development server
-make dev
-
-# Build for production
+make dev       # or: npm install && npm run dev
 make build
-
-# Start production server
 make start
-
-# Run linter
 make lint
-
-# Clean build artifacts
 make clean
 ```
 
-#### Using npm directly
+## Environment
 
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-## Environment Configuration
-
-Create a `.env.local` file with the following variables:
+Create `.env.local`:
 
 ```env
-# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Mock Mode (Set to false to use real backend)
 NEXT_PUBLIC_USE_MOCK=true
 NEXT_PUBLIC_FORCE_MOCK=false
 
-# Local-development KAWO credentials (required when mock mode is disabled)
-# These values are used only when NODE_ENV=development. Do not set them in Vercel.
+# Local only when mock is off — do not set on Vercel
 NEXT_PUBLIC_KAWO_TOKEN=your_kawo_token
 NEXT_PUBLIC_KAWO_ORG_ID=your_kawo_org_id
 NEXT_PUBLIC_KAWO_BRAND_ID=your_kawo_brand_id
 NEXT_PUBLIC_KAWO_API_URL=http://localhost:8005
 ```
 
-## Architecture
-
-### 1. KAWO Credential Sources
-
-Credential loading intentionally differs by environment:
-
-- **Local development:** the app reads `NEXT_PUBLIC_KAWO_TOKEN`, `NEXT_PUBLIC_KAWO_ORG_ID`, and `NEXT_PUBLIC_KAWO_BRAND_ID` from `.env.local`; it does not load KAWO credentials from Supabase. `NEXT_PUBLIC_KAWO_API_URL` is optional and falls back to `DEFAULT_KAWO_API_URL`.
-- **Production:** KAWO environment overrides are ignored. The app reads the signed-in user's `kawo_token`, `kawo_org_id`, `kawo_brand_id`, and `kawo_api_url` from the owner-only Supabase `user_kawo_credentials` table. A blank API URL falls back to `DEFAULT_KAWO_API_URL`.
-- **Vercel:** do not configure `NEXT_PUBLIC_KAWO_TOKEN`, `NEXT_PUBLIC_KAWO_ORG_ID`, `NEXT_PUBLIC_KAWO_BRAND_ID`, or `NEXT_PUBLIC_KAWO_API_URL`. Production credentials are managed per user through Supabase.
-
-### 2. Backend Requests
-
-1. **Frontend Login**: User logs in via Supabase Auth.
-2. **Credential Loading**: The user store selects the development or production source described above.
-3. **Direct Request**: The browser calls the configured KAWO API URL directly.
-4. **Authentication Headers**: The API client injects the Bearer token and the `X-KAWO-Org-Id` / `X-KAWO-Brand-Id` headers.
-
-### 3. State Management & Data Fetching
-- **TanStack Query (React Query)**: Manages server state, caching, and polling.
-- **Zustand**: Manages global client UI state.
-- **Mock vs Real Data**: 
-  - `lib/api/client.ts` contains a `USE_MOCK` flag (controlled by `NEXT_PUBLIC_USE_MOCK`).
-  - When enabled, it returns mock data immediately.
-  - When disabled, it calls the KAWO backend directly.
-
-## External Backend Architecture
-
-The external backend service (managed in a separate repository) handles:
-- **MongoDB**: Primary operational database (User content, conversations, operational data).
-- **PostgreSQL (pgvector)**: Vector store for RAG capabilities.
-- **LangChain/LLM Orchestration**: Handling complex AI flows.
-
-## API Migration Status
-
-This section tracks the migration status of API endpoints from Mock Data to Real Backend.
-
-| Feature Category | Feature | Status | Backend Endpoint |
-|-----------------|----------|--------|-----------------|
-| **Content** | `aiService.generateContent` | ✅ Integrated | `POST /content/write` |
-| | `aiService.localizeContent` | 🟡 Partial | `POST /ai/localize` (with mock fallback) |
-| | `aiService.analyzeCompliance` | 🟡 Partial | `POST /ai/compliance` (with mock fallback) |
-| **Leads/Frost** | `frostService.getDashboard` | ✅ Integrated | `GET /frost/dashboard` |
-| | `frostService.getNewLeadsCount` | ✅ Integrated | `GET /frost/leads/new-count` |
-| | `frostService.searchContacts` | ✅ Integrated | `POST /frost/contacts/search` |
-| | `aiService.generateFollowUp` | 🟡 Partial | `POST /ai/follow-up` (with mock fallback) |
-| **Analytics** | `analyticsService.getAnalyticsData` | ✅ Integrated | `GET /analytics/dashboard` |
-| | `aiService.generateReport` | 🟡 Partial | `POST /ai/report` (with mock fallback) |
-| **Chat** | `aiService.chatStream` | ✅ Integrated | `POST /agent/query` (Streaming SSE) |
-| | `aiService.getConversations` | ✅ Integrated | `GET /agent/conversations` |
-| | `aiService.getMessages` | ✅ Integrated | `GET /agent/conversations/{id}/messages` |
-| | Deep Agent (within chat) | ✅ Integrated | Embedded in `/agent/query` stream |
-| | Artifacts (within chat) | ✅ Integrated | Embedded in `/agent/query` stream |
-| **Reports** | `aiService.getReport` | ✅ Integrated | `GET /agent/conversations/{id}/report/{reportId}` |
-| | `aiService.updateReportInsights` | ✅ Integrated | `PUT /agent/reports/{reportId}/pages/{page}/sections/{section}/insights` |
-| **Dashboard** | `getDashboardData` | 🔴 Mock | - |
-
-## Implementation Details
-
-### Content Generation (Integrated)
-- **Frontend Service:** `aiService.generateContent`
-- **Backend Endpoint:** `POST /content/write`
-- **Payload:** Maps `brief` and `platform` to backend `ContentGenerationRequest`.
-
-### Chat System (Integrated)
-- **Frontend Service:** `aiService.chatStream`
-- **Backend Endpoint:** `POST /agent/query`
-- **Mechanism:** Server-Sent Events (SSE) for streaming responses.
-- **Features:** Supports tool usage, web search toggling, and history management.
-
-### Frost / Leads (Integrated)
-- **Frontend Service:** `frostService`
-- **Backend Endpoint:** `/frost/...`
-- **Features:** Dashboard stats, new lead counts, and contact search are fully connected to the backend CRM integration.
-
-### Deep Agent & Artifacts (Integrated via Chat Stream)
-- **Feature:** Both deep agent plans and artifacts are embedded in chat streaming responses
-- **Backend Endpoint:** `POST /agent/query` (Streaming SSE)
-- **Components:**
-  - Deep Agent: `deep-agent-display.tsx`, `tool-call-display.tsx`
-  - Artifacts: `artifact-display.tsx`, `artifact-panel.tsx`, `artifact-renderers.tsx`
-- **How It Works:** Backend streams research progress and generates artifacts within the chat flow, frontend detects and renders them in real-time.
-
-### Reports (Integrated)
-- **Report Retrieval:** `aiService.getReport()` → `GET /agent/conversations/{id}/report/{reportId}`
-- **Update Insights:** `aiService.updateReportInsights()` → `PUT /agent/reports/{reportId}/pages/{page}/sections/{section}/insights`
-- **Components:** `report-content.tsx`, `report-outline-sidebar.tsx`
-- **Features:** Editable insights, outline-based navigation, real-time content updates.
+Vercel env vars live in project Settings (not `.env.local`) and need a redeploy to apply. Do not put `NEXT_PUBLIC_KAWO_*` on Vercel — production credentials come from Supabase per user.

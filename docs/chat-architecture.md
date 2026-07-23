@@ -1,98 +1,115 @@
 # Chat Architecture
 
-This document describes the chat interface implementation, including message rendering, streaming support, and conversation management.
+Frontend chat for Kevin: one `ChatInterface` with two modes (`agent` / `deep_agent`), SSE streaming to the KAWO backend, ordered message `parts`, side-panel artifacts/reports, and a module-level stream registry so navigation mid-stream does not lose state.
 
-## Overview
+Credentials / mock mode: see [CLAUDE.md](../CLAUDE.md).
 
-The chat system consists of several components that work together to provide a rich messaging experience:
+## Modes & routes
+
+| Mode | Wrapper | Stream endpoint | Routes |
+|------|---------|-----------------|--------|
+| `agent` | `AgentChatInterface` → `ChatInterface conversationMode="agent"` | `POST /agent/query` | `/chat/agent`, `/chat/agent/new`, `/chat/agent/[id]` |
+| `deep_agent` | `DeepAgentChatInterface` → `ChatInterface conversationMode="deep_agent"` | `POST /deep-agent/query` | `/chat/deep-agent`, `/chat/deep-agent/new`, `/chat/deep-agent/[id]` |
+
+- `/chat` redirects to `/chat/agent`.
+- Legacy `/chat/[id]` also mounts `AgentChatInterface`.
+- If a loaded conversation’s `conversation_mode` disagrees with the route, the UI `router.replace`s to the correct path.
+- Mode can also be toggled via `?deepAgent=` when not locked by `conversationMode`.
+
+## Component map
 
 ```
 components/chat/
-├── chat-interface.tsx    # Main chat component with streaming & history
-├── message-content.tsx   # Markdown rendering for message text
-├── tool-call-display.tsx # Tool call visualization with input/output
-├── artifact-display.tsx  # Artifact display (charts, tables, code)
-├── quick-chat.tsx        # Floating chat widget
-└── index.ts              # Component exports
+├── chat-interface.tsx           # Core UI + stream loop (everything goes through here)
+├── agent-chat-interface.tsx     # Thin wrapper: conversationMode="agent"
+├── deep-agent-chat-interface.tsx
+├── chat-input-area.tsx          # Composer (model, web search, uploads, mode toggles)
+├── message-content.tsx          # Markdown / GFM
+├── memoized-markdown.tsx
+├── thinking-display.tsx
+├── tool-call-display.tsx
+├── deep-agent-display.tsx       # Subagents + todos
+├── artifact-context.tsx         # Selected artifact + panel state
+├── artifact-panel.tsx           # Side panel shell
+├── artifact-display.tsx         # Inline / typed artifact views
+├── artifact-renderers.tsx
+├── artifact-snippet.tsx
+├── brand-posts-artifact.tsx
+├── web-search-artifact.tsx
+├── help-center-artifact.tsx
+├── report-content.tsx
+├── report-outline-sidebar.tsx
+├── conversation-list.tsx
+├── conversation-list-item.tsx
+├── message-actions.tsx
+├── quick-chat.tsx               # Floating widget (simpler path)
+└── index.ts
+
+lib/
+├── api/client.ts                # aiService.chatStream, conversations, reports
+├── hooks/use-deep-agent-stream.ts
+├── utils/parse-sub-content.ts   # History → Message parts
+└── streaming/stream-registry.ts # Survives remount mid-stream
 ```
 
-## Data Flow
+## Data flow
 
-### 1. Loading from Database (Conversation History)
-
-When a user opens an existing conversation:
+### Load history
 
 ```
-chatId prop → loadHistory(id) → aiService.getMessages() → parseSubContentList() → setMessages()
-           → loadConversationTitle(id) → aiService.getConversation() → setConversationTitle()
+chatId → streamRegistry.getSession(id)?  # reconnect live stream if any
+       → aiService.getConversation(id)   # title, conversation_mode, report id
+       → aiService.getMessages(id)
+       → parseSubContentList(msg.sub_content_list)
+       → setMessages + hydrateDeepAgent(from deep_agent parts)
 ```
 
-### 2. Live Streaming (New Messages)
-
-When a user sends a message:
+### Send + stream
 
 ```
-handleSend() → aiService.chatStream() → for await (chunk)
-                                            ├── chunk.new_conversation → setConversationId, update URL
-                                            ├── chunk.content → append to message
-                                            ├── chunk.tool_start → add tool to toolCalls[]
-                                            ├── chunk.tool_end → update tool with output/artifact
-                                            ├── chunk.follow_up_questions → store for display
-                                            └── chunk.error → append error to content
-                                        → finally: fetch title if new conversation
+handleSend()
+  → append user + empty assistant message
+  → streamRegistry.createSession(key)
+  → aiService.chatStream(query, { deepAgent, conversationId, images, documentIds, … })
+  → for await (chunk):
+        new_conversation → set id, history.replaceState(`/chat/{mode}/{id}`), `chat-created`
+        content / coordinator_token → text part
+        thinking / coordinator_thinking → thinking part
+        tool_start / tool_end → tool parts (+ auto-open artifact panel)
+        tool_input_stream → live create_artifact / write_file preview
+        execute_status → sandbox status on running `execute` tool
+        report → open report artifact
+        deep-agent typed events → useDeepAgentStream.processEvent
+        follow_up_questions | done | stopped → clear isThinking
+        error → append to content
+  → finally: streamRegistry.complete; fetch title if new
 ```
 
-## Message Data Structure
+URL updates for new chats use `window.history.replaceState` (not `router.replace`) so `/new` → `/[id]` does not remount and flash.
 
-### Database Format (sub_content_list)
+## Message model
 
-Messages from the database include a `sub_content_list` array that contains the sequence of events:
+Messages are ordered **parts** (text / thinking / tool / deep_agent), not a flat string + optional tools.
 
 ```typescript
-interface SubContentItem {
-  type: "tool_input" | "tool_output" | "assistant_message" | "user_message"
-  tool?: string           // Tool name (for tool_input/tool_output)
-  tool_input?: any        // Input parameters
-  tool_output?: any       // Output data
-  artifact?: any          // Associated artifact data
-  content?: string        // Message text content
+interface ContentPart {
+  type: "text" | "thinking" | "tool" | "deep_agent"
+  content?: string
+  tool?: ToolCall
+  deepAgent?: DeepAgentStreamState
 }
-```
 
-Example from database:
-```json
-{
-  "sub_content_list": [
-    {
-      "type": "tool_input",
-      "tool": "get_account_insights",
-      "tool_input": { "action": "best_time_to_publish", "network_list": ["xhs"] }
-    },
-    {
-      "type": "tool_output",
-      "tool": "get_account_insights",
-      "tool_output": { "xhs": { "markdown_summary": "**Best Times:**\n..." } },
-      "artifact": null
-    },
-    {
-      "type": "assistant_message",
-      "content": "For your Xiaohongshu account..."
-    }
-  ]
-}
-```
-
-### Internal Message Format
-
-The chat interface converts database messages to this format:
-
-```typescript
 interface Message {
   id: string
   role: "user" | "assistant" | "tool"
   content: string
   timestamp: Date
   toolCalls?: ToolCall[]
+  images?: Array<{ image_url: string; filename?: string; file_type?: string }>
+  documents?: any[]
+  parts?: ContentPart[]
+  thinking?: string
+  report?: any
   isStreaming?: boolean
   followUpQuestions?: string[]
 }
@@ -104,136 +121,107 @@ interface ToolCall {
   output?: any
   artifact?: any
   state: "running" | "completed" | "failed"
+  executeStatus?: "executing" | "done" | "error"
 }
 ```
 
-## Parsing Logic
+## History parsing (`parseSubContentList`)
 
-The `parseSubContentList()` function converts database format to internal format:
+Converts DB `sub_content_list` → `{ toolCalls, content, images, documents, parts }`.
 
-1. **Maintains sequence order** - Items are processed in array order
-2. **Matches tool inputs with outputs** - Uses a Map to pair tool_input with corresponding tool_output
-3. **Handles multiple calls to same tool** - Tracks pending tools in an array per tool name
-4. **Associates artifacts with tool calls** - Artifacts are stored on the specific ToolCall, not at message level
+Recognized item types include:
 
-```typescript
-function parseSubContentList(subContentList): { toolCalls: ToolCall[], content: string }
-```
+| `type` | Behavior |
+|--------|----------|
+| `tool_input` / `tool_output` | Pair tools (by `tool_call_id` or last matching name) |
+| `tool_call` / `tool_use` | Single tool entry (optional output) |
+| `ai_message` / `tool_message` | LangChain-style messages + nested `tool_calls` |
+| `assistant_message` / `user_message` / `text` | Text parts |
+| `thinking` | Thinking part |
+| `deep_agent_state` | Rebuild `DeepAgentStreamState` + coordinator tools/content |
+| `image` / `user_image` / `document` / `user_document` | Attachments |
 
-## Components
+## SSE events
 
-### MessageContent
+### Shared / agent (`/agent/query`)
 
-Renders markdown content with full GFM (GitHub Flavored Markdown) support:
+| Event | Role |
+|-------|------|
+| `new_conversation` | Includes conversation id (several shapes accepted) |
+| `content` or untyped `content` | Assistant text tokens |
+| `thinking` or untyped `thinking` | Thinking tokens |
+| `tool_start` / `tool_end` | Tool lifecycle; `tool_end` may include `artifact` |
+| `tool_input_stream` | Partial tool args (`create_artifact` / `write_file`) |
+| `execute_status` | Sandbox execute progress |
+| `follow_up_questions` | Suggestions; clears thinking/send lock |
+| `report` | Full report payload → panel |
+| `done` / `stopped` / `error` | Terminal / cancel / error |
 
-- Headers (h1-h3)
-- Lists (ordered, unordered)
-- Tables
-- Code blocks (inline and fenced)
-- Links
-- Blockquotes
-- Bold/Italic text
+### Deep agent (`/deep-agent/query`)
 
-Features:
-- Theme-aware styling (different colors for user vs assistant)
-- Proper whitespace handling
-- Mobile-responsive
+Handled by `useDeepAgentStream` when `chunk.type` is set:
 
-### ToolCallDisplay
+| `type` | Role |
+|--------|------|
+| `coordinator_token` / `coordinator_thinking` | Coordinator text/thinking (also handled in main loop) |
+| `todo_update` | Todo list |
+| `subagent_started` | Spawn subagent under `parent_message_id` |
+| `subagent_token` / `subagent_thinking` | Subagent stream |
+| `subagent_tool_start` / `subagent_tool_end` | Subagent tools (+ artifacts) |
+| `subagent_execute_status` | Subagent sandbox execute |
+| `subagent_completed` / `subagent_error` | Subagent terminal |
+| `done` / `stopped` | Run complete / user cancel |
 
-Displays tool execution with expandable details:
+Deep-agent UI: `deep-agent-display.tsx` + todo list from `deepAgentState.values.todos`.
 
-- **Header**: Icon, tool name, state indicator (spinner/checkmark)
-- **Expanded view**: Input parameters, output data, artifact preview
-- **Collapsed view**: Markdown summary (if available) or "Data available" indicator
+## Artifacts & reports
 
-Behavior:
-- Auto-collapses when tool completes during streaming
-- Remembers user toggle state
-- Shows inline summary when collapsed
+- `ArtifactProvider` wraps `ChatInterface`; `useArtifact()` opens/updates the side panel.
+- Types: `chart | code | table | report | data | html | markdown | mermaid | file`.
+- Specialized inline views: brand posts, web search, help center.
+- Reports use `report-content` + `report-outline-sidebar`; APIs: `getReport`, `updateReportInsights`, `exportReport`.
+- Streaming artifacts open early via `tool_input_stream`, then finalize on `tool_end`.
 
-### ArtifactDisplay (Standalone)
+## Stream registry
 
-For rendering artifacts outside of tool calls:
+`lib/streaming/stream-registry.ts` keeps sessions alive across remounts:
 
-- Type-specific icons and colors
-- Copy to clipboard
-- Collapsible content
-- Supports: chart, code, table, report, data types
+1. `createSession(conversationId || "new")` before the stream loop  
+2. `update` after each chunk (messages + `lastArtifact`)  
+3. `renameKey("new" → realId)` on `new_conversation`  
+4. `complete` when finished (scheduled cleanup)  
+5. On remount, subscribe and sync React state from the session snapshot  
 
-## Streaming Events
+## API (chat-related)
 
-The backend sends these event types via SSE:
+| Method | Path | Use |
+|--------|------|-----|
+| GET | `/agent/conversations` | List (`conversation_mode` filter) |
+| GET | `/agent/conversations/{id}` | Title / mode / metadata |
+| GET | `/agent/conversations/{id}/messages` | History |
+| POST | `/agent/query` | Agent SSE |
+| POST | `/deep-agent/query` | Deep-agent SSE |
+| GET | `/agent/conversations/{id}/report/{reportId}` | Report body |
+| PUT | `/agent/reports/{id}/pages/{page}/sections/{section}/insights` | Edit insights |
+| GET | `/agent/reports/{id}/export` | HTML export |
 
-| Event | Description |
-|-------|-------------|
-| `chunk.new_conversation` | New conversation created, includes `conversation_id` |
-| `chunk.content` | Incremental text content |
-| `chunk.tool_start` | Tool execution started, includes `tool` name and `input` |
-| `chunk.tool_end` | Tool execution completed, includes `tool`, `output`, optional `artifact` |
-| `chunk.follow_up_questions` | Array of suggested follow-up questions |
-| `chunk.error` | Error message |
+`chatStream` options include: `conversationId`, `projectId`, `model`, `includeWebSearch`, `thinkingEnabled`, `toolSelectionEnabled`, `images`, `documentIds`, `reportFromTemplate`, `reportContext`, `fastPath`, `deepAgent`, `sqlEnabled`.
 
-## Conversation Title
+Auth headers: Bearer + `X-KAWO-Org-Id` / `X-KAWO-Brand-Id` (see CLAUDE.md for credential sources).
 
-- **On load**: Fetched via `aiService.getConversation(id)`
-- **After first message**: Fetched 1 second after stream completes (allows backend to generate title)
-- **Document title**: Updated to `{title} - Kevin`
+## Events
 
-## State Management
-
-Key states in ChatInterface:
-
-```typescript
-const [messages, setMessages] = useState<Message[]>([])
-const [input, setInput] = useState("")
-const [isThinking, setIsThinking] = useState(false)
-const [conversationId, setConversationId] = useState<string | undefined>()
-const [conversationTitle, setConversationTitle] = useState<string>("New Conversation")
-```
-
-## API Integration
-
-### Endpoints Used
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/agent/conversations/{id}` | Get conversation details |
-| GET | `/agent/conversations/{id}/messages` | Get message history |
-| POST | `/agent/query` | Stream chat response (SSE) |
-
-### Authentication
-
-- In development, credentials are loaded from `.env.local`
-- In production, credentials are loaded from the signed-in user's owner-only Supabase `user_kawo_credentials` row
-- The API client sends the Bearer token and KAWO organization/brand headers directly to the backend
-
-## Error Handling
-
-1. **Credentials missing**: Shows error banner, disables input
-2. **Stream error**: Displays error message in chat
-3. **History load error**: Logs to console (silent failure)
-
-## Events Dispatched
-
-| Event | When | Purpose |
-|-------|------|---------|
-| `chat-created` | New conversation created | Refresh sidebar chat list |
+| DOM event | When | Purpose |
+|-----------|------|---------|
+| `chat-created` | New conversation id from stream | Refresh sidebar list |
 
 ## Usage
 
 ```tsx
-import { ChatInterface } from "@/components/chat"
+import { AgentChatInterface } from "@/components/chat/agent-chat-interface"
+import { DeepAgentChatInterface } from "@/components/chat/deep-agent-chat-interface"
 
-// New chat
-<ChatInterface initialMessage="Hello!" />
-
-// Existing conversation
-<ChatInterface chatId="conversation-id-123" />
+<AgentChatInterface chatId="…" />
+<DeepAgentChatInterface initialMessage="Research …" />
+// Or: <ChatInterface conversationMode="agent" | "deep_agent" />
 ```
-
-## File Locations
-
-- **Main component**: `components/chat/chat-interface.tsx`
-- **API client**: `lib/api/client.ts`
-- **Chat pages**: `app/(dashboard)/chat/[id]/page.tsx`, `app/(dashboard)/chat/new/page.tsx`
