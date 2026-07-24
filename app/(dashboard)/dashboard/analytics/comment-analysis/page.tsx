@@ -997,6 +997,70 @@ function downloadHTMLReport(report: CommentAnalysisReport) {
 type ModelMode = "flash" | "plus" | "flash-thinking" | "plus-thinking"
 const MODEL_MODE_OPTIONS: ModelMode[] = ["flash", "plus", "flash-thinking", "plus-thinking"]
 
+type PendingAnalysis = {
+  comments: ProcessedComment[]
+  filename: string
+  name: string
+  postContent: string
+  modelModes: AnalysisModelModes
+  existingSource: DataSource
+}
+
+function NameConflictModal({
+  existingSource,
+  onReplace,
+  onCreateNew,
+  onClose,
+}: {
+  existingSource: DataSource
+  onReplace: () => void
+  onCreateNew: () => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
+          <h2 className="font-serif text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Report already exists
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            A report named{" "}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              “{existingSource.name}”
+            </span>{" "}
+            already exists
+            {typeof existingSource.comment_count === "number"
+              ? ` (${existingSource.comment_count} comments)`
+              : ""}
+            . Replace it, or keep it and analyze as a new report?
+          </p>
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-slate-100 dark:border-slate-800 px-6 py-4">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="outline" size="sm" onClick={onCreateNew}>
+            Analyze as new
+          </Button>
+          <Button
+            size="sm"
+            onClick={onReplace}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            Replace existing
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BatchModal({
   sources,
   postContents,
@@ -1112,6 +1176,9 @@ export default function CommentAnalysisPage() {
   const [showBatchModal, setShowBatchModal] = useState(false)
   const [batchPostContents, setBatchPostContents] = useState<Record<string, string>>({})
 
+  // Same-name collision: ask Replace vs Analyze as new
+  const [pendingAnalysis, setPendingAnalysis] = useState<PendingAnalysis | null>(null)
+
   // Load sources on mount
   useEffect(() => {
     if (!profile?.kawo_token) return
@@ -1185,18 +1252,20 @@ export default function CommentAnalysisPage() {
     }
   }, [selectedSourceId, profile?.kawo_token])
 
-  const handleFileProcessed = async (
+  const startAnalysisJob = async (
     comments: ProcessedComment[],
     filename: string,
     name: string,
     postContent: string,
-    modelModes: AnalysisModelModes
+    modelModes: AnalysisModelModes,
+    sourceId?: string
   ) => {
+    setPendingAnalysis(null)
     setIsAnalyzing(true)
     setIsAnalyzingBatch(false)
     setAnalysisPhase(0)
     setAnalysisMessage("Starting analysis...")
-    setShowUploader(false) // Hide uploader, show progress
+    setShowUploader(false)
 
     try {
       const items = comments.map(c => ({
@@ -1211,8 +1280,9 @@ export default function CommentAnalysisPage() {
       const { job_id } = await createAnalysisJob({
         items,
         filename,
-        name: name || filename.split('.')[0] || "Uploaded Analysis",
+        name,
         post_content: postContent || undefined,
+        source_id: sourceId,
         model_schema: modelModes.model_schema,
         model_tagging: modelModes.model_tagging,
         model_tagging_rerun: modelModes.model_tagging_rerun,
@@ -1245,8 +1315,39 @@ export default function CommentAnalysisPage() {
       console.error(err)
       setError(err instanceof Error ? err : new Error("Analysis failed"))
       setIsAnalyzing(false)
-      setShowUploader(true) // Show uploader again on error
+      setShowUploader(true)
     }
+  }
+
+  const handleFileProcessed = async (
+    comments: ProcessedComment[],
+    filename: string,
+    name: string,
+    postContent: string,
+    modelModes: AnalysisModelModes
+  ) => {
+    const displayName = name || filename.split('.')[0] || "Uploaded Analysis"
+    const matches = dataSources
+      .filter(s => s.name === displayName)
+      .sort((a, b) => {
+        const ta = a.updated_at ? Date.parse(a.updated_at) : 0
+        const tb = b.updated_at ? Date.parse(b.updated_at) : 0
+        return tb - ta
+      })
+
+    if (matches.length > 0) {
+      setPendingAnalysis({
+        comments,
+        filename,
+        name: displayName,
+        postContent,
+        modelModes,
+        existingSource: matches[0],
+      })
+      return
+    }
+
+    await startAnalysisJob(comments, filename, displayName, postContent, modelModes)
   }
 
   const handleBatchAnalysis = async (batchName: string, modelInsights: ModelMode) => {
@@ -1344,6 +1445,32 @@ export default function CommentAnalysisPage() {
       alert("Failed to delete report")
     }
   }
+
+  const nameConflictModal = pendingAnalysis ? (
+    <NameConflictModal
+      existingSource={pendingAnalysis.existingSource}
+      onReplace={() =>
+        startAnalysisJob(
+          pendingAnalysis.comments,
+          pendingAnalysis.filename,
+          pendingAnalysis.name,
+          pendingAnalysis.postContent,
+          pendingAnalysis.modelModes,
+          pendingAnalysis.existingSource.id
+        )
+      }
+      onCreateNew={() =>
+        startAnalysisJob(
+          pendingAnalysis.comments,
+          pendingAnalysis.filename,
+          pendingAnalysis.name,
+          pendingAnalysis.postContent,
+          pendingAnalysis.modelModes
+        )
+      }
+      onClose={() => setPendingAnalysis(null)}
+    />
+  ) : null
 
   // =================================================================================================
   // VIEW 1: LIST VIEW (Dashboard)
@@ -1539,6 +1666,7 @@ export default function CommentAnalysisPage() {
             onClose={() => setShowBatchModal(false)}
           />
         )}
+        {nameConflictModal}
       </div>
     )
   }
@@ -1639,7 +1767,10 @@ export default function CommentAnalysisPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowUploader(false)}
+                onClick={() => {
+                  setPendingAnalysis(null)
+                  setShowUploader(false)
+                }}
                 className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -1654,6 +1785,7 @@ export default function CommentAnalysisPage() {
             <FileUploader onDataProcessed={handleFileProcessed} />
           </div>
         </div>
+        {nameConflictModal}
       </div>
     )
   }
